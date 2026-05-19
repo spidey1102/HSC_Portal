@@ -9,6 +9,8 @@ export default function Sidebar({
   setSelectedLevel,
   viewBookmarks,
   setViewBookmarks,
+  viewTextbooks,
+  setViewTextbooks,
   bookmarksCount,
   totalPapersCount,
   subjectCounts
@@ -29,7 +31,7 @@ export default function Sidebar({
       }}>
         {/* App Icon (Home) */}
         <div 
-          onClick={() => { setViewBookmarks(false); setSelectedLevel(12); }}
+          onClick={() => { setViewBookmarks(false); setViewTextbooks(false); setSelectedLevel(12); }}
           style={{
             width: '48px',
             height: '48px',
@@ -50,7 +52,7 @@ export default function Sidebar({
 
         {/* Level 12 (Server 1) */}
         <div 
-          onClick={() => { setSelectedLevel(12); setViewBookmarks(false); }}
+          onClick={() => { setSelectedLevel(12); setViewBookmarks(false); setViewTextbooks(false); }}
           style={{
             width: '48px',
             height: '48px',
@@ -89,7 +91,7 @@ export default function Sidebar({
 
         {/* Level 11 (Server 2) */}
         <div 
-          onClick={() => { setSelectedLevel(11); setViewBookmarks(false); }}
+          onClick={() => { setSelectedLevel(11); setViewBookmarks(false); setViewTextbooks(false); }}
           style={{
             width: '48px',
             height: '48px',
@@ -130,7 +132,7 @@ export default function Sidebar({
 
         {/* Bookmarks (DM/Special) */}
         <div 
-          onClick={() => setViewBookmarks(true)}
+          onClick={() => { setViewBookmarks(true); setViewTextbooks(false); }}
           style={{
             width: '48px',
             height: '48px',
@@ -142,7 +144,8 @@ export default function Sidebar({
             cursor: 'pointer',
             transition: 'all 0.2s ease-out',
             position: 'relative',
-            color: viewBookmarks ? 'white' : 'var(--status-positive)'
+            color: viewBookmarks ? 'white' : 'var(--status-positive)',
+            marginBottom: '8px'
           }}
           onMouseEnter={(e) => {
             if (!viewBookmarks) {
@@ -189,6 +192,44 @@ export default function Sidebar({
           )}
         </div>
 
+        {/* Textbooks Server */}
+        <div 
+          onClick={() => { setViewTextbooks(true); setViewBookmarks(false); }}
+          style={{
+            width: '48px',
+            height: '48px',
+            backgroundColor: viewTextbooks ? '#10b981' : 'var(--bg-primary)', // Emereald color
+            borderRadius: viewTextbooks ? '16px' : '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease-out',
+            position: 'relative',
+            color: viewTextbooks ? 'white' : '#10b981'
+          }}
+          onMouseEnter={(e) => {
+            if (!viewTextbooks) {
+              e.currentTarget.style.borderRadius = '16px';
+              e.currentTarget.style.backgroundColor = '#10b981';
+              e.currentTarget.style.color = 'white';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!viewTextbooks) {
+              e.currentTarget.style.borderRadius = '50%';
+              e.currentTarget.style.backgroundColor = 'var(--bg-primary)';
+              e.currentTarget.style.color = '#10b981';
+            }
+          }}
+          title="Textbooks Library"
+        >
+          {viewTextbooks && (
+            <div style={{ position: 'absolute', left: '-16px', top: '50%', transform: 'translateY(-50%)', width: '8px', height: '40px', backgroundColor: 'white', borderRadius: '0 4px 4px 0' }} />
+          )}
+          <BookOpen size={24} />
+        </div>
+
       </div>
 
       {/* Channel List (Inner Sidebar) */}
@@ -232,12 +273,16 @@ export default function Sidebar({
             textTransform: 'uppercase',
             letterSpacing: '0.02em'
           }}>
-            Subjects (Channels)
+            {viewTextbooks ? 'Categories' : 'Subjects (Channels)'}
           </div>
 
           {/* All Subjects (General channel) */}
           <div
-            onClick={() => { setSelectedSubject(null); setViewBookmarks(false); }}
+            onClick={() => { 
+              if (viewTextbooks) return; // No filter actions for textbooks yet
+              setSelectedSubject(null); 
+              setViewBookmarks(false); 
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -245,17 +290,17 @@ export default function Sidebar({
               borderRadius: '4px',
               cursor: 'pointer',
               marginBottom: '2px',
-              backgroundColor: selectedSubject === null ? 'var(--bg-modifier-selected)' : 'transparent',
-              color: selectedSubject === null ? 'var(--interactive-active)' : 'var(--interactive-normal)',
+              backgroundColor: (selectedSubject === null || viewTextbooks) ? 'var(--bg-modifier-selected)' : 'transparent',
+              color: (selectedSubject === null || viewTextbooks) ? 'var(--interactive-active)' : 'var(--interactive-normal)',
             }}
             onMouseEnter={(e) => {
-              if (selectedSubject !== null) {
+              if (selectedSubject !== null && !viewTextbooks) {
                 e.currentTarget.style.backgroundColor = 'var(--bg-modifier-hover)';
                 e.currentTarget.style.color = 'var(--interactive-hover)';
               }
             }}
             onMouseLeave={(e) => {
-              if (selectedSubject !== null) {
+              if (selectedSubject !== null && !viewTextbooks) {
                 e.currentTarget.style.backgroundColor = 'transparent';
                 e.currentTarget.style.color = 'var(--interactive-normal)';
               }
@@ -265,7 +310,7 @@ export default function Sidebar({
             <span style={{ fontSize: '15px', fontWeight: 500 }}>general</span>
           </div>
 
-          {subjects.map((sub, idx) => {
+          {!viewTextbooks && subjects.map((sub, idx) => {
             const isSelected = selectedSubject === idx;
             const count = subjectCounts[idx] || 0;
             
@@ -277,7 +322,7 @@ export default function Sidebar({
             return (
               <div
                 key={idx}
-                onClick={() => { setSelectedSubject(idx); setViewBookmarks(false); }}
+                onClick={() => { setSelectedSubject(idx); setViewBookmarks(false); setViewTextbooks(false); }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

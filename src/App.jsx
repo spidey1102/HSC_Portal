@@ -3,7 +3,8 @@ import Sidebar from './components/Sidebar';
 import Filters from './components/Filters';
 import PaperCard from './components/PaperCard';
 import PracticeRoom from './components/PracticeRoom';
-import { Sparkles, Library, RefreshCw, Star, Trash2 } from 'lucide-react';
+import TextbooksView from './components/TextbooksView';
+import { Sparkles, Library, RefreshCw, Star, Trash2, Book } from 'lucide-react';
 import './App.css';
 
 export default function App() {
@@ -29,6 +30,9 @@ export default function App() {
     const saved = localStorage.getItem('hsc_bookmarks');
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
+
+  // Textbooks State
+  const [viewTextbooks, setViewTextbooks] = useState(false);
 
   // active Paper for practice room
   const [activePaper, setActivePaper] = useState(null);
@@ -88,7 +92,8 @@ export default function App() {
     selectedYear,
     solutionsOnly,
     searchQuery,
-    viewBookmarks
+    viewBookmarks,
+    viewTextbooks
   ]);
 
   // Compute subject counts based on current level dynamically
@@ -167,6 +172,7 @@ export default function App() {
     solutionsOnly,
     searchQuery,
     viewBookmarks,
+    viewTextbooks,
     bookmarks
   ]);
 
@@ -201,6 +207,8 @@ export default function App() {
         setSelectedLevel={setSelectedLevel}
         viewBookmarks={viewBookmarks}
         setViewBookmarks={setViewBookmarks}
+        viewTextbooks={viewTextbooks}
+        setViewTextbooks={setViewTextbooks}
         bookmarksCount={bookmarks.size}
         totalPapersCount={papers.length}
         subjectCounts={subjectCounts}
@@ -221,9 +229,9 @@ export default function App() {
           zIndex: 2
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Library size={24} color="var(--text-muted)" />
+            {viewTextbooks ? <Book size={24} color="var(--text-muted)" /> : <Library size={24} color="var(--text-muted)" />}
             <h1 style={{ fontSize: '16px', color: 'var(--header-primary)', margin: 0, fontWeight: 600 }}>
-              {viewBookmarks ? 'saved-library' : 'hsc-past-papers'}
+              {viewTextbooks ? 'textbooks' : viewBookmarks ? 'saved-library' : 'hsc-past-papers'}
             </h1>
           </div>
 
@@ -245,30 +253,36 @@ export default function App() {
             )}
             
             {/* The Filters Search bar can sit up here or right below */}
-            <Filters
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-              selectedCategory={selectedCategory}
-              setSelectedCategory={setSelectedCategory}
-              selectedSchool={selectedSchool}
-              setSelectedSchool={setSelectedSchool}
-              selectedYear={selectedYear}
-              setSelectedYear={setSelectedYear}
-              solutionsOnly={solutionsOnly}
-              setSolutionsOnly={setSolutionsOnly}
-              schools={schools}
-              years={activeYears}
-              resetFilters={resetFilters}
-              hasActiveFilters={hasActiveFilters}
-            />
+            {!viewTextbooks && (
+              <Filters
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                selectedCategory={selectedCategory}
+                setSelectedCategory={setSelectedCategory}
+                selectedSchool={selectedSchool}
+                setSelectedSchool={setSelectedSchool}
+                selectedYear={selectedYear}
+                setSelectedYear={setSelectedYear}
+                solutionsOnly={solutionsOnly}
+                setSolutionsOnly={setSolutionsOnly}
+                schools={schools}
+                years={activeYears}
+                resetFilters={resetFilters}
+                hasActiveFilters={hasActiveFilters}
+              />
+            )}
           </div>
         </div>
 
         {/* Scrollable Chat/Content Area */}
         <div className="scrollable-content">
           
-          {/* Welcome Message (Discord style start of channel) */}
-          <div style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border-subtle)' }}>
+          {viewTextbooks ? (
+            <TextbooksView />
+          ) : (
+            <>
+              {/* Welcome Message (Discord style start of channel) */}
+              <div style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border-subtle)' }}>
             <div style={{
               background: 'var(--bg-secondary)',
               width: '68px',
@@ -370,6 +384,8 @@ export default function App() {
                   </button>
                 </div>
               )}
+            </>
+          )}
             </>
           )}
 
