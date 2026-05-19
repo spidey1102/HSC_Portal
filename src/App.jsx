@@ -230,7 +230,7 @@ export default function App() {
             <p style={{ color: 'var(--text-secondary)', marginTop: '8px', fontSize: '0.95rem' }}>
               {viewBookmarks 
                 ? `You have saved ${bookmarks.size} papers for practice.`
-                : `Instant search & filter over 45,500+ official NESA past papers and school trial exams.`}
+                : `Instant search & filter over 7,200+ official NESA past papers and school trial exams.`}
             </p>
           </div>
 
@@ -265,7 +265,7 @@ export default function App() {
           }}>
             <RefreshCw size={48} className="pulse-glow" color="var(--accent-indigo)" style={{ animation: 'spin 2s linear infinite' }} />
             <h3 style={{ fontWeight: '500' }}>Assembling resource indexing database...</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Optimizing 45,000+ trial documents for client-side search</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Optimizing 7,000+ trial documents for client-side search</p>
           </div>
         ) : error ? (
           <div className="glass" style={{ padding: '32px', textAlign: 'center', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)' }}>

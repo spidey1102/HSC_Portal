@@ -4,9 +4,41 @@ import re
 import json
 import time
 import os
+import ssl
 
 BASE_URL = "https://thsconline.github.io"
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+
+# Create SSL context that skips certificate verification (macOS Python compatibility)
+SSL_CTX = ssl.create_default_context()
+SSL_CTX.check_hostname = False
+SSL_CTX.verify_mode = ssl.CERT_NONE
+
+
+# Mapping of filename suffixes to subject-matching keywords.
+# When multiple subjects share the same directory (e.g. /Maths/), the subpage
+# filename suffix is used to match against the subject names that link to that
+# directory. This handles cases where names vary between year levels (e.g.
+# "General Maths" in Year 11 vs "Standard Maths" in Year 12 both use _general).
+#
+# For English: pages without a level-specific suffix (hscpapers.html,
+# trialpapers_paper1.html, assessment-tasks.html) contain papers shared across
+# both Advanced and Standard — these get assigned to the first subject in the
+# group (usually "English Advanced") as a sensible default.
+SUFFIX_KEYWORDS = {
+    # Maths suffixes
+    '_general':      ['general', 'standard'],       # Matches "General Maths" or "Standard Maths"
+    '_advanced':     ['(2u)', 'advanced'],           # Matches "Maths (2U)"
+    '_accelerated':  ['(2u)', 'accelerated'],        # Yr11 accelerated → Maths (2U)
+    '_extension1':   ['ext 1', 'extension 1'],       # Matches "Maths Ext 1"
+    '_extension2':   ['ext 2', 'extension 2'],       # Matches "Maths Ext 2"
+    # English suffixes
+    '_paper2_advanced': ['advanced'],                 # Matches "English Advanced"
+    '_paper2_standard': ['standard'],                 # Matches "English Standard"
+    # Studies of Religion suffixes
+    '_sor1':         ['religion 1', 'sor 1', 'sor1'], # Matches "Studies of Religion 1"
+    '_sor2':         ['religion 2', 'sor 2', 'sor2'], # Matches "Studies of Religion 2"
+}
 
 def fetch_html(url):
     # Safely URL-encode spaces and special characters in paths
@@ -14,7 +46,7 @@ def fetch_html(url):
     print(f"Fetching: {safe_url}")
     req = urllib.request.Request(safe_url, headers=HEADERS)
     try:
-        with urllib.request.urlopen(req, timeout=15) as response:
+        with urllib.request.urlopen(req, timeout=15, context=SSL_CTX) as response:
             return response.read().decode('utf-8')
     except Exception as e:
         print(f"  [ERROR] Failed to fetch {safe_url}: {e}")
@@ -28,6 +60,7 @@ def parse_subjects(html, level_prefix):
     
     subjects = []
     ignored = {'yr9', 'yr10', 'yr11', 'yr12', 'upload', 'about', 'download', 'fz', 'fz/', 'files', 'files/'}
+    seen = set()  # Deduplicate entries (same name+path)
     
     for relative_path, name in matches:
         subject_key = relative_path.strip('/')
@@ -38,6 +71,11 @@ def parse_subjects(html, level_prefix):
         subject_name = name.replace('&nbsp;', ' ').replace('&#38;', '&').strip()
         # Clean extra html tags if any
         subject_name = re.sub(r'<[^>]*>', '', subject_name).strip()
+        
+        dedup_key = (subject_name, subject_key)
+        if dedup_key in seen:
+            continue
+        seen.add(dedup_key)
         
         subjects.append({
             'key': subject_key,
@@ -50,24 +88,59 @@ def parse_subjects(html, level_prefix):
 def discover_subpages(html, subject_path):
     # Find all local .html page links in the subject page
     # E.g. <a href="hscpapers.html">...</a> or <a href="/s/yr12/Chemistry/trialpapers.html">...</a>
-    pattern = r'href=["\']([^"\']+\.html)["\']'
+    pattern = r'href=["\']([^"\']+\.html(?:#[^"\']*)?)["\']'
     matches = re.findall(pattern, html)
     
     subpages = set()
     ignored_keywords = {'index.html', 'upload', 'about', 'download', 'home', 'back', '..'}
     
     for link in matches:
+        # Strip anchor fragment for deduplication
+        link_no_anchor = link.split('#')[0]
+        
         # Check if it goes up or to main navigation
-        if any(keyword in link.lower() for keyword in ignored_keywords):
+        if any(keyword in link_no_anchor.lower() for keyword in ignored_keywords):
             continue
             
-        # Resolve full URL
-        full_url = urllib.parse.urljoin(BASE_URL + subject_path, link)
+        # Resolve full URL (without anchor)
+        full_url = urllib.parse.urljoin(BASE_URL + subject_path, link_no_anchor)
         # Ensure it is actually within the subject path to avoid navigating out
         if subject_path in full_url:
             subpages.add(full_url)
             
     return list(subpages)
+
+
+def resolve_subject_for_subpage(page_url, subject_names):
+    """
+    Determine the correct subject for a subpage URL based on its filename suffix
+    and the list of subject names that share this directory.
+    
+    For shared directories (Maths, English, Studies of Religion), multiple subjects
+    point to the same folder but the subpage filenames contain suffixes that indicate
+    which specific subject they belong to.
+    
+    E.g. trialpapers_extension1.html -> matches "Maths Ext 1" via keywords ['ext 1']
+         trialpapers_general.html   -> matches "Standard Maths" or "General Maths"
+         hscpapers.html             -> no matching suffix, returns first subject as default
+    """
+    filename = page_url.split('/')[-1].lower().replace('.html', '')
+    
+    # Check suffixes from most specific (longest) to least specific
+    for suffix, keywords in sorted(SUFFIX_KEYWORDS.items(), key=lambda x: -len(x[0])):
+        if filename.endswith(suffix):
+            # Find which subject name matches these keywords
+            for subject_name in subject_names:
+                name_lower = subject_name.lower()
+                if any(kw in name_lower for kw in keywords):
+                    return subject_name
+            # If no subject matched the keywords, log a warning and use first subject
+            print(f"    ⚠ Suffix '{suffix}' found but no subject matched keywords {keywords} in {subject_names}")
+            return subject_names[0]
+    
+    # No matching suffix — return the first subject as default
+    return subject_names[0]
+
 
 def parse_papers(html, subject_name, level, page_url):
     # Find all elements like <a href="#v" onclick="pdf(this, 1820)">2001 HSC</a>
@@ -164,22 +237,42 @@ def main():
         subjects = parse_subjects(level_html, level_prefix)
         print(f"Discovered {len(subjects)} subjects for {level_name}")
         
-        for idx, sub in enumerate(subjects, 1):
-            print(f"\n[{level_name}] Subject {idx}/{len(subjects)}: {sub['name']}")
+        # Group subjects by their directory path to handle shared directories.
+        # E.g. Maths (2U), Maths Ext 1, Maths Ext 2, Standard Maths all share /Maths/
+        path_to_subjects = {}
+        for sub in subjects:
+            path_to_subjects.setdefault(sub['path'], []).append(sub)
+        
+        for path, path_subjects in path_to_subjects.items():
+            subject_names = [s['name'] for s in path_subjects]
+            is_shared = len(path_subjects) > 1
             
-            subject_html = fetch_html(BASE_URL + sub['path'])
+            print(f"\n[{level_name}] Directory: {path}")
+            if is_shared:
+                print(f"  ⚠ SHARED directory for subjects: {', '.join(subject_names)}")
+            else:
+                print(f"  Subject: {subject_names[0]}")
+            
+            subject_html = fetch_html(BASE_URL + path)
             if not subject_html:
                 continue
                 
-            subpages = discover_subpages(subject_html, sub['path'])
-            print(f"  Found {len(subpages)} paper pages for {sub['name']}")
+            subpages = discover_subpages(subject_html, path)
+            print(f"  Found {len(subpages)} paper pages")
             
             for page in subpages:
                 page_html = fetch_html(page)
                 if not page_html:
                     continue
+                
+                # Determine the correct subject for this specific subpage
+                if is_shared:
+                    resolved_subject = resolve_subject_for_subpage(page, subject_names)
+                    print(f"    → Resolved to: {resolved_subject} (from {page.split('/')[-1]})")
+                else:
+                    resolved_subject = subject_names[0]
                     
-                papers = parse_papers(page_html, sub['name'], level_name, page)
+                papers = parse_papers(page_html, resolved_subject, level_name, page)
                 print(f"    - Extracted {len(papers)} papers from {page.split('/')[-1]}")
                 all_papers.extend(papers)
                 

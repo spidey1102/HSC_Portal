@@ -35,7 +35,7 @@ export default function Filters({
           }} size={20} />
           <input
             type="text"
-            placeholder="Search 45,000+ past papers, schools, subjects or years..."
+            placeholder="Search 7,200+ past papers, schools, subjects or years..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
