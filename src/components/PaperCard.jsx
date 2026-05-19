@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, FileText, CheckCircle2, ChevronRight } from 'lucide-react';
+import { Star, FileText, CheckCircle2 } from 'lucide-react';
 
 export default function PaperCard({
   paper,
@@ -13,13 +13,13 @@ export default function PaperCard({
   const getCategoryDetails = (code) => {
     switch (code) {
       case 'H':
-        return { label: 'Official HSC', bg: 'rgba(139, 92, 246, 0.15)', color: '#a78bfa', border: 'rgba(139, 92, 246, 0.3)' };
+        return { label: 'Official HSC', color: '#eb459e' }; // Discord pink
       case 'T':
-        return { label: 'School Trial', bg: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: 'rgba(59, 130, 246, 0.3)' };
+        return { label: 'School Trial', color: '#5865F2' }; // Discord blurple
       case 'A':
-        return { label: 'Internal Task', bg: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: 'rgba(245, 158, 11, 0.3)' };
+        return { label: 'Internal Task', color: '#fdb462' }; // Discord yellow
       default:
-        return { label: 'Other Resource', bg: 'rgba(107, 114, 128, 0.15)', color: '#9ca3af', border: 'rgba(107, 114, 128, 0.3)' };
+        return { label: 'Other Resource', color: '#949ba4' }; // Discord grey
     }
   };
 
@@ -27,45 +27,37 @@ export default function PaperCard({
 
   return (
     <div
-      className="glass animate-fade-in"
       style={{
         display: 'flex',
         flexDirection: 'column',
-        padding: '20px',
+        backgroundColor: 'var(--bg-secondary)',
+        borderRadius: '4px',
+        borderLeft: `4px solid ${cat.color}`,
+        padding: '12px 16px',
         position: 'relative',
-        transition: 'var(--transition-normal)',
-        background: 'var(--card-bg)',
         height: '100%',
         justifyContent: 'space-between'
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'translateY(-4px)';
-        e.currentTarget.style.borderColor = 'var(--border-hover)';
-        e.currentTarget.style.boxShadow = '0 8px 30px rgba(0, 0, 0, 0.3), rgba(99, 102, 241, 0.05) 0px 0px 20px';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.borderColor = 'var(--border-color)';
-        e.currentTarget.style.boxShadow = 'none';
       }}
     >
       {/* Header Info */}
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-          {/* Category Badge */}
-          <span style={{
-            fontSize: '0.7rem',
-            fontWeight: '700',
-            letterSpacing: '0.05em',
-            textTransform: 'uppercase',
-            background: cat.bg,
-            color: cat.color,
-            border: `1px solid ${cat.border}`,
-            padding: '4px 8px',
-            borderRadius: '6px'
-          }}>
-            {cat.label}
-          </span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: 600,
+              color: 'var(--header-secondary)'
+            }}>
+              {cat.label}
+            </span>
+            {/* Solutions indicator inline */}
+            {paper.w === 1 && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', backgroundColor: 'rgba(35, 165, 89, 0.15)', color: 'var(--status-positive)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                <CheckCircle2 size={10} /> SOLVED
+              </span>
+            )}
+          </div>
           
           {/* Bookmark Toggle */}
           <button
@@ -77,24 +69,30 @@ export default function PaperCard({
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              color: isBookmarked ? '#fbbf24' : 'var(--text-muted)',
+              color: isBookmarked ? '#f0b232' : 'var(--interactive-muted)',
               transition: 'var(--transition-fast)',
-              padding: '4px'
+              padding: '2px'
+            }}
+            onMouseEnter={(e) => {
+              if (!isBookmarked) e.currentTarget.style.color = 'var(--interactive-hover)';
+            }}
+            onMouseLeave={(e) => {
+              if (!isBookmarked) e.currentTarget.style.color = 'var(--interactive-muted)';
             }}
             title={isBookmarked ? "Remove Bookmark" : "Save Paper"}
           >
-            <Star size={18} fill={isBookmarked ? "#fbbf24" : "transparent"} />
+            <Star size={16} fill={isBookmarked ? "#f0b232" : "transparent"} />
           </button>
         </div>
 
         {/* Paper Name / Label */}
         <h3 style={{
-          fontSize: '1.05rem',
-          lineHeight: '1.4',
-          marginBottom: '16px',
-          fontWeight: '600',
-          color: 'white',
-          height: '48px',
+          fontSize: '16px',
+          lineHeight: '1.3',
+          marginBottom: '12px',
+          fontWeight: 600,
+          color: 'var(--header-primary)',
+          height: '42px',
           overflow: 'hidden',
           display: '-webkit-box',
           WebkitLineClamp: 2,
@@ -107,79 +105,56 @@ export default function PaperCard({
       {/* Meta details footer */}
       <div>
         <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-          fontSize: '0.8rem',
-          color: 'var(--text-secondary)',
-          borderTop: '1px solid var(--border-color)',
-          paddingTop: '12px',
+          display: 'grid',
+          gridTemplateColumns: 'auto 1fr',
+          columnGap: '12px',
+          rowGap: '4px',
+          fontSize: '13px',
+          color: 'var(--text-normal)',
           marginBottom: '16px'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Subject:</span>
-            <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{subjectName}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>School:</span>
-            <span style={{
-              fontWeight: '600',
-              color: 'var(--text-primary)',
-              maxWidth: '130px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }} title={schoolName}>
-              {schoolName}
-            </span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Year / Level:</span>
-            <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
-              {paper.y} (Y{paper.l})
-            </span>
-          </div>
+          <span style={{ color: 'var(--header-secondary)' }}>Subject:</span>
+          <span style={{ fontWeight: 500 }}>{subjectName}</span>
+          
+          <span style={{ color: 'var(--header-secondary)' }}>School:</span>
+          <span style={{
+            fontWeight: 500,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }} title={schoolName}>
+            {schoolName}
+          </span>
+          
+          <span style={{ color: 'var(--header-secondary)' }}>Year:</span>
+          <span style={{ fontWeight: 500 }}>
+            {paper.y} (Year {paper.l})
+          </span>
         </div>
 
         {/* Action button */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={() => onSelectPaper(paper)}
             className="btn-primary"
             style={{
               width: '100%',
-              fontSize: '0.85rem',
-              padding: '10px 14px',
               justifyContent: 'center',
-              borderRadius: '10px',
-              boxShadow: 'none',
-              background: cat.color === '#fbbf24' ? 'var(--cyan-gradient)' : 'var(--accent-gradient)'
+              backgroundColor: 'var(--bg-modifier-accent)',
+              color: 'var(--text-normal)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--brand-experiment)';
+              e.currentTarget.style.color = 'white';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--bg-modifier-accent)';
+              e.currentTarget.style.color = 'var(--text-normal)';
             }}
           >
             <FileText size={16} />
-            <span>Practice Exam</span>
-            <ChevronRight size={14} />
+            <span>Practice</span>
           </button>
-          
-          {paper.w === 1 && (
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'var(--success-glow)',
-                color: 'var(--success)',
-                border: '1px solid rgba(16, 185, 129, 0.2)',
-                borderRadius: '10px',
-                width: '38px',
-                height: '38px',
-                flexShrink: 0
-              }}
-              title="Worked Solutions Available!"
-            >
-              <CheckCircle2 size={18} />
-            </div>
-          )}
         </div>
       </div>
 

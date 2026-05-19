@@ -192,7 +192,7 @@ export default function App() {
   return (
     <div className="app-container">
       
-      {/* Sidebar Navigation */}
+      {/* Sidebar Navigation (Server List & Channel List) */}
       <Sidebar
         subjects={subjects}
         selectedSubject={selectedSubject}
@@ -209,72 +209,42 @@ export default function App() {
       {/* Main Panel Area */}
       <main className="main-content">
         
-        {/* Header Title Section */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <Library size={18} color="var(--accent-cyan)" />
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                HSC Past Papers Portal
-              </span>
-            </div>
-            <h1 style={{ fontSize: '2.5rem', lineHeight: '1.1' }}>
-              {viewBookmarks ? (
-                <span className="gradient-text">Saved Library</span>
-              ) : (
-                <>
-                  Practice for <span className="gradient-text">Success</span>
-                </>
-              )}
+        {/* Discord-style Top Bar */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '12px 24px',
+          borderBottom: '1px solid var(--bg-tertiary)',
+          background: 'var(--bg-primary)',
+          boxShadow: 'var(--elevation-low)',
+          zIndex: 2
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Library size={24} color="var(--text-muted)" />
+            <h1 style={{ fontSize: '16px', color: 'var(--header-primary)', margin: 0, fontWeight: 600 }}>
+              {viewBookmarks ? 'saved-library' : 'hsc-past-papers'}
             </h1>
-            <p style={{ color: 'var(--text-secondary)', marginTop: '8px', fontSize: '0.95rem' }}>
-              {viewBookmarks 
-                ? `You have saved ${bookmarks.size} papers for practice.`
-                : `Instant search & filter over 7,200+ official NESA past papers and school trial exams.`}
-            </p>
           </div>
 
-          {/* Bookmarks Quick Clear Action */}
-          {viewBookmarks && bookmarks.size > 0 && (
-            <button
-              onClick={clearAllBookmarks}
-              className="btn-secondary"
-              style={{
-                borderColor: 'rgba(239, 68, 68, 0.2)',
-                color: '#ef4444',
-                background: 'rgba(239, 68, 68, 0.05)',
-                gap: '8px'
-              }}
-            >
-              <Trash2 size={16} />
-              <span>Clear All Bookmarks</span>
-            </button>
-          )}
-        </div>
-
-        {/* Dynamic loading view */}
-        {loading ? (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexGrow: 1,
-            minHeight: '400px',
-            gap: '16px'
-          }}>
-            <RefreshCw size={48} className="pulse-glow" color="var(--accent-indigo)" style={{ animation: 'spin 2s linear infinite' }} />
-            <h3 style={{ fontWeight: '500' }}>Assembling resource indexing database...</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Optimizing 7,000+ trial documents for client-side search</p>
-          </div>
-        ) : error ? (
-          <div className="glass" style={{ padding: '32px', textAlign: 'center', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
-            <h2>Database Load Error</h2>
-            <p style={{ marginTop: '12px' }}>{error}</p>
-          </div>
-        ) : (
-          <>
-            {/* Filters panel bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Action buttons (e.g., Clear Bookmarks) */}
+            {viewBookmarks && bookmarks.size > 0 && (
+              <button
+                onClick={clearAllBookmarks}
+                className="btn-secondary"
+                style={{
+                  color: 'var(--status-danger)',
+                  background: 'transparent',
+                  padding: '4px 8px'
+                }}
+                title="Clear All Bookmarks"
+              >
+                <Trash2 size={18} />
+              </button>
+            )}
+            
+            {/* The Filters Search bar can sit up here or right below */}
             <Filters
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
@@ -291,78 +261,119 @@ export default function App() {
               resetFilters={resetFilters}
               hasActiveFilters={hasActiveFilters}
             />
+          </div>
+        </div>
 
-            {/* Results Counters */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              <span>
-                Found <strong style={{ color: 'white' }}>{filteredPapers.length.toLocaleString()}</strong> matches
-                {selectedSubject !== null && ` for ${subjects[selectedSubject]}`}
-              </span>
-              <span>
-                Showing first {Math.min(renderLimit, filteredPapers.length).toLocaleString()}
-              </span>
+        {/* Scrollable Chat/Content Area */}
+        <div className="scrollable-content">
+          
+          {/* Welcome Message (Discord style start of channel) */}
+          <div style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border-subtle)' }}>
+            <div style={{
+              background: 'var(--bg-secondary)',
+              width: '68px',
+              height: '68px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '16px'
+            }}>
+              <Library size={40} color="var(--header-primary)" />
             </div>
+            <h1 style={{ fontSize: '32px', color: 'var(--header-primary)', marginBottom: '8px' }}>
+              Welcome to #{viewBookmarks ? 'saved-library' : 'hsc-past-papers'}!
+            </h1>
+            <p style={{ color: 'var(--text-muted)' }}>
+              {viewBookmarks 
+                ? `This is the start of your saved library. You have ${bookmarks.size} papers ready for practice.`
+                : `This is the start of the ultimate prep center. Search through 7,200+ official NESA past papers and school trial exams.`}
+            </p>
+          </div>
 
-            {/* Papers Grid */}
-            {filteredPapers.length > 0 ? (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                gap: '24px'
-              }}>
-                {paginatedPapers.map((paper, idx) => (
-                  <PaperCard
-                    key={`${paper.v}-${idx}`}
-                    paper={paper}
-                    subjectName={subjects[paper.s]}
-                    schoolName={schools[paper.h]}
-                    isBookmarked={bookmarks.has(paper.v + '_' + paper.n)}
-                    toggleBookmark={() => toggleBookmark(paper.v + '_' + paper.n)}
-                    onSelectPaper={setActivePaper}
-                  />
-                ))}
+          {/* Dynamic loading view */}
+          {loading ? (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '40px 0',
+              gap: '16px'
+            }}>
+              <RefreshCw size={32} color="var(--text-muted)" style={{ animation: 'spin 2s linear infinite' }} />
+              <h3 style={{ color: 'var(--text-normal)' }}>Loading resources...</h3>
+            </div>
+          ) : error ? (
+            <div style={{ padding: '24px', background: 'var(--status-danger)', borderRadius: '4px', color: 'white' }}>
+              <h3 style={{ marginBottom: '8px', color: 'white' }}>Load Error</h3>
+              <p>{error}</p>
+            </div>
+          ) : (
+            <>
+              {/* Results Counters */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px', textTransform: 'uppercase', fontWeight: 600 }}>
+                <span>
+                  Found {filteredPapers.length.toLocaleString()} matches
+                  {selectedSubject !== null && ` in ${subjects[selectedSubject]}`}
+                </span>
+                <span>
+                  Showing {Math.min(renderLimit, filteredPapers.length).toLocaleString()}
+                </span>
               </div>
-            ) : (
-              <div className="glass" style={{
-                padding: '48px',
-                textAlign: 'center',
-                color: 'var(--text-muted)',
-                background: 'rgba(255,255,255,0.01)'
-              }}>
-                <h2>No Papers Found Matching Filters</h2>
-                <p style={{ marginTop: '12px', fontSize: '0.9rem' }}>
-                  Try resetting some filters or searching for broad terms (e.g. "Maths", "2022", or "Abbotsleigh").
-                </p>
-                <button
-                  onClick={resetFilters}
-                  className="btn-primary"
-                  style={{ marginTop: '20px' }}
-                >
-                  Clear Active Filters
-                </button>
-              </div>
-            )}
 
-            {/* Pagination Show More */}
-            {filteredPapers.length > renderLimit && (
-              <div style={{ display: 'flex', justifyContent: 'center', margin: '24px 0 48px 0' }}>
-                <button
-                  onClick={() => setRenderLimit(prev => prev + 40)}
-                  className="btn-secondary"
-                  style={{
-                    padding: '12px 28px',
-                    borderRadius: '12px',
-                    borderColor: 'var(--border-color)',
-                    fontSize: '0.95rem'
-                  }}
-                >
-                  Load More Documents (+40)
-                </button>
-              </div>
-            )}
-          </>
-        )}
+              {/* Papers Grid */}
+              {filteredPapers.length > 0 ? (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                  gap: '16px'
+                }}>
+                  {paginatedPapers.map((paper, idx) => (
+                    <PaperCard
+                      key={`${paper.v}-${idx}`}
+                      paper={paper}
+                      subjectName={subjects[paper.s]}
+                      schoolName={schools[paper.h]}
+                      isBookmarked={bookmarks.has(paper.v + '_' + paper.n)}
+                      toggleBookmark={() => toggleBookmark(paper.v + '_' + paper.n)}
+                      onSelectPaper={setActivePaper}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div style={{
+                  padding: '40px',
+                  textAlign: 'center',
+                  color: 'var(--text-muted)',
+                  background: 'var(--bg-secondary)',
+                  borderRadius: '8px'
+                }}>
+                  <h3 style={{ color: 'var(--header-primary)', marginBottom: '8px' }}>No matches found</h3>
+                  <p style={{ marginBottom: '16px' }}>
+                    Try resetting your filters or searching for different terms.
+                  </p>
+                  <button onClick={resetFilters} className="btn-primary">
+                    Reset Filters
+                  </button>
+                </div>
+              )}
 
+              {/* Pagination Show More */}
+              {filteredPapers.length > renderLimit && (
+                <div style={{ display: 'flex', justifyContent: 'center', margin: '32px 0 64px 0' }}>
+                  <button
+                    onClick={() => setRenderLimit(prev => prev + 40)}
+                    className="btn-secondary"
+                  >
+                    Load More Messages
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+        </div>
       </main>
 
       {/* Practice Exam split viewer portal Overlay */}
@@ -382,3 +393,4 @@ export default function App() {
     </div>
   );
 }
+

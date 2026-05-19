@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, RotateCcw, Check, Sparkles } from 'lucide-react';
+import { Search, XCircle, Check } from 'lucide-react';
 
 export default function Filters({
   searchQuery,
@@ -18,197 +18,161 @@ export default function Filters({
   hasActiveFilters
 }) {
   return (
-    <div className="glass" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
       
-      {/* Search & Reset */}
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-        <div style={{
-          position: 'relative',
-          flexGrow: 1,
-          display: 'flex',
-          alignItems: 'center'
-        }}>
-          <Search style={{
-            position: 'absolute',
-            left: '16px',
-            color: 'var(--text-muted)'
-          }} size={20} />
-          <input
-            type="text"
-            placeholder="Search 7,200+ past papers, schools, subjects or years..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: '100%',
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '12px',
-              padding: '14px 16px 14px 48px',
-              fontSize: '1rem',
-              color: 'white',
-              outline: 'none',
-              transition: 'var(--transition-fast)'
-            }}
-            onFocus={(e) => e.target.style.borderColor = 'var(--accent-indigo)'}
-            onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
-          />
-        </div>
-        
-        {hasActiveFilters && (
-          <button
-            onClick={resetFilters}
-            className="btn-secondary"
-            style={{
-              padding: '14px 18px',
-              borderRadius: '12px',
-              gap: '6px'
-            }}
-            title="Reset All Filters"
-          >
-            <RotateCcw size={16} />
-            <span style={{ fontSize: '0.95rem' }}>Reset</span>
-          </button>
-        )}
+      {/* Search Input (Discord Style) */}
+      <div style={{
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        width: '240px'
+      }}>
+        <input
+          type="text"
+          placeholder="Search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="discord-input"
+          style={{
+            width: '100%',
+            height: '24px',
+            padding: '0 8px',
+            paddingRight: '24px',
+            fontSize: '14px',
+            backgroundColor: 'var(--bg-tertiary)',
+            color: 'var(--text-normal)'
+          }}
+        />
+        <Search style={{
+          position: 'absolute',
+          right: '6px',
+          color: 'var(--text-muted)'
+        }} size={14} />
       </div>
 
-      {/* Category Tabs & Quick Toggles */}
-      <div style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: '16px'
-      }}>
-        {/* Category Selector Cards */}
-        <div style={{
-          display: 'flex',
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid var(--border-color)',
-          padding: '4px',
-          borderRadius: '10px',
-          gap: '2px'
-        }}>
-          {[
-            { id: null, label: 'All Resources' },
-            { id: 'H', label: 'HSC Papers' },
-            { id: 'T', label: 'Trial Exams' },
-            { id: 'A', label: 'Internal Tasks' }
-          ].map((cat) => {
-            const isSelected = selectedCategory === cat.id;
-            return (
-              <button
-                key={cat.label}
-                onClick={() => setSelectedCategory(cat.id)}
-                style={{
-                  background: isSelected ? 'var(--accent-indigo)' : 'transparent',
-                  color: isSelected ? 'white' : 'var(--text-secondary)',
-                  border: 'none',
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  fontSize: '0.85rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'var(--transition-fast)'
-                }}
-              >
-                {cat.label}
-              </button>
-            );
-          })}
-        </div>
+      <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--bg-modifier-accent)' }} />
 
-        {/* Worked Solutions Toggle Card */}
-        <button
-          onClick={() => setSolutionsOnly(!solutionsOnly)}
-          className="btn-secondary"
+      {/* Dropdown Filters */}
+      <div style={{ display: 'flex', gap: '8px' }}>
+        
+        {/* Category */}
+        <select
+          value={selectedCategory || ''}
+          onChange={(e) => setSelectedCategory(e.target.value || null)}
           style={{
-            background: solutionsOnly ? 'var(--success-glow)' : 'transparent',
-            borderColor: solutionsOnly ? 'var(--success)' : 'var(--border-color)',
-            color: solutionsOnly ? '#ffffff' : 'var(--text-secondary)',
-            borderRadius: '10px',
-            padding: '8px 16px',
-            gap: '8px'
+            backgroundColor: 'transparent',
+            color: selectedCategory ? 'var(--interactive-active)' : 'var(--interactive-normal)',
+            border: 'none',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: 'pointer',
+            outline: 'none',
+            padding: '4px'
           }}
         >
-          {solutionsOnly ? (
-            <div style={{
-              background: 'var(--success)',
-              borderRadius: '50%',
-              width: '18px',
-              height: '18px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Check size={12} color="white" />
-            </div>
-          ) : (
-            <Sparkles size={16} color="var(--accent-cyan)" />
-          )}
-          <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>Worked Solutions Only</span>
+          <option value="" style={{ background: 'var(--bg-secondary)', color: 'var(--text-normal)' }}>All Types</option>
+          <option value="H" style={{ background: 'var(--bg-secondary)', color: 'var(--text-normal)' }}>HSC Papers</option>
+          <option value="T" style={{ background: 'var(--bg-secondary)', color: 'var(--text-normal)' }}>Trial Exams</option>
+          <option value="A" style={{ background: 'var(--bg-secondary)', color: 'var(--text-normal)' }}>Internal Tasks</option>
+        </select>
+
+        {/* Year */}
+        <select
+          value={selectedYear || ''}
+          onChange={(e) => setSelectedYear(e.target.value || null)}
+          style={{
+            backgroundColor: 'transparent',
+            color: selectedYear ? 'var(--interactive-active)' : 'var(--interactive-normal)',
+            border: 'none',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: 'pointer',
+            outline: 'none',
+            padding: '4px'
+          }}
+        >
+          <option value="" style={{ background: 'var(--bg-secondary)', color: 'var(--text-normal)' }}>Any Year</option>
+          {years.map((year) => (
+            <option key={year} value={year} style={{ background: 'var(--bg-secondary)', color: 'var(--text-normal)' }}>{year}</option>
+          ))}
+        </select>
+
+        {/* School */}
+        <select
+          value={selectedSchool || ''}
+          onChange={(e) => setSelectedSchool(e.target.value ? parseInt(e.target.value) : null)}
+          style={{
+            backgroundColor: 'transparent',
+            color: selectedSchool !== null ? 'var(--interactive-active)' : 'var(--interactive-normal)',
+            border: 'none',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: 'pointer',
+            outline: 'none',
+            padding: '4px',
+            maxWidth: '120px'
+          }}
+        >
+          <option value="" style={{ background: 'var(--bg-secondary)', color: 'var(--text-normal)' }}>Any School</option>
+          {schools.map((school, idx) => (
+            <option key={idx} value={idx} style={{ background: 'var(--bg-secondary)', color: 'var(--text-normal)' }}>{school}</option>
+          ))}
+        </select>
+      </div>
+
+      <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--bg-modifier-accent)' }} />
+
+      {/* Solutions Toggle */}
+      <button
+        onClick={() => setSolutionsOnly(!solutionsOnly)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          background: 'none',
+          border: 'none',
+          color: solutionsOnly ? 'var(--status-positive)' : 'var(--interactive-normal)',
+          fontSize: '14px',
+          fontWeight: 500,
+          cursor: 'pointer',
+          padding: '4px'
+        }}
+        title="Show papers with worked solutions only"
+      >
+        <div style={{
+          width: '16px',
+          height: '16px',
+          borderRadius: '4px',
+          border: `1px solid ${solutionsOnly ? 'var(--status-positive)' : 'var(--interactive-normal)'}`,
+          backgroundColor: solutionsOnly ? 'var(--status-positive)' : 'transparent',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          {solutionsOnly && <Check size={12} color="white" />}
+        </div>
+        <span>Solutions</span>
+      </button>
+
+      {/* Reset */}
+      {hasActiveFilters && (
+        <button
+          onClick={resetFilters}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--status-danger)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            padding: '4px',
+            marginLeft: '4px'
+          }}
+          title="Reset Filters"
+        >
+          <XCircle size={18} />
         </button>
-      </div>
-
-      {/* Select Box Dropdowns Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px',
-        borderTop: '1px solid var(--border-color)',
-        paddingTop: '20px'
-      }}>
-        {/* School Select */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: '600' }}>
-            Filter by School / Publisher
-          </label>
-          <select
-            value={selectedSchool || ''}
-            onChange={(e) => setSelectedSchool(e.target.value ? parseInt(e.target.value) : null)}
-            style={{
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '10px',
-              padding: '10px 14px',
-              fontSize: '0.9rem',
-              color: 'white',
-              outline: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="" style={{ background: '#0b0f19' }}>All Schools ({schools.length})</option>
-            {schools.map((school, idx) => (
-              <option key={idx} value={idx} style={{ background: '#0b0f19' }}>{school}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Year Select */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: '600' }}>
-            Filter by Exam Year
-          </label>
-          <select
-            value={selectedYear || ''}
-            onChange={(e) => setSelectedYear(e.target.value || null)}
-            style={{
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '10px',
-              padding: '10px 14px',
-              fontSize: '0.9rem',
-              color: 'white',
-              outline: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="" style={{ background: '#0b0f19' }}>All Years ({years.length})</option>
-            {years.map((year) => (
-              <option key={year} value={year} style={{ background: '#0b0f19' }}>{year}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+      )}
 
     </div>
   );

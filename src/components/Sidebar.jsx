@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, Star, GraduationCap, Award, Database } from 'lucide-react';
+import { BookOpen, Star, GraduationCap, Award, Database, Hash } from 'lucide-react';
 
 export default function Sidebar({
   subjects,
@@ -14,188 +14,350 @@ export default function Sidebar({
   subjectCounts
 }) {
   return (
-    <aside className="sidebar glass-panel">
-      {/* Brand */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-        <div style={{
-          background: 'var(--accent-gradient)',
-          padding: '10px',
-          borderRadius: '12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: 'var(--glow-shadow)'
-        }}>
-          <GraduationCap size={24} color="white" />
-        </div>
-        <div>
-          <h2 style={{ fontSize: '1.4rem', lineHeight: '1.2' }} className="gradient-text">HSC Portal</h2>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-            Ultimate Prep Center
-          </span>
-        </div>
-      </div>
-
-      <hr style={{ border: 'none', height: '1px', background: 'var(--border-color)', margin: '8px 0' }} />
-
-      {/* Level Selectors */}
-      <div>
-        <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>
-          Course Level
-        </h4>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <button
-            onClick={() => { setSelectedLevel(12); setViewBookmarks(false); }}
-            className={`btn-secondary ${selectedLevel === 12 && !viewBookmarks ? 'active' : ''}`}
-            style={{
-              justifyContent: 'flex-start',
-              width: '100%',
-              background: selectedLevel === 12 && !viewBookmarks ? 'var(--accent-gradient)' : 'rgba(255,255,255,0.02)',
-              color: selectedLevel === 12 && !viewBookmarks ? 'white' : 'var(--text-primary)',
-              borderColor: selectedLevel === 12 && !viewBookmarks ? 'transparent' : 'var(--border-color)',
-              padding: '12px 16px'
-            }}
-          >
-            <Award size={18} />
-            <span>Year 12 (HSC)</span>
-          </button>
-          <button
-            onClick={() => { setSelectedLevel(11); setViewBookmarks(false); }}
-            className={`btn-secondary ${selectedLevel === 11 && !viewBookmarks ? 'active' : ''}`}
-            style={{
-              justifyContent: 'flex-start',
-              width: '100%',
-              background: selectedLevel === 11 && !viewBookmarks ? 'var(--accent-gradient)' : 'rgba(255,255,255,0.02)',
-              color: selectedLevel === 11 && !viewBookmarks ? 'white' : 'var(--text-primary)',
-              borderColor: selectedLevel === 11 && !viewBookmarks ? 'transparent' : 'var(--border-color)',
-              padding: '12px 16px'
-            }}
-          >
-            <BookOpen size={18} />
-            <span>Year 11 (Prelim)</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Bookmarks Toggle */}
-      <div>
-        <button
-          onClick={() => setViewBookmarks(true)}
-          className={`btn-secondary ${viewBookmarks ? 'active' : ''}`}
+    <aside style={{ display: 'flex', height: '100vh', flexShrink: 0 }}>
+      
+      {/* Server List (Far Left Bar) */}
+      <div style={{
+        width: '72px',
+        backgroundColor: 'var(--bg-tertiary)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '12px 0',
+        gap: '8px',
+        zIndex: 10
+      }}>
+        {/* App Icon (Home) */}
+        <div 
+          onClick={() => { setViewBookmarks(false); setSelectedLevel(12); }}
           style={{
-            justifyContent: 'space-between',
-            width: '100%',
-            background: viewBookmarks ? 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)' : 'rgba(255,255,255,0.02)',
-            color: 'white',
-            borderColor: viewBookmarks ? 'transparent' : 'var(--border-color)',
-            padding: '12px 16px',
-            boxShadow: viewBookmarks ? '0 4px 15px rgba(225, 29, 72, 0.3)' : 'none'
+            width: '48px',
+            height: '48px',
+            backgroundColor: 'var(--brand-experiment)',
+            borderRadius: '16px', // Slightly squarish for Home
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'border-radius 0.2s ease-out, background-color 0.2s ease-out',
+            marginBottom: '8px'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Star size={18} fill={viewBookmarks ? "white" : "transparent"} color="white" />
-            <span>Bookmarks</span>
-          </div>
-          <span style={{
-            fontSize: '0.8rem',
-            background: 'rgba(255,255,255,0.2)',
-            padding: '2px 8px',
-            borderRadius: '20px',
-            fontWeight: '600'
-          }}>
-            {bookmarksCount}
-          </span>
-        </button>
+          <GraduationCap size={28} color="white" />
+        </div>
+
+        <div style={{ width: '32px', height: '2px', backgroundColor: 'var(--bg-modifier-accent)', borderRadius: '1px', marginBottom: '8px' }} />
+
+        {/* Level 12 (Server 1) */}
+        <div 
+          onClick={() => { setSelectedLevel(12); setViewBookmarks(false); }}
+          style={{
+            width: '48px',
+            height: '48px',
+            backgroundColor: selectedLevel === 12 && !viewBookmarks ? 'var(--brand-experiment)' : 'var(--bg-primary)',
+            borderRadius: selectedLevel === 12 && !viewBookmarks ? '16px' : '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease-out',
+            position: 'relative',
+            color: selectedLevel === 12 && !viewBookmarks ? 'white' : 'var(--text-normal)'
+          }}
+          onMouseEnter={(e) => {
+            if (selectedLevel !== 12 || viewBookmarks) {
+              e.currentTarget.style.borderRadius = '16px';
+              e.currentTarget.style.backgroundColor = 'var(--brand-experiment)';
+              e.currentTarget.style.color = 'white';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (selectedLevel !== 12 || viewBookmarks) {
+              e.currentTarget.style.borderRadius = '50%';
+              e.currentTarget.style.backgroundColor = 'var(--bg-primary)';
+              e.currentTarget.style.color = 'var(--text-normal)';
+            }
+          }}
+          title="Year 12 (HSC)"
+        >
+          {/* Active indicator pip */}
+          {selectedLevel === 12 && !viewBookmarks && (
+            <div style={{ position: 'absolute', left: '-16px', top: '50%', transform: 'translateY(-50%)', width: '8px', height: '40px', backgroundColor: 'white', borderRadius: '0 4px 4px 0' }} />
+          )}
+          <Award size={24} />
+        </div>
+
+        {/* Level 11 (Server 2) */}
+        <div 
+          onClick={() => { setSelectedLevel(11); setViewBookmarks(false); }}
+          style={{
+            width: '48px',
+            height: '48px',
+            backgroundColor: selectedLevel === 11 && !viewBookmarks ? 'var(--brand-experiment)' : 'var(--bg-primary)',
+            borderRadius: selectedLevel === 11 && !viewBookmarks ? '16px' : '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease-out',
+            position: 'relative',
+            color: selectedLevel === 11 && !viewBookmarks ? 'white' : 'var(--text-normal)'
+          }}
+          onMouseEnter={(e) => {
+            if (selectedLevel !== 11 || viewBookmarks) {
+              e.currentTarget.style.borderRadius = '16px';
+              e.currentTarget.style.backgroundColor = 'var(--brand-experiment)';
+              e.currentTarget.style.color = 'white';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (selectedLevel !== 11 || viewBookmarks) {
+              e.currentTarget.style.borderRadius = '50%';
+              e.currentTarget.style.backgroundColor = 'var(--bg-primary)';
+              e.currentTarget.style.color = 'var(--text-normal)';
+            }
+          }}
+          title="Year 11 (Prelim)"
+        >
+          {/* Active indicator pip */}
+          {selectedLevel === 11 && !viewBookmarks && (
+            <div style={{ position: 'absolute', left: '-16px', top: '50%', transform: 'translateY(-50%)', width: '8px', height: '40px', backgroundColor: 'white', borderRadius: '0 4px 4px 0' }} />
+          )}
+          <BookOpen size={24} />
+        </div>
+
+        <div style={{ width: '32px', height: '2px', backgroundColor: 'var(--bg-modifier-accent)', borderRadius: '1px', margin: '8px 0' }} />
+
+        {/* Bookmarks (DM/Special) */}
+        <div 
+          onClick={() => setViewBookmarks(true)}
+          style={{
+            width: '48px',
+            height: '48px',
+            backgroundColor: viewBookmarks ? 'var(--status-positive)' : 'var(--bg-primary)',
+            borderRadius: viewBookmarks ? '16px' : '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease-out',
+            position: 'relative',
+            color: viewBookmarks ? 'white' : 'var(--status-positive)'
+          }}
+          onMouseEnter={(e) => {
+            if (!viewBookmarks) {
+              e.currentTarget.style.borderRadius = '16px';
+              e.currentTarget.style.backgroundColor = 'var(--status-positive)';
+              e.currentTarget.style.color = 'white';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!viewBookmarks) {
+              e.currentTarget.style.borderRadius = '50%';
+              e.currentTarget.style.backgroundColor = 'var(--bg-primary)';
+              e.currentTarget.style.color = 'var(--status-positive)';
+            }
+          }}
+          title="Bookmarks"
+        >
+          {viewBookmarks && (
+            <div style={{ position: 'absolute', left: '-16px', top: '50%', transform: 'translateY(-50%)', width: '8px', height: '40px', backgroundColor: 'white', borderRadius: '0 4px 4px 0' }} />
+          )}
+          <Star size={24} fill={viewBookmarks ? "white" : "currentColor"} />
+          
+          {/* Notification Badge */}
+          {bookmarksCount > 0 && (
+            <div style={{
+              position: 'absolute',
+              bottom: '-2px',
+              right: '-2px',
+              backgroundColor: 'var(--status-danger)',
+              color: 'white',
+              fontSize: '11px',
+              fontWeight: 800,
+              padding: '0 4px',
+              minWidth: '20px',
+              height: '20px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '3px solid var(--bg-tertiary)'
+            }}>
+              {bookmarksCount}
+            </div>
+          )}
+        </div>
+
       </div>
 
-      <hr style={{ border: 'none', height: '1px', background: 'var(--border-color)', margin: '8px 0' }} />
-
-      {/* Subjects list */}
-      <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, overflow: 'hidden' }}>
-        <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>
-          Subjects ({subjects.length})
-        </h4>
+      {/* Channel List (Inner Sidebar) */}
+      <div style={{
+        width: '240px',
+        backgroundColor: 'var(--bg-secondary)',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%'
+      }}>
+        {/* Server Header */}
         <div style={{
+          height: '48px',
+          padding: '0 16px',
           display: 'flex',
-          flexDirection: 'column',
-          gap: '4px',
-          overflowY: 'auto',
-          paddingRight: '4px',
-          flexGrow: 1
-        }}>
-          {/* "All Subjects" select card */}
-          <button
+          alignItems: 'center',
+          borderBottom: '1px solid var(--bg-modifier-accent)',
+          boxShadow: 'var(--elevation-low)',
+          cursor: 'pointer',
+          transition: 'background-color 0.2s',
+          fontWeight: 600,
+          color: 'var(--header-primary)'
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-modifier-hover)'}
+        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+        >
+          HSC Portal Server
+        </div>
+
+        {/* Channels scroll area */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 8px' }}>
+          
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: '4px 8px',
+            marginBottom: '4px',
+            color: 'var(--header-secondary)',
+            fontSize: '12px',
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.02em'
+          }}>
+            Subjects (Channels)
+          </div>
+
+          {/* All Subjects (General channel) */}
+          <div
             onClick={() => { setSelectedSubject(null); setViewBookmarks(false); }}
-            className="btn-secondary"
             style={{
-              justifyContent: 'space-between',
-              width: '100%',
-              background: selectedSubject === null ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
-              borderColor: selectedSubject === null ? 'var(--accent-indigo)' : 'transparent',
-              color: selectedSubject === null ? 'white' : 'var(--text-secondary)',
-              padding: '8px 12px',
-              fontSize: '0.9rem',
-              borderRadius: '8px'
+              display: 'flex',
+              alignItems: 'center',
+              padding: '6px 8px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              marginBottom: '2px',
+              backgroundColor: selectedSubject === null ? 'var(--bg-modifier-selected)' : 'transparent',
+              color: selectedSubject === null ? 'var(--interactive-active)' : 'var(--interactive-normal)',
+            }}
+            onMouseEnter={(e) => {
+              if (selectedSubject !== null) {
+                e.currentTarget.style.backgroundColor = 'var(--bg-modifier-hover)';
+                e.currentTarget.style.color = 'var(--interactive-hover)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (selectedSubject !== null) {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = 'var(--interactive-normal)';
+              }
             }}
           >
-            <span>All Subjects</span>
-          </button>
-          
+            <Hash size={20} color="var(--interactive-muted)" style={{ marginRight: '6px' }} />
+            <span style={{ fontSize: '15px', fontWeight: 500 }}>general</span>
+          </div>
+
           {subjects.map((sub, idx) => {
             const isSelected = selectedSubject === idx;
             const count = subjectCounts[idx] || 0;
             
-            if (count === 0) return null; // Only show subjects that have papers for the active level
+            if (count === 0) return null;
             
+            // Format subject name for discord channel (lowercase, spaces to hyphens)
+            const channelName = sub.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
             return (
-              <button
+              <div
                 key={idx}
                 onClick={() => { setSelectedSubject(idx); setViewBookmarks(false); }}
-                className="btn-secondary"
                 style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   justifyContent: 'space-between',
-                  width: '100%',
-                  background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
-                  borderColor: isSelected ? 'var(--accent-indigo)' : 'transparent',
-                  color: isSelected ? 'white' : 'var(--text-secondary)',
-                  padding: '8px 12px',
-                  fontSize: '0.9rem',
-                  borderRadius: '8px',
-                  textAlign: 'left'
+                  padding: '6px 8px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  marginBottom: '2px',
+                  backgroundColor: isSelected ? 'var(--bg-modifier-selected)' : 'transparent',
+                  color: isSelected ? 'var(--interactive-active)' : 'var(--interactive-normal)',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-modifier-hover)';
+                    e.currentTarget.style.color = 'var(--interactive-hover)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = 'var(--interactive-normal)';
+                  }
                 }}
               >
-                <span style={{
-                  textOverflow: 'ellipsis',
-                  overflow: 'hidden',
-                  whiteSpace: 'nowrap',
-                  maxWidth: '180px'
-                }}>
-                  {sub}
-                </span>
-                <span style={{
-                  fontSize: '0.75rem',
-                  background: isSelected ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255,255,255,0.05)',
-                  color: isSelected ? 'white' : 'var(--text-muted)',
-                  padding: '2px 6px',
-                  borderRadius: '6px'
-                }}>
-                  {count}
-                </span>
-              </button>
+                <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
+                  <Hash size={20} color="var(--interactive-muted)" style={{ marginRight: '6px', flexShrink: 0 }} />
+                  <span style={{ 
+                    fontSize: '15px', 
+                    fontWeight: 500,
+                    textOverflow: 'ellipsis',
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {channelName}
+                  </span>
+                </div>
+                {/* Count badge */}
+                {!isSelected && (
+                  <span style={{
+                    fontSize: '12px',
+                    backgroundColor: 'var(--bg-primary)',
+                    padding: '2px 6px',
+                    borderRadius: '8px',
+                    color: 'var(--text-muted)'
+                  }}>
+                    {count}
+                  </span>
+                )}
+              </div>
             );
           })}
         </div>
-      </div>
 
-      {/* Library Stats Footer */}
-      <div className="glass" style={{ padding: '16px', borderRadius: '12px', marginTop: 'auto', background: 'rgba(255,255,255,0.01)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-          <Database size={14} color="var(--accent-cyan)" />
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600' }}>Local Database Stats</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-          <span>Total Papers:</span>
-          <span style={{ fontWeight: '700', color: 'white' }}>{totalPapersCount.toLocaleString()}</span>
+        {/* User Panel (Bottom left) */}
+        <div style={{
+          backgroundColor: '#232428', /* Discord's user panel color */
+          padding: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <div style={{
+            width: '32px',
+            height: '32px',
+            backgroundColor: 'var(--bg-modifier-accent)',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <Database size={16} color="var(--text-normal)" />
+          </div>
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--header-primary)' }}>
+              Local DB
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--header-secondary)' }}>
+              {totalPapersCount.toLocaleString()} resources
+            </div>
+          </div>
         </div>
       </div>
     </aside>
