@@ -2,6 +2,7 @@ name: Automated Scraper
 
 permissions:
   contents: write
+  issues: write
 
 on:
   schedule:
@@ -55,56 +56,17 @@ jobs:
           echo "Deploying to Vercel..."
           npx vercel --prod --token "$VERCEL_TOKEN" --confirm
 
-      - name: Send success email
-        if: success()
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: ${{ secrets.SMTP_HOST }}
-          server_port: ${{ secrets.SMTP_PORT }}
-          username: ${{ secrets.SMTP_USERNAME }}
-          password: ${{ secrets.SMTP_PASSWORD }}
-          subject: 'Automated scraper succeeded — ${{ github.repository }}'
-          to: ${{ secrets.EMAIL_TO }}
-          from: ${{ secrets.EMAIL_FROM }}
-          body: |
-            Repository: ${{ github.repository }}
-            Workflow: ${{ github.workflow }}
-            Run number: ${{ github.run_number }}
-            Result: SUCCESS
-            View run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: Send failure email
+      - name: Create GitHub issue on failure
         if: failure()
-        uses: dawidd6/action-send-mail@v3
+        uses: actions/github-script@v6
         with:
-          server_address: ${{ secrets.SMTP_HOST }}
-          server_port: ${{ secrets.SMTP_PORT }}
-          username: ${{ secrets.SMTP_USERNAME }}
-          password: ${{ secrets.SMTP_PASSWORD }}
-          subject: 'Automated scraper FAILED — ${{ github.repository }}'
-          to: ${{ secrets.EMAIL_TO }}
-          from: ${{ secrets.EMAIL_FROM }}
-          body: |
-            Repository: ${{ github.repository }}
-            Workflow: ${{ github.workflow }}
-            Run number: ${{ github.run_number }}
-            Result: FAILURE
-            View run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: Send cancelled email
-        if: cancelled()
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: ${{ secrets.SMTP_HOST }}
-          server_port: ${{ secrets.SMTP_PORT }}
-          username: ${{ secrets.SMTP_USERNAME }}
-          password: ${{ secrets.SMTP_PASSWORD }}
-          subject: 'Automated scraper CANCELLED — ${{ github.repository }}'
-          to: ${{ secrets.EMAIL_TO }}
-          from: ${{ secrets.EMAIL_FROM }}
-          body: |
-            Repository: ${{ github.repository }}
-            Workflow: ${{ github.workflow }}
-            Run number: ${{ github.run_number }}
-            Result: CANCELLED
-            View run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          script: |
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+            const title = `Automated scraper FAILED — run #${process.env.GITHUB_RUN_NUMBER}`;
+            const body = `The automated scraper workflow failed.\n\nRun: ${runUrl}\nCommit: ${process.env.GITHUB_SHA}\n\nCheck Actions logs for details.`;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body
+            });
