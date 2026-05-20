@@ -18,14 +18,14 @@ export default function Filters({
   hasActiveFilters
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
       
       {/* Search Input (Discord Style) */}
       <div style={{
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
-        width: '240px'
+        width: 'min(240px, 40vw)'
       }}>
         <input
           type="text"

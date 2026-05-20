@@ -4,7 +4,7 @@ import Filters from './components/Filters';
 import PaperCard from './components/PaperCard';
 import PracticeRoom from './components/PracticeRoom';
 import TextbooksView from './components/TextbooksView';
-import { Sparkles, Library, RefreshCw, Star, Trash2, Book } from 'lucide-react';
+import { Sparkles, Library, RefreshCw, Star, Trash2, Book, Menu } from 'lucide-react';
 import './App.css';
 
 export default function App() {
@@ -36,6 +36,9 @@ export default function App() {
 
   // active Paper for practice room
   const [activePaper, setActivePaper] = useState(null);
+
+  // Mobile sidebar toggle
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Pagination Limit
   const [renderLimit, setRenderLimit] = useState(40);
@@ -198,7 +201,7 @@ export default function App() {
   const paginatedPapers = filteredPapers.slice(0, renderLimit);
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${isSidebarOpen ? 'sidebar-visible' : ''}`}>
       
       {/* Sidebar Navigation (Server List & Channel List) */}
       <Sidebar
@@ -217,7 +220,10 @@ export default function App() {
       />
 
       {/* Main Panel Area */}
-      <main className="main-content">
+      <main
+        className="main-content"
+        onClick={() => { if (isSidebarOpen && window.innerWidth <= 768) setIsSidebarOpen(false); }}
+      >
         
         {/* Discord-style Top Bar */}
         <div style={{
@@ -231,6 +237,13 @@ export default function App() {
           zIndex: 2
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              className="mobile-menu-btn"
+              onClick={() => setIsSidebarOpen(s => !s)}
+              aria-label="Toggle menu"
+            >
+              <Menu size={18} />
+            </button>
             {viewTextbooks ? <Book size={24} color="var(--text-muted)" /> : <Library size={24} color="var(--text-muted)" />}
             <h1 style={{ fontSize: '16px', color: 'var(--header-primary)', margin: 0, fontWeight: 600 }}>
               {viewTextbooks ? 'textbooks' : viewBookmarks ? 'saved-library' : 'hsc-past-papers'}
@@ -340,11 +353,7 @@ export default function App() {
 
               {/* Papers Grid */}
               {filteredPapers.length > 0 ? (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                  gap: '16px'
-                }}>
+                <div className="papers-grid">
                   {paginatedPapers.map((paper, idx) => (
                     <PaperCard
                       key={`${paper.v}-${idx}`}

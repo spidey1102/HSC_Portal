@@ -71,7 +71,7 @@ body {
   background-color: var(--bg-primary);
   color: var(--text-normal);
   min-height: 100vh;
-  overflow: hidden; /* App container handles layout */
+  overflow: auto; /* allow page scrolling on mobile */
   -webkit-font-smoothing: antialiased;
   font-size: 16px;
   line-height: 1.5;
@@ -158,9 +158,9 @@ button, select, input {
 /* Layout */
 .app-container {
   display: flex;
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden;
+  min-height: 100vh;
+  width: 100%;
+  overflow: visible;
   background-color: var(--bg-primary);
 }
 
@@ -203,4 +203,86 @@ button, select, input {
 
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out forwards;
+}
+
+/* Sidebar & Mobile Layout helpers */
+.app-sidebar {
+  display: flex;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.server-list {
+  width: 72px;
+  background-color: var(--bg-tertiary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  gap: 8px;
+  z-index: 10;
+}
+
+.channel-panel {
+  width: 240px;
+  background-color: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.mobile-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+}
+
+.papers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  body { font-size: 15px; }
+
+  .app-container {
+    flex-direction: column;
+    min-height: 100vh;
+    height: auto;
+    overflow: visible;
+  }
+
+  .app-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 280px;
+    transform: translateX(-110%);
+    transition: transform 0.22s ease;
+    z-index: 1200;
+    display: flex;
+    flex-direction: row;
+  }
+
+  .app-container.sidebar-visible .app-sidebar {
+    transform: translateX(0);
+  }
+
+  .server-list { width: 64px; }
+  .channel-panel { width: 216px; }
+
+  .main-content { width: 100%; min-height: 0; height: auto; }
+
+  .scrollable-content { padding: 12px; }
+
+  .mobile-menu-btn { display: inline-flex; }
+
+  .papers-grid { grid-template-columns: 1fr; }
 }

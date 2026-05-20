@@ -16,11 +16,10 @@ export default function Sidebar({
   subjectCounts
 }) {
   return (
-    <aside style={{ display: 'flex', height: '100vh', flexShrink: 0 }}>
+    <aside className="app-sidebar">
       
       {/* Server List (Far Left Bar) */}
-      <div style={{
-        width: '72px',
+      <div className="server-list" style={{
         backgroundColor: 'var(--bg-tertiary)',
         display: 'flex',
         flexDirection: 'column',
@@ -233,8 +232,7 @@ export default function Sidebar({
       </div>
 
       {/* Channel List (Inner Sidebar) */}
-      <div style={{
-        width: '240px',
+      <div className="channel-panel" style={{
         backgroundColor: 'var(--bg-secondary)',
         display: 'flex',
         flexDirection: 'column',

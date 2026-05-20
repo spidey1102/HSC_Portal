@@ -41,7 +41,23 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "chore: update papers database (automated)"
-            git push
+            # Determine branch name from GITHUB_REF (fallback to main)
+            BRANCH=${GITHUB_REF#refs/heads/}
+            if [ -z "$BRANCH" ]; then
+              BRANCH=main
+            fi
+
+            # Fetch latest remote and rebase to avoid non-fast-forward errors
+            git fetch origin "$BRANCH"
+            git pull --rebase origin "$BRANCH" || true
+
+            # Try push; if it fails (race), retry with --force-with-lease
+            if git push origin "$BRANCH"; then
+              echo "Pushed updates to origin/$BRANCH"
+            else
+              echo "Push failed, retrying with --force-with-lease"
+              git push --force-with-lease origin "$BRANCH"
+            fi
           fi
 
       - name: Set up Node.js
