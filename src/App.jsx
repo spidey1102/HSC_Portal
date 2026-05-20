@@ -5,6 +5,7 @@ import PaperCard from './components/PaperCard';
 import PracticeRoom from './components/PracticeRoom';
 import TextbooksView from './components/TextbooksView';
 import { Sparkles, Library, RefreshCw, Star, Trash2, Book, Menu } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 import './App.css';
 
 export default function App() {
@@ -417,7 +418,9 @@ export default function App() {
         />
       )}
 
+      {/* Vercel Web Analytics */}
+      <Analytics />
+
     </div>
   );
 }
-
