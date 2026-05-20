@@ -286,3 +286,38 @@ button, select, input {
 
   .papers-grid { grid-template-columns: 1fr; }
 }
+
+/* Tools panel overlay and collapse behavior */
+.tools-panel {
+  transition: width 0.22s ease, transform 0.22s ease;
+  overflow: hidden;
+}
+
+.tools-panel.collapsed {
+  width: 0 !important;
+  min-width: 0 !important;
+  border-left: none !important;
+}
+
+@media (max-width: 768px) {
+  .tools-panel {
+    position: absolute;
+    top: 64px; /* matches header height in PracticeRoom */
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 360px;
+    transform: translateX(100%);
+    box-shadow: -8px 0 16px rgba(0,0,0,0.6);
+    z-index: 1300;
+    background-color: var(--bg-secondary);
+  }
+
+  .tools-panel:not(.collapsed) {
+    transform: translateX(0);
+  }
+
+  .tools-panel.collapsed {
+    transform: translateX(100%);
+  }
+}

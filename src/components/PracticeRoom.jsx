@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, X, ExternalLink, Edit3, BookOpen, Clock, AlertTriangle } from 'lucide-react';
+import { Play, Pause, RotateCcw, X, ExternalLink, Edit3, BookOpen, Clock, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function PracticeRoom({
   paper,
@@ -16,6 +16,24 @@ export default function PracticeRoom({
   const [totalSeconds, setTotalSeconds] = useState(3 * 3600);
   const [timerRunning, setTimerRunning] = useState(false);
   const timerInterval = useRef(null);
+  // Tools panel collapsed state (persisted)
+  const [toolsCollapsed, setToolsCollapsed] = useState(() => {
+    try {
+      const raw = localStorage.getItem('hsc_tools_collapsed');
+      return raw ? JSON.parse(raw) : false;
+    } catch (e) {
+      return false;
+    }
+  });
+  // Collapsed timer state (persisted)
+  const [timerCollapsed, setTimerCollapsed] = useState(() => {
+    try {
+      const raw = localStorage.getItem('hsc_timer_collapsed');
+      return raw ? JSON.parse(raw) : false;
+    } catch (e) {
+      return false;
+    }
+  });
 
   // Scratchpad State
   const [notes, setNotes] = useState(() => {
@@ -70,6 +88,22 @@ export default function PracticeRoom({
     return () => clearInterval(timerInterval.current);
   }, [timerRunning]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem('hsc_timer_collapsed', JSON.stringify(timerCollapsed));
+    } catch (e) {
+      // ignore
+    }
+  }, [timerCollapsed]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('hsc_tools_collapsed', JSON.stringify(toolsCollapsed));
+    } catch (e) {
+      // ignore
+    }
+  }, [toolsCollapsed]);
+
   const formatTime = (totalSecs) => {
     const hrs = Math.floor(totalSecs / 3600);
     const mins = Math.floor((totalSecs % 3600) / 60);
@@ -83,7 +117,7 @@ export default function PracticeRoom({
     setTimerRunning(false);
   };
 
-  const progressPercentage = (secondsLeft / totalSeconds) * 100;
+  const progressPercentage = totalSeconds > 0 ? (secondsLeft / totalSeconds) * 100 : 0;
   const isTimeCritical = secondsLeft < 15 * 60;
 
   const viewUrl = `https://thsconline.github.io/s/v/${paper.v}/${encodeURIComponent(paper.n)}`;
@@ -131,7 +165,7 @@ export default function PracticeRoom({
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <a
             href={viewUrl}
             target="_blank"
@@ -142,6 +176,16 @@ export default function PracticeRoom({
             <span>Open in Browser</span>
             <ExternalLink size={16} />
           </a>
+
+          <button
+            onClick={() => setToolsCollapsed(s => !s)}
+            className="btn-secondary"
+            title={toolsCollapsed ? 'Show tools panel' : 'Hide tools panel'}
+            style={{ padding: '6px' }}
+            aria-expanded={!toolsCollapsed}
+          >
+            {toolsCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
         </div>
       </header>
 
@@ -164,124 +208,188 @@ export default function PracticeRoom({
         </div>
 
         {/* Tools Panel (Discord Sidebar style) */}
-        <div style={{
-          width: '350px',
-          flexShrink: 0,
-          backgroundColor: 'var(--bg-secondary)',
-          display: 'flex',
-          flexDirection: 'column',
-          borderLeft: '1px solid var(--bg-modifier-accent)'
-        }}>
+        <div
+          className={`tools-panel ${toolsCollapsed ? 'collapsed' : ''}`}
+          style={{
+            width: toolsCollapsed ? '0px' : '350px',
+            minWidth: toolsCollapsed ? '0px' : '350px',
+            flexShrink: 0,
+            backgroundColor: 'var(--bg-secondary)',
+            display: 'flex',
+            flexDirection: 'column',
+            borderLeft: toolsCollapsed ? 'none' : '1px solid var(--bg-modifier-accent)',
+            overflow: 'hidden',
+            transition: 'width 0.22s ease, min-width 0.22s ease, transform 0.22s ease'
+          }}
+          aria-hidden={toolsCollapsed}
+        >
           
           {/* Timer Widget */}
           <div style={{ padding: '16px', borderBottom: '1px solid var(--bg-modifier-accent)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--header-secondary)', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>
-              <Clock size={16} />
-              <span>Exam Timer</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--header-secondary)', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>
+                <Clock size={16} />
+                <span>Exam Timer</span>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  onClick={() => setTimerCollapsed(prev => !prev)}
+                  className="btn-secondary"
+                  aria-expanded={!timerCollapsed}
+                  title={timerCollapsed ? 'Show timer' : 'Collapse timer'}
+                  style={{ padding: '6px 8px' }}
+                >
+                  {timerCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </button>
+              </div>
             </div>
 
-            <div style={{
-              backgroundColor: 'var(--bg-tertiary)',
-              padding: '16px',
-              borderRadius: '8px',
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
-              {/* Progress bar boundary background */}
+            {timerCollapsed ? (
               <div style={{
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-                height: '4px',
-                width: `${progressPercentage}%`,
-                backgroundColor: isTimeCritical ? 'var(--status-danger)' : 'var(--brand-experiment)',
-                transition: 'width 1s linear'
-              }} />
-
-              {/* Display Clock */}
-              <h3 style={{
-                fontSize: '32px',
-                fontFamily: 'monospace',
-                fontWeight: 700,
-                color: isTimeCritical ? 'var(--status-danger)' : 'var(--header-primary)',
-                textAlign: 'center',
-                marginBottom: '12px'
+                backgroundColor: 'var(--bg-tertiary)',
+                padding: '8px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px'
               }}>
-                {formatTime(secondsLeft)}
-              </h3>
+                <div style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '18px', color: isTimeCritical ? 'var(--status-danger)' : 'var(--header-primary)' }}>
+                  {formatTime(secondsLeft)}
+                </div>
 
-              {/* Time Critical Warning */}
-              {isTimeCritical && secondsLeft > 0 && (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => setTimerRunning(!timerRunning)}
+                    className="btn-primary"
+                    style={{ padding: '6px 8px', minWidth: '44px' }}
+                  >
+                    {timerRunning ? <Pause size={14} /> : <Play size={14} />}
+                  </button>
+
+                  <button
+                    onClick={() => { setTimerRunning(false); setSecondsLeft(totalSeconds); }}
+                    className="btn-secondary"
+                    style={{ padding: '6px 8px' }}
+                  >
+                    <RotateCcw size={14} />
+                  </button>
+
+                  <button
+                    onClick={() => setTimerCollapsed(false)}
+                    className="btn-secondary"
+                    title="Expand timer"
+                    style={{ padding: '6px 8px' }}
+                  >
+                    <ChevronUp size={14} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                backgroundColor: 'var(--bg-tertiary)',
+                padding: '16px',
+                borderRadius: '8px',
+                position: 'relative',
+                overflow: 'hidden'
+              }}>
+                {/* Progress bar boundary background */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  height: '4px',
+                  width: `${progressPercentage}%`,
+                  backgroundColor: isTimeCritical ? 'var(--status-danger)' : 'var(--brand-experiment)',
+                  transition: 'width 1s linear'
+                }} />
+
+                {/* Display Clock */}
+                <h3 style={{
+                  fontSize: '32px',
+                  fontFamily: 'monospace',
+                  fontWeight: 700,
+                  color: isTimeCritical ? 'var(--status-danger)' : 'var(--header-primary)',
+                  textAlign: 'center',
+                  marginBottom: '12px'
+                }}>
+                  {formatTime(secondsLeft)}
+                </h3>
+
+                {/* Time Critical Warning */}
+                {isTimeCritical && secondsLeft > 0 && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    color: 'var(--status-danger)',
+                    fontSize: '12px',
+                    marginBottom: '12px',
+                    fontWeight: 600
+                  }}>
+                    <AlertTriangle size={14} />
+                    <span>Time is almost up!</span>
+                  </div>
+                )}
+
+                {/* Controls */}
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                  <button
+                    onClick={() => setTimerRunning(!timerRunning)}
+                    className="btn-primary"
+                    style={{
+                      backgroundColor: timerRunning ? 'var(--status-warning)' : 'var(--status-positive)',
+                      color: timerRunning ? 'black' : 'white',
+                      flex: 1,
+                      justifyContent: 'center'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
+                    onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}
+                  >
+                    {timerRunning ? <Pause size={16} /> : <Play size={16} />}
+                    <span>{timerRunning ? 'Pause' : 'Start'}</span>
+                  </button>
+                  <button
+                    onClick={() => { setTimerRunning(false); setSecondsLeft(totalSeconds); }}
+                    className="btn-secondary"
+                  >
+                    <RotateCcw size={16} />
+                  </button>
+                </div>
+
+                {/* Time Presets */}
                 <div style={{
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  color: 'var(--status-danger)',
-                  fontSize: '12px',
-                  marginBottom: '12px',
-                  fontWeight: 600
+                  gap: '4px',
+                  marginTop: '16px',
+                  backgroundColor: 'var(--bg-primary)',
+                  padding: '4px',
+                  borderRadius: '4px'
                 }}>
-                  <AlertTriangle size={14} />
-                  <span>Time is almost up!</span>
+                  {[1, 2, 3].map((hrs) => (
+                    <button
+                      key={hrs}
+                      onClick={() => setPresetTime(hrs)}
+                      style={{
+                        flexGrow: 1,
+                        backgroundColor: totalSeconds === hrs * 3600 ? 'var(--bg-modifier-selected)' : 'transparent',
+                        border: 'none',
+                        color: totalSeconds === hrs * 3600 ? 'var(--interactive-active)' : 'var(--interactive-normal)',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        padding: '4px',
+                        borderRadius: '3px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {hrs} hr
+                    </button>
+                  ))}
                 </div>
-              )}
-
-              {/* Controls */}
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                <button
-                  onClick={() => setTimerRunning(!timerRunning)}
-                  className="btn-primary"
-                  style={{
-                    backgroundColor: timerRunning ? 'var(--status-warning)' : 'var(--status-positive)',
-                    color: timerRunning ? 'black' : 'white',
-                    flex: 1,
-                    justifyContent: 'center'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
-                  onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}
-                >
-                  {timerRunning ? <Pause size={16} /> : <Play size={16} />}
-                  <span>{timerRunning ? 'Pause' : 'Start'}</span>
-                </button>
-                <button
-                  onClick={() => { setTimerRunning(false); setSecondsLeft(totalSeconds); }}
-                  className="btn-secondary"
-                >
-                  <RotateCcw size={16} />
-                </button>
               </div>
-
-              {/* Time Presets */}
-              <div style={{
-                display: 'flex',
-                gap: '4px',
-                marginTop: '16px',
-                backgroundColor: 'var(--bg-primary)',
-                padding: '4px',
-                borderRadius: '4px'
-              }}>
-                {[1, 2, 3].map((hrs) => (
-                  <button
-                    key={hrs}
-                    onClick={() => setPresetTime(hrs)}
-                    style={{
-                      flexGrow: 1,
-                      backgroundColor: totalSeconds === hrs * 3600 ? 'var(--bg-modifier-selected)' : 'transparent',
-                      border: 'none',
-                      color: totalSeconds === hrs * 3600 ? 'var(--interactive-active)' : 'var(--interactive-normal)',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      padding: '4px',
-                      borderRadius: '3px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {hrs} hr
-                  </button>
-                ))}
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Solutions Links */}
