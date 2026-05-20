@@ -26,9 +26,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Run scraper and optimize
+      - name: Fetch NESA data and convert, then optimize
         run: |
-          python -u scraper.py
+          echo "Python version:" && python --version
+          python -u scripts/convert_nesa_to_raw.py
           python -u optimize_data.py
 
       - name: Commit updated database if changed
