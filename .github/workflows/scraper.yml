@@ -50,12 +50,15 @@ jobs:
           node-version: '18'
 
       - name: Deploy to Vercel
-        if: ${{ secrets.VERCEL_TOKEN != '' }}
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          echo "Deploying to Vercel..."
-          npx vercel --prod --token "$VERCEL_TOKEN" --confirm
+          if [ -z "${VERCEL_TOKEN}" ]; then
+            echo "VERCEL_TOKEN not set; skipping Vercel deploy."
+          else
+            echo "Deploying to Vercel..."
+            npx vercel --prod --token "$VERCEL_TOKEN" --confirm
+          fi
 
       - name: Create GitHub issue on failure
         if: failure()
