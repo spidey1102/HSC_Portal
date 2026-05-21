@@ -21,9 +21,9 @@ A modern all-in-one portal designed to help NSW HSC students manage study resour
 Depending on the current implementation, this project may include:
 
 - Frontend: HTML, CSS, JavaScript
-- Backend: Node.js / Express
-- Database: MongoDB / Firebase / SQL
-- Hosting: GitHub Pages / Vercel / Netlify
+- Backend: Node.js 
+- Database: SQL
+- Hosting: GitHub Pages / Vercel
 
 ---
 
@@ -63,11 +63,7 @@ npm start
 
 ## Usage
 
-1. Open the application in your browser
-2. Create or log into your account
-3. Add subjects and assessments
-4. Upload or organise study materials
-5. Track your HSC preparation progress
+1. Just Run
 
 ---
 
