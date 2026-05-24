@@ -195,6 +195,23 @@ button, select, input {
   color: var(--text-muted);
 }
 
+.timer-duration-input {
+  width: 100%;
+  background-color: var(--bg-tertiary);
+  color: var(--header-primary);
+  border: 1px solid var(--bg-modifier-accent);
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+
+.timer-duration-input:focus {
+  border-color: var(--brand-experiment);
+}
+
 /* Animations (Keep subtle) */
 @keyframes fadeIn {
   from { opacity: 0; }

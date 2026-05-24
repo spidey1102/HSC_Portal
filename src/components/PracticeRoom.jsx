@@ -11,9 +11,24 @@ export default function PracticeRoom({
   schools,
   onSelectPaper
 }) {
+  const loadSavedTimerSeconds = () => {
+    try {
+      const raw = localStorage.getItem('hsc_timer_duration_secs');
+      const secs = parseInt(raw, 10);
+      if (secs >= 60 && secs <= 10 * 3600) return secs;
+    } catch (e) {
+      // ignore
+    }
+    return 3 * 3600;
+  };
+
+  const initialTimerSecs = loadSavedTimerSeconds();
+
   // Timer States
-  const [secondsLeft, setSecondsLeft] = useState(3 * 3600); // 3 hours default
-  const [totalSeconds, setTotalSeconds] = useState(3 * 3600);
+  const [secondsLeft, setSecondsLeft] = useState(initialTimerSecs);
+  const [totalSeconds, setTotalSeconds] = useState(initialTimerSecs);
+  const [customHours, setCustomHours] = useState(Math.floor(initialTimerSecs / 3600));
+  const [customMinutes, setCustomMinutes] = useState(Math.floor((initialTimerSecs % 3600) / 60));
   const [timerRunning, setTimerRunning] = useState(false);
   const timerInterval = useRef(null);
   // Tools panel collapsed state (persisted)
@@ -137,10 +152,23 @@ export default function PracticeRoom({
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const setPresetTime = (hours) => {
-    setSecondsLeft(hours * 3600);
-    setTotalSeconds(hours * 3600);
+  const applyCustomTimer = () => {
+    const hrs = Math.min(10, Math.max(0, parseInt(String(customHours), 10) || 0));
+    const mins = Math.min(59, Math.max(0, parseInt(String(customMinutes), 10) || 0));
+    let total = hrs * 3600 + mins * 60;
+    if (total < 60) total = 60;
+
+    setSecondsLeft(total);
+    setTotalSeconds(total);
     setTimerRunning(false);
+    setCustomHours(Math.floor(total / 3600));
+    setCustomMinutes(Math.floor((total % 3600) / 60));
+
+    try {
+      localStorage.setItem('hsc_timer_duration_secs', String(total));
+    } catch (e) {
+      // ignore
+    }
   };
 
   const progressPercentage = totalSeconds > 0 ? (secondsLeft / totalSeconds) * 100 : 0;
@@ -453,34 +481,68 @@ export default function PracticeRoom({
                   </button>
                 </div>
 
-                {/* Time Presets */}
-                <div style={{
-                  display: 'flex',
-                  gap: '4px',
-                  marginTop: '16px',
-                  backgroundColor: 'var(--bg-primary)',
-                  padding: '4px',
-                  borderRadius: '4px'
-                }}>
-                  {[1, 2, 3].map((hrs) => (
+                {/* Custom duration */}
+                <div style={{ marginTop: '16px' }}>
+                  <div style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: 'var(--header-secondary)',
+                    textTransform: 'uppercase',
+                    marginBottom: '8px',
+                  }}>
+                    Set duration
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    gap: '8px',
+                    alignItems: 'center',
+                    backgroundColor: 'var(--bg-primary)',
+                    padding: '8px',
+                    borderRadius: '4px',
+                  }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>Hours</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={10}
+                        value={customHours}
+                        onChange={(e) => setCustomHours(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && applyCustomTimer()}
+                        className="timer-duration-input"
+                        aria-label="Timer hours"
+                      />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>Minutes</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={59}
+                        value={customMinutes}
+                        onChange={(e) => setCustomMinutes(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && applyCustomTimer()}
+                        className="timer-duration-input"
+                        aria-label="Timer minutes"
+                      />
+                    </label>
                     <button
-                      key={hrs}
-                      onClick={() => setPresetTime(hrs)}
+                      type="button"
+                      onClick={applyCustomTimer}
+                      className="btn-primary"
                       style={{
-                        flexGrow: 1,
-                        backgroundColor: totalSeconds === hrs * 3600 ? 'var(--bg-modifier-selected)' : 'transparent',
-                        border: 'none',
-                        color: totalSeconds === hrs * 3600 ? 'var(--interactive-active)' : 'var(--interactive-normal)',
+                        alignSelf: 'flex-end',
+                        padding: '8px 12px',
                         fontSize: '12px',
                         fontWeight: 600,
-                        padding: '4px',
-                        borderRadius: '3px',
-                        cursor: 'pointer'
                       }}
                     >
-                      {hrs} hr
+                      Apply
                     </button>
-                  ))}
+                  </div>
+                  <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px', marginBottom: 0 }}>
+                    Your last duration is remembered for next time (min 1 minute).
+                  </p>
                 </div>
               </div>
             )}
