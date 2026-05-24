@@ -40,6 +40,32 @@ export default function PracticeRoom({
     return localStorage.getItem(`hsc_notes_${paper.v}`) || '';
   });
 
+  // Formula Sheet states
+  const [showFormula, setShowFormula] = useState(false);
+
+  const getFormulaSheet = (sub) => {
+    if (!sub) return null;
+    const s = sub.toLowerCase();
+    
+    if (s.includes('physics')) {
+      return '/sheets/physics-data-sheet.pdf';
+    } else if (s.includes('chemistry')) {
+      return '/sheets/chemistry-data-sheet.pdf';
+    } else if (s.includes('earth') || s.includes('environmental')) {
+      return '/sheets/earth-env-science-sheet.pdf';
+    } else if (s.includes('math')) {
+      if (s.includes('standard')) {
+        return '/sheets/maths-standard-reference.pdf';
+      } else {
+        // Advanced, Extension 1, Extension 2
+        return '/sheets/mathematics-reference.pdf';
+      }
+    }
+    return null;
+  };
+
+  const sheetUrl = getFormulaSheet(subjectName);
+
   // Matching papers
   const [relatedResources, setRelatedResources] = useState([]);
 
@@ -166,6 +192,31 @@ export default function PracticeRoom({
         </div>
 
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {sheetUrl && (
+            <button
+              onClick={() => setShowFormula(prev => !prev)}
+              className="btn-secondary"
+              style={{
+                backgroundColor: showFormula ? 'var(--brand-experiment)' : 'transparent',
+                color: showFormula ? 'white' : 'var(--interactive-normal)',
+                borderColor: showFormula ? 'var(--brand-experiment)' : 'var(--bg-modifier-accent)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 12px',
+                fontWeight: 600,
+                fontSize: '14px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              title="Toggle Formula Sheet Split View"
+            >
+              <BookOpen size={16} />
+              <span>{showFormula ? 'Hide Formula Sheet' : 'Formula Sheet'}</span>
+            </button>
+          )}
+
           <a
             href={viewUrl}
             target="_blank"
@@ -192,19 +243,62 @@ export default function PracticeRoom({
       {/* Main Workspace */}
       <div style={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
         
-        {/* PDF Frame Panel */}
-        <div style={{ flexGrow: 1, backgroundColor: 'var(--bg-primary)', position: 'relative' }}>
-          <iframe
-            src={directIframeUrl}
-            style={{
-              width: '100%',
+        {/* Split View Container */}
+        <div style={{
+          display: 'flex',
+          flexGrow: 1,
+          overflow: 'hidden',
+          gap: showFormula && sheetUrl ? '8px' : '0px',
+          padding: showFormula && sheetUrl ? '8px' : '0',
+          backgroundColor: 'var(--bg-primary)'
+        }}>
+          
+          {/* Left: Exam Paper Panel */}
+          <div style={{
+            width: showFormula && sheetUrl ? '50%' : '100%',
+            height: '100%',
+            position: 'relative',
+            transition: 'width 0.22s ease',
+            borderRadius: showFormula && sheetUrl ? '8px' : '0',
+            overflow: 'hidden'
+          }}>
+            <iframe
+              src={directIframeUrl}
+              style={{
+                width: '100%',
+                height: '100%',
+                border: 'none',
+                backgroundColor: 'var(--bg-primary)'
+              }}
+              sandbox="allow-scripts allow-popups allow-pointer-lock allow-presentation allow-same-origin allow-modals allow-top-navigation allow-downloads"
+              title="PDF Practice Viewer"
+            />
+          </div>
+
+          {/* Right: Formula Sheet Panel */}
+          {showFormula && sheetUrl && (
+            <div style={{
+              width: '50%',
               height: '100%',
-              border: 'none',
-              backgroundColor: 'var(--bg-primary)'
-            }}
-            sandbox="allow-scripts allow-popups allow-pointer-lock allow-presentation allow-same-origin allow-modals allow-top-navigation allow-downloads"
-            title="PDF Practice Viewer"
-          />
+              position: 'relative',
+              transition: 'width 0.22s ease',
+              borderRadius: '8px',
+              overflow: 'hidden',
+              border: '1px solid var(--bg-modifier-accent)'
+            }}>
+              <iframe
+                src={sheetUrl}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                  backgroundColor: 'var(--bg-primary)'
+                }}
+                title="Formula Sheet Reference"
+              />
+            </div>
+          )}
+          
         </div>
 
         {/* Tools Panel (Discord Sidebar style) */}
