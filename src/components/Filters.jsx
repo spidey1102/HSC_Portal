@@ -10,6 +10,8 @@ export default function Filters({
   setSelectedSchool,
   selectedYear,
   setSelectedYear,
+  yearSort,
+  setYearSort,
   solutionsOnly,
   setSolutionsOnly,
   schools,
@@ -95,6 +97,27 @@ export default function Filters({
           {years.map((year) => (
             <option key={year} value={year} style={{ background: 'var(--bg-secondary)', color: 'var(--text-normal)' }}>{year}</option>
           ))}
+        </select>
+
+        {/* Sort by year */}
+        <select
+          value={yearSort}
+          onChange={(e) => setYearSort(e.target.value)}
+          style={{
+            backgroundColor: 'transparent',
+            color: yearSort !== 'desc' ? 'var(--interactive-active)' : 'var(--interactive-normal)',
+            border: 'none',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: 'pointer',
+            outline: 'none',
+            padding: '4px'
+          }}
+          title="Sort papers by year"
+        >
+          <option value="desc" style={{ background: 'var(--bg-secondary)', color: 'var(--text-normal)' }}>Year ↓ Newest</option>
+          <option value="asc" style={{ background: 'var(--bg-secondary)', color: 'var(--text-normal)' }}>Year ↑ Oldest</option>
+          <option value="none" style={{ background: 'var(--bg-secondary)', color: 'var(--text-normal)' }}>Default order</option>
         </select>
 
         {/* School */}

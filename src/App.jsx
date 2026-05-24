@@ -25,6 +25,7 @@ export default function App() {
   const [selectedYear, setSelectedYear] = useState(null);
   const [solutionsOnly, setSolutionsOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [yearSort, setYearSort] = useState('desc'); // desc = newest first, asc = oldest first, none = default order
 
   // Bookmarks State
   const [viewBookmarks, setViewBookmarks] = useState(false);
@@ -97,6 +98,7 @@ export default function App() {
     selectedCategory,
     selectedSchool,
     selectedYear,
+    yearSort,
     solutionsOnly,
     searchQuery,
     viewBookmarks,
@@ -183,11 +185,28 @@ export default function App() {
     bookmarks
   ]);
 
+  const getYearSortValue = (year) => {
+    const n = parseInt(String(year), 10);
+    return Number.isFinite(n) ? n : -1;
+  };
+
+  const sortedPapers = useMemo(() => {
+    if (yearSort === 'none') return filteredPapers;
+    const list = [...filteredPapers];
+    list.sort((a, b) => {
+      const ya = getYearSortValue(a.y);
+      const yb = getYearSortValue(b.y);
+      return yearSort === 'desc' ? yb - ya : ya - yb;
+    });
+    return list;
+  }, [filteredPapers, yearSort]);
+
   const hasActiveFilters = 
     selectedSubject !== null || 
     selectedCategory !== null || 
     selectedSchool !== null || 
     selectedYear !== null || 
+    yearSort !== 'desc' ||
     solutionsOnly || 
     searchQuery !== '';
 
@@ -196,11 +215,12 @@ export default function App() {
     setSelectedCategory(null);
     setSelectedSchool(null);
     setSelectedYear(null);
+    setYearSort('desc');
     setSolutionsOnly(false);
     setSearchQuery('');
   };
 
-  const paginatedPapers = filteredPapers.slice(0, renderLimit);
+  const paginatedPapers = sortedPapers.slice(0, renderLimit);
 
   return (
     <div className={`app-container ${isSidebarOpen ? 'sidebar-visible' : ''}`}>
@@ -280,6 +300,8 @@ export default function App() {
                 setSelectedSchool={setSelectedSchool}
                 selectedYear={selectedYear}
                 setSelectedYear={setSelectedYear}
+                yearSort={yearSort}
+                setYearSort={setYearSort}
                 solutionsOnly={solutionsOnly}
                 setSolutionsOnly={setSolutionsOnly}
                 schools={schools}
@@ -350,16 +372,16 @@ export default function App() {
               {/* Results Counters */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px', textTransform: 'uppercase', fontWeight: 600 }}>
                 <span>
-                  Found {filteredPapers.length.toLocaleString()} matches
+                  Found {sortedPapers.length.toLocaleString()} matches
                   {selectedSubject !== null && ` in ${subjects[selectedSubject]}`}
                 </span>
                 <span>
-                  Showing {Math.min(renderLimit, filteredPapers.length).toLocaleString()}
+                  Showing {Math.min(renderLimit, sortedPapers.length).toLocaleString()}
                 </span>
               </div>
 
               {/* Papers Grid */}
-              {filteredPapers.length > 0 ? (
+              {sortedPapers.length > 0 ? (
                 <div className="papers-grid">
                   {paginatedPapers.map((paper, idx) => (
                     <PaperCard
@@ -392,7 +414,7 @@ export default function App() {
               )}
 
               {/* Pagination Show More */}
-              {filteredPapers.length > renderLimit && (
+              {sortedPapers.length > renderLimit && (
                 <div style={{ display: 'flex', justifyContent: 'center', margin: '32px 0 64px 0' }}>
                   <button
                     onClick={() => setRenderLimit(prev => prev + 40)}
