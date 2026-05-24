@@ -4,6 +4,7 @@ import Filters from './components/Filters';
 import PaperCard from './components/PaperCard';
 import PracticeRoom from './components/PracticeRoom';
 import TextbooksView from './components/TextbooksView';
+import ExamCountdown from './components/ExamCountdown';
 import { Sparkles, Library, RefreshCw, Star, Trash2, Book, Menu } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react';
 import './App.css';
@@ -319,6 +320,11 @@ export default function App() {
                 ? `This is the start of your saved library. You have ${bookmarks.size} papers ready for practice.`
                 : `This is the start of the ultimate prep center. Search through 7,200+ official NESA past papers and school trial exams.`}
             </p>
+            {!viewBookmarks && !viewTextbooks && selectedLevel === 12 && (
+              <ExamCountdown
+                subjectName={selectedSubject !== null ? subjects[selectedSubject] : null}
+              />
+            )}
           </div>
 
           {/* Dynamic loading view */}

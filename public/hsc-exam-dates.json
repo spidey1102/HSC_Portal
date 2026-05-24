@@ -1,0 +1,336 @@
+{
+  "year": 2026,
+  "timezone": "Australia/Sydney",
+  "source": "NESA 2026 HSC written exam timetable",
+  "defaultCountdownTo": "first-written",
+  "period": {
+    "start": "2026-10-13",
+    "end": "2026-11-05",
+    "label": "HSC written examinations"
+  },
+  "nesaUrl": "https://www.nsw.gov.au/education-and-training/nesa/key-dates/hsc-written-exam-timetable",
+  "nesaPdfUrl": "https://www.nsw.gov.au/sites/default/files/noindex/2026-05/2026-hsc-written-exam-timetable-01-05-26.pdf",
+  "schedule": [
+    {
+      "date": "2026-10-13",
+      "day": "Tuesday",
+      "hscDay": 1,
+      "exams": [
+        {
+          "subject": "English Advanced Paper 1 – Texts and Human Experiences",
+          "startTime": "09:50",
+          "endTime": "11:30"
+        },
+        {
+          "subject": "English Standard Paper 1 – Texts and Human Experiences",
+          "startTime": "09:50",
+          "endTime": "11:30"
+        },
+        {
+          "subject": "English Studies",
+          "startTime": "09:50",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "English EAL/D Paper 1 – Module A and Focus on Writing",
+          "startTime": "09:50",
+          "endTime": "11:30"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-14",
+      "day": "Wednesday",
+      "hscDay": 2,
+      "exams": [
+        {
+          "subject": "English Advanced Paper 2 – Modules",
+          "startTime": "09:25",
+          "endTime": "11:30"
+        },
+        {
+          "subject": "English Standard Paper 2 – Modules",
+          "startTime": "09:25",
+          "endTime": "11:30"
+        },
+        {
+          "subject": "Modern History",
+          "startTime": "09:25",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "Agriculture",
+          "startTime": "13:55",
+          "endTime": "17:00"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-15",
+      "day": "Thursday",
+      "hscDay": 3,
+      "exams": [
+        {
+          "subject": "Earth and Environmental Science",
+          "startTime": "09:25",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "Japanese Continuers",
+          "startTime": "14:00",
+          "endTime": "17:00"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-16",
+      "day": "Friday",
+      "hscDay": 4,
+      "exams": [
+        {
+          "subject": "Hospitality (VET)",
+          "startTime": "13:55",
+          "endTime": "16:00"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-19",
+      "day": "Monday",
+      "hscDay": 5,
+      "exams": [
+        {
+          "subject": "Mathematics Advanced",
+          "startTime": "09:20",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "Mathematics Standard 2",
+          "startTime": "09:20",
+          "endTime": "12:00"
+        },
+        {
+          "subject": "Mathematics Extension 2",
+          "startTime": "13:50",
+          "endTime": "17:00"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-20",
+      "day": "Tuesday",
+      "hscDay": 6,
+      "exams": [
+        {
+          "subject": "Engineering Studies",
+          "startTime": "09:25",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "Biology",
+          "startTime": "09:25",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "Society and Culture",
+          "startTime": "13:55",
+          "endTime": "16:00"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-21",
+      "day": "Wednesday",
+      "hscDay": 7,
+      "exams": [
+        {
+          "subject": "Studies of Religion II",
+          "startTime": "09:25",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "History Extension",
+          "startTime": "13:50",
+          "endTime": "16:00"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-22",
+      "day": "Thursday",
+      "hscDay": 8,
+      "exams": [
+        {
+          "subject": "Ancient History",
+          "startTime": "09:25",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "Drama",
+          "startTime": "13:55",
+          "endTime": "15:30"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-23",
+      "day": "Friday",
+      "hscDay": 9,
+      "exams": [
+        {
+          "subject": "Mathematics Extension 1",
+          "startTime": "13:50",
+          "endTime": "16:00"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-26",
+      "day": "Monday",
+      "hscDay": 10,
+      "exams": [
+        {
+          "subject": "Business Studies",
+          "startTime": "09:25",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "Science Extension",
+          "startTime": "13:50",
+          "endTime": "16:00"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-27",
+      "day": "Tuesday",
+      "hscDay": 11,
+      "exams": [
+        {
+          "subject": "Software Engineering",
+          "startTime": "09:50",
+          "endTime": "12:20"
+        },
+        {
+          "subject": "Economics",
+          "startTime": "13:55",
+          "endTime": "17:00"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-28",
+      "day": "Wednesday",
+      "hscDay": 12,
+      "exams": [
+        {
+          "subject": "Health and Movement Science",
+          "startTime": "09:20",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "English Extension 1",
+          "startTime": "13:50",
+          "endTime": "16:00"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-29",
+      "day": "Thursday",
+      "hscDay": 13,
+      "exams": [
+        {
+          "subject": "Enterprise Computing",
+          "startTime": "09:50",
+          "endTime": "12:20"
+        },
+        {
+          "subject": "Design and Technology",
+          "startTime": "13:55",
+          "endTime": "15:30"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-30",
+      "day": "Friday",
+      "hscDay": 14,
+      "exams": [
+        {
+          "subject": "Chemistry",
+          "startTime": "09:25",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "Visual Arts – Art Criticism and Art History",
+          "startTime": "13:55",
+          "endTime": "15:30"
+        }
+      ]
+    },
+    {
+      "date": "2026-11-02",
+      "day": "Monday",
+      "hscDay": 15,
+      "exams": [
+        {
+          "subject": "Legal Studies",
+          "startTime": "09:25",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "Geography",
+          "startTime": "13:50",
+          "endTime": "17:00"
+        }
+      ]
+    },
+    {
+      "date": "2026-11-03",
+      "day": "Tuesday",
+      "hscDay": 16,
+      "exams": [
+        {
+          "subject": "Community and Family Studies",
+          "startTime": "09:25",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "Investigating Science",
+          "startTime": "13:55",
+          "endTime": "17:00"
+        }
+      ]
+    },
+    {
+      "date": "2026-11-04",
+      "day": "Wednesday",
+      "hscDay": 17,
+      "exams": [
+        {
+          "subject": "Food Technology",
+          "startTime": "09:25",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "Industrial Technology",
+          "startTime": "13:55",
+          "endTime": "15:30"
+        }
+      ]
+    },
+    {
+      "date": "2026-11-05",
+      "day": "Thursday",
+      "hscDay": 18,
+      "exams": [
+        {
+          "subject": "Physics",
+          "startTime": "09:25",
+          "endTime": "12:30"
+        }
+      ]
+    }
+  ]
+}
