@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, FileText, CheckCircle2 } from 'lucide-react';
+import { Star, FileText, CheckCircle2, Share2 } from 'lucide-react';
 
 export default function PaperCard({
   paper,
@@ -7,6 +7,7 @@ export default function PaperCard({
   schoolName,
   isBookmarked,
   toggleBookmark,
+  sharePaper,
   onSelectPaper
 }) {
   const getCategoryDetails = (code) => {
@@ -40,22 +41,40 @@ export default function PaperCard({
             {cat.label}
           </span>
 
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleBookmark();
-            }}
-            className="btn-secondary"
-            style={{
-              padding: '8px 10px',
-              minWidth: '40px',
-              justifyContent: 'center',
-              color: isBookmarked ? 'var(--status-warning)' : 'var(--interactive-muted)'
-            }}
-            title={isBookmarked ? 'Remove bookmark' : 'Save paper'}
-          >
-            <Star size={16} fill={isBookmarked ? 'currentColor' : 'none'} />
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                sharePaper();
+              }}
+              className="btn-secondary"
+              style={{
+                padding: '8px 10px',
+                minWidth: '40px',
+                justifyContent: 'center',
+              }}
+              title="Share test link"
+            >
+              <Share2 size={16} />
+            </button>
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleBookmark();
+              }}
+              className="btn-secondary"
+              style={{
+                padding: '8px 10px',
+                minWidth: '40px',
+                justifyContent: 'center',
+                color: isBookmarked ? 'var(--status-warning)' : 'var(--interactive-muted)'
+              }}
+              title={isBookmarked ? 'Remove bookmark' : 'Save paper'}
+            >
+              <Star size={16} fill={isBookmarked ? 'currentColor' : 'none'} />
+            </button>
+          </div>
         </div>
 
         <h3

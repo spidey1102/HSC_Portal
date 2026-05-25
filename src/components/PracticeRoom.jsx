@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, X, ExternalLink, Edit3, BookOpen, Clock, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Pause, RotateCcw, X, ExternalLink, Edit3, BookOpen, Clock, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Share2 } from 'lucide-react';
 
 export default function PracticeRoom({
   paper,
@@ -9,6 +9,7 @@ export default function PracticeRoom({
   allPapers,
   subjects,
   schools,
+  onSharePaper,
   onSelectPaper
 }) {
   const loadSavedTimerSeconds = () => {
@@ -219,6 +220,16 @@ export default function PracticeRoom({
         </div>
 
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button
+            onClick={onSharePaper}
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            title="Share this test"
+          >
+            <Share2 size={16} />
+            <span>Share</span>
+          </button>
+
           {sheetUrl && (
             <button
               onClick={() => setShowFormula(prev => !prev)}

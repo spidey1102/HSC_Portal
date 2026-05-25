@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import Filters from './components/Filters';
 import PaperCard from './components/PaperCard';
@@ -60,6 +60,8 @@ export default function App() {
 
   // Pagination Limit
   const [renderLimit, setRenderLimit] = useState(40);
+  const [shareNotice, setShareNotice] = useState('');
+  const shareNoticeTimer = useRef(null);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -69,6 +71,12 @@ export default function App() {
       // ignore
     }
   }, [theme]);
+
+  useEffect(() => {
+    return () => {
+      if (shareNoticeTimer.current) clearTimeout(shareNoticeTimer.current);
+    };
+  }, []);
 
   // Fetch compiled database
   useEffect(() => {
@@ -112,6 +120,85 @@ export default function App() {
       localStorage.removeItem('hsc_bookmarks');
     }
   };
+
+  const flashShareNotice = (message) => {
+    setShareNotice(message);
+    if (shareNoticeTimer.current) clearTimeout(shareNoticeTimer.current);
+    shareNoticeTimer.current = setTimeout(() => setShareNotice(''), 1800);
+  };
+
+  const copyText = async (text) => {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+
+    const input = document.createElement('textarea');
+    input.value = text;
+    input.setAttribute('readonly', '');
+    input.style.position = 'fixed';
+    input.style.left = '-9999px';
+    document.body.appendChild(input);
+    input.select();
+    const success = document.execCommand('copy');
+    document.body.removeChild(input);
+    return success;
+  };
+
+  const buildPaperShareUrl = (paper) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('paper', String(paper.v));
+    return url.toString();
+  };
+
+  const sharePaper = async (paper) => {
+    const shareUrl = buildPaperShareUrl(paper);
+    const shareData = {
+      title: paper.n,
+      text: `Open this HSC paper in HSC Portal`,
+      url: shareUrl,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        flashShareNotice('Share sheet opened');
+        return;
+      }
+
+      await copyText(shareUrl);
+      flashShareNotice('Share link copied');
+    } catch (e) {
+      try {
+        await copyText(shareUrl);
+        flashShareNotice('Share link copied');
+      } catch (copyErr) {
+        window.prompt('Copy this share link', shareUrl);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!papers.length || loading) return;
+    if (activePaper) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const paperId = params.get('paper');
+    if (!paperId) return;
+
+    const match = papers.find((p) => String(p.v) === paperId);
+    if (match) setActivePaper(match);
+  }, [papers, loading, activePaper]);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (activePaper) {
+      url.searchParams.set('paper', String(activePaper.v));
+    } else {
+      url.searchParams.delete('paper');
+    }
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  }, [activePaper]);
 
   // Reset pagination limit when filters change
   useEffect(() => {
@@ -311,6 +398,10 @@ export default function App() {
           </div>
 
           <div className="control-group">
+            {shareNotice && (
+              <span className="pill subtle" style={{ padding: '8px 12px' }}>{shareNotice}</span>
+            )}
+
             <button
               type="button"
               onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
@@ -452,6 +543,7 @@ export default function App() {
                               schoolName={schools[paper.h]}
                               isBookmarked={bookmarks.has(paper.v + '_' + paper.n)}
                               toggleBookmark={() => toggleBookmark(paper.v + '_' + paper.n)}
+                              sharePaper={() => sharePaper(paper)}
                               onSelectPaper={setActivePaper}
                             />
                           ))}
@@ -497,6 +589,7 @@ export default function App() {
           allPapers={papers}
           subjects={subjects}
           schools={schools}
+          onSharePaper={() => sharePaper(activePaper)}
           onSelectPaper={setActivePaper}
         />
       )}
