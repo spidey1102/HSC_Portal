@@ -61,11 +61,12 @@ export default function PracticeRoom({
   const [aiOpen, setAiOpen] = useState(false);
   const [aiModel, setAiModel] = useState(() => {
     try {
-      return localStorage.getItem('hsc_openrouter_model') || 'openai/gpt-oss-120b:free';
+      return localStorage.getItem('hsc_openrouter_model') || 'deepseek/deepseek-v4-flash:free';
     } catch (e) {
-      return 'openai/gpt-oss-120b:free';
+      return 'deepseek/deepseek-v4-flash:free';
     }
   });
+  const [aiExcerpt, setAiExcerpt] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiResponse, setAiResponse] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
@@ -115,6 +116,7 @@ export default function PracticeRoom({
     } catch (e) {
       setNotes('');
     }
+    setAiExcerpt('');
     setAiPrompt('');
     setAiResponse('');
     setAiError('');
@@ -210,7 +212,7 @@ export default function PracticeRoom({
     if (!value) return '';
     const trimmed = String(value).trim();
     if (trimmed.length <= limit) return trimmed;
-    return `${trimmed.slice(0, limit)}…`;
+    return `${trimmed.slice(0, limit)}...`;
   };
 
   const buildStudyContext = () => {
@@ -218,6 +220,7 @@ export default function PracticeRoom({
       ? relatedResources.map((res) => res.n.includes('Guidelines') ? 'Marking Guidelines' : res.n).join(', ')
       : 'No closely related resources were detected.';
 
+    const excerptBlock = compactText(aiExcerpt || '', 1200);
     const noteBlock = compactText(notes || '', 2400);
 
     return [
@@ -226,6 +229,7 @@ export default function PracticeRoom({
       `School/resource group: ${schoolName || 'Unknown'}`,
       `Paper ID: ${paper.v}`,
       `Related resources: ${resourceList}`,
+      excerptBlock ? `Highlighted excerpt:\n${excerptBlock}` : 'Highlighted excerpt: none provided.',
       noteBlock ? `Student notes:\n${noteBlock}` : 'Student notes: none yet.',
     ].join('\n');
   };
@@ -279,6 +283,26 @@ export default function PracticeRoom({
       setAiError(error?.message || 'Something went wrong while contacting OpenRouter.');
     } finally {
       setAiLoading(false);
+    }
+  };
+
+  const useClipboardExcerpt = async () => {
+    try {
+      if (!navigator.clipboard?.readText) {
+        setAiError('Clipboard access is not available in this browser.');
+        return;
+      }
+
+      const copied = await navigator.clipboard.readText();
+      if (!copied.trim()) {
+        setAiError('Your clipboard is empty.');
+        return;
+      }
+
+      setAiExcerpt(copied.trim());
+      setAiError('');
+    } catch (error) {
+      setAiError(error?.message || 'Could not read the clipboard.');
     }
   };
 
@@ -478,7 +502,7 @@ export default function PracticeRoom({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: aiOpen ? '12px' : 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--header-secondary)', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>
                 <Sparkles size={16} />
-                <span>Study AI</span>
+                <span>Doubt Clarifier</span>
               </div>
 
               <button
@@ -500,7 +524,7 @@ export default function PracticeRoom({
                 fontSize: '13px',
                 lineHeight: 1.45
               }}>
-                A quiet study helper for revision checklists, quick quizzes, and cleaning up your notes.
+                Paste a copied highlight or type your doubt. The assistant will explain the excerpt plainly.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -518,42 +542,70 @@ export default function PracticeRoom({
                   />
                 </label>
 
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+                    Highlight or excerpt
+                  </span>
+                  <textarea
+                    value={aiExcerpt}
+                    onChange={(e) => setAiExcerpt(e.target.value)}
+                    className="discord-input"
+                    placeholder="Paste the highlighted text here if you copied it from the paper..."
+                    rows={4}
+                    style={{
+                      width: '100%',
+                      resize: 'vertical',
+                      minHeight: '92px',
+                      fontSize: '13px',
+                      lineHeight: 1.45
+                    }}
+                  />
+                </label>
+
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     className="btn-secondary"
                     style={{ padding: '6px 10px', fontSize: '12px' }}
                     onClick={() => {
-                      const prompt = 'Turn my notes into a short revision checklist with the most important ideas first.';
+                      const prompt = 'Explain the highlighted excerpt in simple words and focus only on what it means.';
                       setAiPrompt(prompt);
                       runStudyAssistant(prompt);
                     }}
                   >
-                    Revision checklist
+                    Explain excerpt
                   </button>
                   <button
                     type="button"
                     className="btn-secondary"
                     style={{ padding: '6px 10px', fontSize: '12px' }}
                     onClick={() => {
-                      const prompt = 'Quiz me on this paper and ask one question at a time. Keep it challenging but fair.';
+                      const prompt = 'Turn the highlighted excerpt into a clear study note and point out the main idea, definition, or method.';
                       setAiPrompt(prompt);
                       runStudyAssistant(prompt);
                     }}
                   >
-                    Quick quiz
+                    Simplify it
                   </button>
                   <button
                     type="button"
                     className="btn-secondary"
                     style={{ padding: '6px 10px', fontSize: '12px' }}
                     onClick={() => {
-                      const prompt = 'Rewrite my notes into clearer study bullets and point out anything that looks incomplete.';
+                      const prompt = 'Ask me one short question about the highlighted excerpt at a time and wait for my answer.';
                       setAiPrompt(prompt);
                       runStudyAssistant(prompt);
                     }}
                   >
-                    Clean notes
+                    Quiz me
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ padding: '6px 10px', fontSize: '12px' }}
+                    onClick={useClipboardExcerpt}
+                  >
+                    Use clipboard
                   </button>
                 </div>
 
@@ -561,7 +613,7 @@ export default function PracticeRoom({
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
                   className="discord-input"
-                  placeholder="Ask for a revision plan, note cleanup, a quiz, or a study checklist..."
+                  placeholder="Ask a doubt about the excerpt or tell the assistant what you want explained..."
                   rows={4}
                   style={{
                     width: '100%',
