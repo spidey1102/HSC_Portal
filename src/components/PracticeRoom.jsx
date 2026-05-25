@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, X, ExternalLink, Edit3, BookOpen, Clock, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Share2 } from 'lucide-react';
+import { Play, Pause, RotateCcw, X, ExternalLink, Edit3, BookOpen, Clock, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Share2, Sparkles, Send } from 'lucide-react';
 
 export default function PracticeRoom({
   paper,
@@ -58,6 +58,18 @@ export default function PracticeRoom({
 
   // Formula Sheet states
   const [showFormula, setShowFormula] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiModel, setAiModel] = useState(() => {
+    try {
+      return localStorage.getItem('hsc_openrouter_model') || 'openai/gpt-oss-120b:free';
+    } catch (e) {
+      return 'openai/gpt-oss-120b:free';
+    }
+  });
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiResponse, setAiResponse] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
 
   const getFormulaSheet = (sub) => {
     if (!sub) return null;
@@ -88,6 +100,25 @@ export default function PracticeRoom({
   useEffect(() => {
     localStorage.setItem(`hsc_notes_${paper.v}`, notes);
   }, [notes, paper.v]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('hsc_openrouter_model', aiModel);
+    } catch (e) {
+      // ignore
+    }
+  }, [aiModel]);
+
+  useEffect(() => {
+    try {
+      setNotes(localStorage.getItem(`hsc_notes_${paper.v}`) || '');
+    } catch (e) {
+      setNotes('');
+    }
+    setAiPrompt('');
+    setAiResponse('');
+    setAiError('');
+  }, [paper.v]);
 
   useEffect(() => {
     if (!allPapers || allPapers.length === 0) return;
@@ -175,6 +206,82 @@ export default function PracticeRoom({
   const progressPercentage = totalSeconds > 0 ? (secondsLeft / totalSeconds) * 100 : 0;
   const isTimeCritical = secondsLeft < 15 * 60;
 
+  const compactText = (value, limit = 2400) => {
+    if (!value) return '';
+    const trimmed = String(value).trim();
+    if (trimmed.length <= limit) return trimmed;
+    return `${trimmed.slice(0, limit)}…`;
+  };
+
+  const buildStudyContext = () => {
+    const resourceList = relatedResources.length > 0
+      ? relatedResources.map((res) => res.n.includes('Guidelines') ? 'Marking Guidelines' : res.n).join(', ')
+      : 'No closely related resources were detected.';
+
+    const noteBlock = compactText(notes || '', 2400);
+
+    return [
+      `Paper title: ${paper.n}`,
+      `Subject: ${subjectName || 'Unknown'}`,
+      `School/resource group: ${schoolName || 'Unknown'}`,
+      `Paper ID: ${paper.v}`,
+      `Related resources: ${resourceList}`,
+      noteBlock ? `Student notes:\n${noteBlock}` : 'Student notes: none yet.',
+    ].join('\n');
+  };
+
+  const runStudyAssistant = async (promptText) => {
+    const cleanPrompt = String(promptText || '').trim();
+    if (!cleanPrompt) {
+      setAiError('Type a question first.');
+      return;
+    }
+
+    setAiLoading(true);
+    setAiError('');
+    setAiResponse('');
+
+    try {
+      const response = await fetch('/api/openrouter', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: aiModel.trim() || 'openai/gpt-oss-120b:free',
+          prompt: cleanPrompt,
+          context: buildStudyContext(),
+          max_tokens: 700,
+          temperature: 0.4,
+        }),
+      });
+
+      const raw = await response.text();
+      let payload = null;
+      try {
+        payload = JSON.parse(raw);
+      } catch (e) {
+        // ignore parse failure
+      }
+
+      if (!response.ok) {
+        const message = payload?.error || raw || `Request failed with status ${response.status}.`;
+        throw new Error(message);
+      }
+
+      const answer = payload?.answer?.trim();
+      if (!answer) {
+        throw new Error('No response came back from OpenRouter.');
+      }
+
+      setAiResponse(answer);
+    } catch (error) {
+      setAiError(error?.message || 'Something went wrong while contacting OpenRouter.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const viewUrl = `https://thsconline.github.io/s/v/${paper.v}/${encodeURIComponent(paper.n)}`;
   const directIframeUrl = `https://script.google.com/macros/s/AKfycbx69GPoJtf9sSevsUbWtPr46vpa01u4oNkHjFmkkWxmj62AZ0q-/exec?export=view&field=${encodeURIComponent(paper.n)}&base=${paper.v}`;
 
@@ -228,6 +335,16 @@ export default function PracticeRoom({
           >
             <Share2 size={16} />
             <span>Share</span>
+          </button>
+
+          <button
+            onClick={() => setAiOpen(prev => !prev)}
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            title={aiOpen ? 'Hide study helper' : 'Show study helper'}
+          >
+            <Sparkles size={16} />
+            <span>Study AI</span>
           </button>
 
           {sheetUrl && (
@@ -356,6 +473,167 @@ export default function PracticeRoom({
           aria-hidden={toolsCollapsed}
         >
           
+          {/* Study AI */}
+          <div style={{ padding: '16px', borderBottom: '1px solid var(--bg-modifier-accent)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: aiOpen ? '12px' : 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--header-secondary)', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>
+                <Sparkles size={16} />
+                <span>Study AI</span>
+              </div>
+
+              <button
+                onClick={() => setAiOpen(prev => !prev)}
+                className="btn-secondary"
+                title={aiOpen ? 'Hide study helper' : 'Show study helper'}
+                style={{ padding: '6px 8px' }}
+              >
+                {aiOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+              </button>
+            </div>
+
+            {!aiOpen ? (
+              <div style={{
+                backgroundColor: 'var(--bg-tertiary)',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                color: 'var(--text-muted)',
+                fontSize: '13px',
+                lineHeight: 1.45
+              }}>
+                A quiet study helper for revision checklists, quick quizzes, and cleaning up your notes.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+                    Model
+                  </span>
+                  <input
+                    type="text"
+                    value={aiModel}
+                    onChange={(e) => setAiModel(e.target.value)}
+                    className="discord-input"
+                    placeholder="openai/gpt-oss-120b:free"
+                    autoComplete="off"
+                  />
+                </label>
+
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ padding: '6px 10px', fontSize: '12px' }}
+                    onClick={() => {
+                      const prompt = 'Turn my notes into a short revision checklist with the most important ideas first.';
+                      setAiPrompt(prompt);
+                      runStudyAssistant(prompt);
+                    }}
+                  >
+                    Revision checklist
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ padding: '6px 10px', fontSize: '12px' }}
+                    onClick={() => {
+                      const prompt = 'Quiz me on this paper and ask one question at a time. Keep it challenging but fair.';
+                      setAiPrompt(prompt);
+                      runStudyAssistant(prompt);
+                    }}
+                  >
+                    Quick quiz
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ padding: '6px 10px', fontSize: '12px' }}
+                    onClick={() => {
+                      const prompt = 'Rewrite my notes into clearer study bullets and point out anything that looks incomplete.';
+                      setAiPrompt(prompt);
+                      runStudyAssistant(prompt);
+                    }}
+                  >
+                    Clean notes
+                  </button>
+                </div>
+
+                <textarea
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  className="discord-input"
+                  placeholder="Ask for a revision plan, note cleanup, a quiz, or a study checklist..."
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    resize: 'vertical',
+                    minHeight: '92px',
+                    fontSize: '13px',
+                    lineHeight: 1.45
+                  }}
+                />
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => runStudyAssistant(aiPrompt)}
+                    className="btn-primary"
+                    style={{
+                      flex: 1,
+                      justifyContent: 'center',
+                      gap: '8px'
+                    }}
+                    disabled={aiLoading}
+                  >
+                    <Send size={16} />
+                    <span>{aiLoading ? 'Asking...' : 'Ask AI'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiPrompt('');
+                      setAiResponse('');
+                      setAiError('');
+                    }}
+                    className="btn-secondary"
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                {aiError && (
+                  <div style={{
+                    backgroundColor: 'rgba(163,61,61,0.08)',
+                    border: '1px solid rgba(163,61,61,0.16)',
+                    color: 'var(--header-primary)',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    lineHeight: 1.45
+                  }}>
+                    {aiError}
+                  </div>
+                )}
+
+                {aiResponse && (
+                  <div style={{
+                    backgroundColor: 'var(--bg-primary)',
+                    border: '1px solid var(--bg-modifier-accent)',
+                    borderRadius: '8px',
+                    padding: '12px',
+                    fontSize: '13px',
+                    lineHeight: 1.55,
+                    whiteSpace: 'pre-wrap',
+                    color: 'var(--text-normal)',
+                    maxHeight: '220px',
+                    overflowY: 'auto'
+                  }}>
+                    {aiResponse}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Timer Widget */}
           <div style={{ padding: '16px', borderBottom: '1px solid var(--bg-modifier-accent)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
