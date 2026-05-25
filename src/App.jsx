@@ -6,7 +6,7 @@ import PracticeRoom from './components/PracticeRoom';
 import TextbooksView from './components/TextbooksView';
 import ExamCountdown from './components/ExamCountdown';
 import CustomCalendar from './components/CustomCalendar';
-import { Sparkles, Library, RefreshCw, Star, Trash2, Book, Menu, Calendar } from 'lucide-react';
+import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react';
 import './App.css';
 
@@ -47,8 +47,28 @@ export default function App() {
   // Mobile sidebar toggle
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Theme state
+  const [theme, setTheme] = useState(() => {
+    try {
+      const saved = localStorage.getItem('hsc_theme');
+      if (saved === 'light' || saved === 'dark') return saved;
+    } catch (e) {
+      // ignore
+    }
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
+
   // Pagination Limit
   const [renderLimit, setRenderLimit] = useState(40);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem('hsc_theme', theme);
+    } catch (e) {
+      // ignore
+    }
+  }, [theme]);
 
   // Fetch compiled database
   useEffect(() => {
@@ -226,6 +246,21 @@ export default function App() {
   };
 
   const paginatedPapers = sortedPapers.slice(0, renderLimit);
+  const currentViewLabel = viewCalendar
+    ? 'Assessment calendar'
+    : viewTextbooks
+      ? 'Textbooks'
+      : viewBookmarks
+        ? 'Saved library'
+        : 'HSC past papers';
+
+  const currentViewDescription = viewCalendar
+    ? 'Track assessment dates and keep the term visible at a glance.'
+    : viewTextbooks
+      ? 'Open subject texts and reference material from one quiet library.'
+      : viewBookmarks
+        ? 'Return to the papers you have saved for practice.'
+        : 'Browse official papers, trial exams, and resources without the clutter.';
 
   return (
     <div className={`app-container ${isSidebarOpen ? 'sidebar-visible' : ''}`}>
@@ -253,192 +288,202 @@ export default function App() {
         className="main-content"
         onClick={() => { if (isSidebarOpen && window.innerWidth <= 768) setIsSidebarOpen(false); }}
       >
-        
-        {/* Discord-style Top Bar */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '12px 24px',
-          borderBottom: '1px solid var(--bg-tertiary)',
-          background: 'var(--bg-primary)',
-          boxShadow: 'var(--elevation-low)',
-          zIndex: 2
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="topbar">
+          <div className="topbar-title">
             <button
               className="mobile-menu-btn"
-              onClick={() => setIsSidebarOpen(s => !s)}
+              onClick={() => setIsSidebarOpen((s) => !s)}
               aria-label="Toggle menu"
             >
               <Menu size={18} />
             </button>
-            {viewCalendar ? <Calendar size={24} color="var(--text-muted)" /> : viewTextbooks ? <Book size={24} color="var(--text-muted)" /> : <Library size={24} color="var(--text-muted)" />}
-            <h1 style={{ fontSize: '16px', color: 'var(--header-primary)', margin: 0, fontWeight: 600 }}>
-              {viewCalendar ? 'assessment-calendar' : viewTextbooks ? 'textbooks' : viewBookmarks ? 'saved-library' : 'hsc-past-papers'}
-            </h1>
+            {viewCalendar ? (
+              <Calendar size={20} color="var(--brand-experiment)" />
+            ) : viewTextbooks ? (
+              <Book size={20} color="var(--brand-experiment)" />
+            ) : (
+              <Library size={20} color="var(--brand-experiment)" />
+            )}
+            <div style={{ minWidth: 0 }}>
+              <div className="topbar-subtitle">HSC Portal</div>
+              <h1>{currentViewLabel}</h1>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {/* Action buttons (e.g., Clear Bookmarks) */}
+          <div className="control-group">
+            <button
+              type="button"
+              onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+              className="btn-secondary"
+              style={{ padding: '10px 12px' }}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
             {viewBookmarks && bookmarks.size > 0 && (
               <button
                 onClick={clearAllBookmarks}
                 className="btn-secondary"
-                style={{
-                  color: 'var(--status-danger)',
-                  background: 'transparent',
-                  padding: '4px 8px'
-                }}
-                title="Clear All Bookmarks"
+                style={{ padding: '10px 12px', color: 'var(--status-danger)' }}
+                title="Clear all bookmarks"
               >
-                <Trash2 size={18} />
+                <Trash2 size={16} />
+                <span>Clear</span>
               </button>
-            )}
-            
-            {/* The Filters Search bar can sit up here or right below */}
-            {!viewTextbooks && !viewCalendar && (
-              <Filters
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                selectedCategory={selectedCategory}
-                setSelectedCategory={setSelectedCategory}
-                selectedSchool={selectedSchool}
-                setSelectedSchool={setSelectedSchool}
-                selectedYear={selectedYear}
-                setSelectedYear={setSelectedYear}
-                yearSort={yearSort}
-                setYearSort={setYearSort}
-                solutionsOnly={solutionsOnly}
-                setSolutionsOnly={setSolutionsOnly}
-                schools={schools}
-                years={activeYears}
-                resetFilters={resetFilters}
-                hasActiveFilters={hasActiveFilters}
-              />
             )}
           </div>
         </div>
 
-        {/* Scrollable Chat/Content Area */}
         <div className="scrollable-content">
-          
-          {viewCalendar ? (
-            <CustomCalendar />
-          ) : viewTextbooks ? (
-            <TextbooksView />
-          ) : (
-            <>
-              {/* Welcome Message (Discord style start of channel) */}
-              <div style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border-subtle)' }}>
-            <div style={{
-              background: 'var(--bg-secondary)',
-              width: '68px',
-              height: '68px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: '16px'
-            }}>
-              <Library size={40} color="var(--header-primary)" />
-            </div>
-            <h1 style={{ fontSize: '32px', color: 'var(--header-primary)', marginBottom: '8px' }}>
-              Welcome to #{viewBookmarks ? 'saved-library' : 'hsc-past-papers'}!
-            </h1>
-            <p style={{ color: 'var(--text-muted)' }}>
-              {viewBookmarks 
-                ? `This is the start of your saved library. You have ${bookmarks.size} papers ready for practice.`
-                : `This is the start of the ultimate prep center. Search through 7,200+ official NESA past papers and school trial exams.`}
-            </p>
-            {!viewBookmarks && !viewTextbooks && selectedLevel === 12 && (
-              <ExamCountdown
-                subjectName={selectedSubject !== null ? subjects[selectedSubject] : null}
-                portalSubjects={subjects}
-              />
+          <div className="content-stack">
+            {viewCalendar ? (
+              <CustomCalendar />
+            ) : viewTextbooks ? (
+              <TextbooksView />
+            ) : (
+              <>
+                <section className="hero-band">
+                  <div className="hero-stack">
+                    <div className="hero-title">
+                      <div className="eyebrow">{viewBookmarks ? 'Saved library' : 'Study workspace'}</div>
+                      <h2 className="page-title">
+                        {viewBookmarks ? 'Your saved papers, ready when you are.' : 'A quieter place to work through papers, notes, and exam prep.'}
+                      </h2>
+                      <p className="page-copy">
+                        {viewBookmarks
+                          ? `You have ${bookmarks.size.toLocaleString()} saved paper${bookmarks.size === 1 ? '' : 's'}.`
+                          : currentViewDescription}
+                      </p>
+                    </div>
+
+                    <div className="metric-grid">
+                      <div className="metric-card">
+                        <div className="metric-label">Resources</div>
+                        <div className="metric-value">{papers.length.toLocaleString()}</div>
+                        <div className="metric-note">Official papers, trials, and tasks</div>
+                      </div>
+                      <div className="metric-card">
+                        <div className="metric-label">Bookmarked</div>
+                        <div className="metric-value">{bookmarks.size.toLocaleString()}</div>
+                        <div className="metric-note">Saved for quick return</div>
+                      </div>
+                      <div className="metric-card">
+                        <div className="metric-label">Current view</div>
+                        <div className="metric-value" style={{ fontSize: '18px', lineHeight: 1.2, marginTop: '14px' }}>
+                          {currentViewLabel}
+                        </div>
+                        <div className="metric-note">Switch subjects or modes from the left rail</div>
+                      </div>
+                    </div>
+
+                    {!viewBookmarks && !viewTextbooks && selectedLevel === 12 && (
+                      <ExamCountdown
+                        subjectName={selectedSubject !== null ? subjects[selectedSubject] : null}
+                        portalSubjects={subjects}
+                      />
+                    )}
+                  </div>
+                </section>
+
+                <section className="content-band">
+                  <div className="tool-strip" style={{ marginBottom: '14px' }}>
+                    <div>
+                      <div className="eyebrow">Filters</div>
+                      <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>
+                        Narrow by type, year, school, and solution status.
+                      </p>
+                    </div>
+                    {!viewTextbooks && !viewCalendar && (
+                      <Filters
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                        selectedCategory={selectedCategory}
+                        setSelectedCategory={setSelectedCategory}
+                        selectedSchool={selectedSchool}
+                        setSelectedSchool={setSelectedSchool}
+                        selectedYear={selectedYear}
+                        setSelectedYear={setSelectedYear}
+                        yearSort={yearSort}
+                        setYearSort={setYearSort}
+                        solutionsOnly={solutionsOnly}
+                        setSolutionsOnly={setSolutionsOnly}
+                        schools={schools}
+                        years={activeYears}
+                        resetFilters={resetFilters}
+                        hasActiveFilters={hasActiveFilters}
+                      />
+                    )}
+                  </div>
+
+                  {loading ? (
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '40px 0',
+                      gap: '16px'
+                    }}>
+                      <RefreshCw size={28} color="var(--text-muted)" className="spin" />
+                      <h3 style={{ color: 'var(--text-normal)' }}>Loading resources</h3>
+                    </div>
+                  ) : error ? (
+                    <div style={{ padding: '24px', background: 'rgba(163,61,61,0.08)', borderRadius: '16px', color: 'var(--header-primary)', border: '1px solid rgba(163,61,61,0.16)' }}>
+                      <h3 style={{ marginBottom: '8px', color: 'var(--status-danger)' }}>Load error</h3>
+                      <p>{error}</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="results-header">
+                        <span>
+                          {sortedPapers.length.toLocaleString()} matches
+                          {selectedSubject !== null && ` in ${subjects[selectedSubject]}`}
+                        </span>
+                        <span>Showing {Math.min(renderLimit, sortedPapers.length).toLocaleString()}</span>
+                      </div>
+
+                      {sortedPapers.length > 0 ? (
+                        <div className="papers-grid">
+                          {paginatedPapers.map((paper, idx) => (
+                            <PaperCard
+                              key={`${paper.v}-${idx}`}
+                              paper={paper}
+                              subjectName={subjects[paper.s]}
+                              schoolName={schools[paper.h]}
+                              isBookmarked={bookmarks.has(paper.v + '_' + paper.n)}
+                              toggleBookmark={() => toggleBookmark(paper.v + '_' + paper.n)}
+                              onSelectPaper={setActivePaper}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="empty-state">
+                          <h3 style={{ color: 'var(--header-primary)', marginBottom: '8px' }}>No matches found</h3>
+                          <p style={{ marginBottom: '16px' }}>
+                            Try resetting your filters or searching for different terms.
+                          </p>
+                          <button onClick={resetFilters} className="btn-primary">
+                            Reset filters
+                          </button>
+                        </div>
+                      )}
+
+                      {sortedPapers.length > renderLimit && (
+                        <div style={{ display: 'flex', justifyContent: 'center', margin: '28px 0 48px' }}>
+                          <button
+                            onClick={() => setRenderLimit((prev) => prev + 40)}
+                            className="btn-secondary"
+                          >
+                            Load more papers
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </section>
+              </>
             )}
           </div>
-
-          {/* Dynamic loading view */}
-          {loading ? (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '40px 0',
-              gap: '16px'
-            }}>
-              <RefreshCw size={32} color="var(--text-muted)" style={{ animation: 'spin 2s linear infinite' }} />
-              <h3 style={{ color: 'var(--text-normal)' }}>Loading resources...</h3>
-            </div>
-          ) : error ? (
-            <div style={{ padding: '24px', background: 'var(--status-danger)', borderRadius: '4px', color: 'white' }}>
-              <h3 style={{ marginBottom: '8px', color: 'white' }}>Load Error</h3>
-              <p>{error}</p>
-            </div>
-          ) : (
-            <>
-              {/* Results Counters */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px', textTransform: 'uppercase', fontWeight: 600 }}>
-                <span>
-                  Found {sortedPapers.length.toLocaleString()} matches
-                  {selectedSubject !== null && ` in ${subjects[selectedSubject]}`}
-                </span>
-                <span>
-                  Showing {Math.min(renderLimit, sortedPapers.length).toLocaleString()}
-                </span>
-              </div>
-
-              {/* Papers Grid */}
-              {sortedPapers.length > 0 ? (
-                <div className="papers-grid">
-                  {paginatedPapers.map((paper, idx) => (
-                    <PaperCard
-                      key={`${paper.v}-${idx}`}
-                      paper={paper}
-                      subjectName={subjects[paper.s]}
-                      schoolName={schools[paper.h]}
-                      isBookmarked={bookmarks.has(paper.v + '_' + paper.n)}
-                      toggleBookmark={() => toggleBookmark(paper.v + '_' + paper.n)}
-                      onSelectPaper={setActivePaper}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div style={{
-                  padding: '40px',
-                  textAlign: 'center',
-                  color: 'var(--text-muted)',
-                  background: 'var(--bg-secondary)',
-                  borderRadius: '8px'
-                }}>
-                  <h3 style={{ color: 'var(--header-primary)', marginBottom: '8px' }}>No matches found</h3>
-                  <p style={{ marginBottom: '16px' }}>
-                    Try resetting your filters or searching for different terms.
-                  </p>
-                  <button onClick={resetFilters} className="btn-primary">
-                    Reset Filters
-                  </button>
-                </div>
-              )}
-
-              {/* Pagination Show More */}
-              {sortedPapers.length > renderLimit && (
-                <div style={{ display: 'flex', justifyContent: 'center', margin: '32px 0 64px 0' }}>
-                  <button
-                    onClick={() => setRenderLimit(prev => prev + 40)}
-                    className="btn-secondary"
-                  >
-                    Load More Messages
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-            </>
-          )}
-
         </div>
       </main>
 

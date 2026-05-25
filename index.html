@@ -15,6 +15,19 @@
     <meta property="og:title" content="NSW HSC Past Papers & Trial Exams Hub | Prep Center" />
     <meta property="og:description" content="Access and search over 45,500+ official NESA NSW HSC past papers, school trials, and internal assessments. Free practice space with stopwatch countdown timers and direct worked solutions." />
     <meta property="og:type" content="website" />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('hsc_theme');
+          var theme = saved === 'dark' || saved === 'light'
+            ? saved
+            : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
     
   </head>
   <body>

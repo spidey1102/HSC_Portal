@@ -12,9 +12,10 @@ function CountdownUnit({ value, label, urgent }) {
         minWidth: '56px',
         textAlign: 'center',
         padding: '8px 6px',
-        borderRadius: '8px',
-        background: urgent ? 'var(--status-warning)' : 'var(--accent-brand)',
-        color: '#fff',
+        borderRadius: '14px',
+        background: urgent ? 'rgba(183,122,42,0.12)' : 'rgba(53,91,79,0.08)',
+        color: urgent ? 'var(--status-warning)' : 'var(--brand-experiment)',
+        border: `1px solid ${urgent ? 'rgba(183,122,42,0.18)' : 'rgba(53,91,79,0.14)'}`,
       }}
     >
       <div style={{ fontSize: '22px', fontWeight: 800, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
@@ -79,10 +80,10 @@ export default function ExamCountdown({ subjectName = null, portalSubjects = [] 
     let filename = `hsc-exams-${year}.ics`;
 
     if (subjectName) {
-      calendarName = `HSC ${year} — ${subjectName}`;
+      calendarName = `HSC ${year} - ${subjectName}`;
       filename = `hsc-${subjectName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${year}.ics`;
     } else if (isHome && mySubjects.length > 0) {
-      calendarName = `HSC ${year} — My subjects`;
+      calendarName = `HSC ${year} - My subjects`;
       filename = `hsc-my-exams-${year}.ics`;
     }
 
@@ -170,8 +171,9 @@ export default function ExamCountdown({ subjectName = null, portalSubjects = [] 
     marginTop: '20px',
     padding: '16px 20px',
     background: 'var(--bg-secondary)',
-    borderRadius: '8px',
+    borderRadius: '18px',
     border: '1px solid var(--border-subtle)',
+    boxShadow: 'var(--elevation-low)',
   };
 
   const pinnedSubjectsBar = isHome && mySubjects.length > 0 && !editingSubjects && (
@@ -216,7 +218,7 @@ export default function ExamCountdown({ subjectName = null, portalSubjects = [] 
         </span>
       </div>
       <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 12px 0' }}>
-        Pin the subjects you&apos;re sitting so home shows <strong>your</strong> next exam — not everyone&apos;s English Paper 1.
+        Pin the subjects you&apos;re sitting so home shows <strong>your</strong> next exam - not everyone&apos;s English Paper 1.
       </p>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
         {portalSubjects.map((name) => {
@@ -238,7 +240,7 @@ export default function ExamCountdown({ subjectName = null, portalSubjects = [] 
                 fontWeight: 600,
                 cursor: atMax ? 'not-allowed' : 'pointer',
                 opacity: atMax ? 0.45 : 1,
-                backgroundColor: selected ? 'var(--brand-experiment)' : 'var(--bg-primary)',
+                backgroundColor: selected ? 'var(--brand-experiment)' : 'var(--bg-elevated)',
                 color: selected ? '#fff' : 'var(--interactive-normal)',
               }}
             >
@@ -341,7 +343,7 @@ export default function ExamCountdown({ subjectName = null, portalSubjects = [] 
 
   const heading =
     mode === 'subject'
-      ? `${subjectName} — next exam`
+      ? `${subjectName} - next exam`
       : mode === 'pinned'
         ? 'Your next exam'
         : 'Next HSC written exam';
@@ -396,7 +398,7 @@ export default function ExamCountdown({ subjectName = null, portalSubjects = [] 
             <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12px', color: 'var(--text-muted)' }}>
               {upcomingInScope.map((exam) => (
                 <li key={exam.id} style={{ marginBottom: '4px' }}>
-                  {exam.label} — {formatExamDate(exam.date, exam.time, exam.endTime)}
+                  {exam.label} - {formatExamDate(exam.date, exam.time, exam.endTime)}
                 </li>
               ))}
             </ul>

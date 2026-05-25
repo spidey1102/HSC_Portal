@@ -184,11 +184,10 @@ export default function PracticeRoom({
       left: 0,
       width: '100vw',
       height: '100vh',
-      backgroundColor: 'var(--bg-primary)',
       zIndex: 100,
       display: 'flex',
       flexDirection: 'column'
-    }} className="animate-fade-in">
+    }} className="practice-surface animate-fade-in">
       
       {/* Top Header Bar */}
       <header style={{
@@ -329,7 +328,7 @@ export default function PracticeRoom({
           
         </div>
 
-        {/* Tools Panel (Discord Sidebar style) */}
+        {/* Tools panel */}
         <div
           className={`tools-panel ${toolsCollapsed ? 'collapsed' : ''}`}
           style={{

@@ -108,7 +108,7 @@ export default function CustomCalendar() {
   const calendarDays = getDaysInMonth(currentMonth);
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div className="content-band" style={{ padding: '0' }}>
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -137,12 +137,11 @@ export default function CustomCalendar() {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000
-        }}>
+        }} className="modal-backdrop">
           <div style={{
             backgroundColor: 'var(--bg-secondary)',
             borderRadius: '8px',
