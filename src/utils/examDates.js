@@ -1,4 +1,4 @@
-import { filterExamsForPortalSubject } from './examSubjectMatch';
+import { filterExamsForPortalSubject, filterExamsForPortalSubjects } from './examSubjectMatch';
 
 const SYDNEY_TZ = 'Australia/Sydney';
 
@@ -162,19 +162,34 @@ function getUpcomingByTime(exams, now = new Date()) {
  * @param {Date} [now]
  */
 export function getNextExamState(rawConfig, options = {}, now = new Date()) {
-  const { subjectName = null } = options;
+  const { subjectName = null, pinnedSubjectNames = null } = options;
   const config = normalizeConfig(rawConfig);
 
   if (!config.exams?.length) {
     return { status: 'unavailable' };
   }
 
-  const pool = subjectName
-    ? filterExamsForPortalSubject(config.exams, subjectName)
-    : config.exams;
+  let pool = config.exams;
+  let mode = 'global';
+
+  if (subjectName) {
+    pool = filterExamsForPortalSubject(config.exams, subjectName);
+    mode = 'subject';
+  } else if (pinnedSubjectNames?.length) {
+    pool = filterExamsForPortalSubjects(config.exams, pinnedSubjectNames);
+    mode = 'pinned';
+  }
 
   if (subjectName && pool.length === 0) {
     return { status: 'no-subject-exams', subjectName, year: config.year };
+  }
+
+  if (mode === 'pinned' && pool.length === 0) {
+    return {
+      status: 'no-subject-exams',
+      pinnedSubjectNames,
+      year: config.year,
+    };
   }
 
   const upcoming = getUpcomingByTime(pool, now);
@@ -185,7 +200,8 @@ export function getNextExamState(rawConfig, options = {}, now = new Date()) {
       year: config.year,
       period: config.period,
       subjectName,
-      mode: subjectName ? 'subject' : 'global',
+      pinnedSubjectNames: mode === 'pinned' ? pinnedSubjectNames : null,
+      mode,
     };
   }
 
@@ -205,7 +221,8 @@ export function getNextExamState(rawConfig, options = {}, now = new Date()) {
     nesaUrl: config.nesaUrl,
     nesaPdfUrl: config.nesaPdfUrl,
     subjectName,
-    mode: subjectName ? 'subject' : 'global',
+    pinnedSubjectNames: mode === 'pinned' ? pinnedSubjectNames : null,
+    mode,
   };
 }
 

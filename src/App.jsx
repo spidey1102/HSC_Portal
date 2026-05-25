@@ -345,6 +345,7 @@ export default function App() {
             {!viewBookmarks && !viewTextbooks && selectedLevel === 12 && (
               <ExamCountdown
                 subjectName={selectedSubject !== null ? subjects[selectedSubject] : null}
+                portalSubjects={subjects}
               />
             )}
           </div>

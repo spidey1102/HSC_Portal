@@ -18,6 +18,21 @@ export function filterExamsForPortalSubject(exams, portalSubjectName) {
   return exams.filter((e) => examMatchesPortalSubject(e.label, portalSubjectName));
 }
 
+/** @param {Array<{ label: string }>} exams @param {string[]} portalSubjectNames */
+export function filterExamsForPortalSubjects(exams, portalSubjectNames) {
+  if (!portalSubjectNames?.length) return exams;
+  return exams.filter((e) =>
+    portalSubjectNames.some((name) => examMatchesPortalSubject(e.label, name))
+  );
+}
+
+/** @param {string[]} portalSubjects @param {Array<{ label: string }>} exams */
+export function getSchedulableSubjects(portalSubjects, exams) {
+  return portalSubjects.filter((name) =>
+    exams.some((e) => examMatchesPortalSubject(e.label, name))
+  );
+}
+
 /** @type {Record<string, Array<(label: string) => boolean>>} */
 const PORTAL_SUBJECT_MATCHERS = {
   'English Advanced': [(l) => l.startsWith('English Advanced')],
@@ -32,8 +47,14 @@ const PORTAL_SUBJECT_MATCHERS = {
   IPT: [(l) => l.startsWith('Enterprise Computing')],
   'Senior Science': [(l) => l.startsWith('Investigating Science')],
   Software: [(l) => l.startsWith('Software Engineering')],
-  'Studies of Religion 1': [(l) => l.startsWith('Studies of Religion')],
-  'Studies of Religion 2': [(l) => l.startsWith('Studies of Religion II')],
+  'Studies of Religion 1': [
+    (l) => /^Studies of Religion I\b/i.test(l),
+    (l) => /^Studies of Religion 1(\s|–|-|$)/i.test(l),
+  ],
+  'Studies of Religion 2': [
+    (l) => /^Studies of Religion II/i.test(l),
+    (l) => /^Studies of Religion 2(\s|–|-|$)/i.test(l),
+  ],
   Agriculture: [(l) => l === 'Agriculture'],
   'Ancient History': [(l) => l === 'Ancient History'],
   Biology: [(l) => l === 'Biology'],

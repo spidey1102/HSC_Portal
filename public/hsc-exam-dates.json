@@ -1,7 +1,7 @@
 {
   "year": 2026,
   "timezone": "Australia/Sydney",
-  "source": "NESA 2026 HSC written exam timetable",
+  "source": "NESA 2026 HSC written exam timetable [source 1]",
   "defaultCountdownTo": "first-written",
   "period": {
     "start": "2026-10-13",
@@ -27,14 +27,19 @@
           "endTime": "11:30"
         },
         {
+          "subject": "English EAL/D Paper 1 – Module A and Focus on Writing",
+          "startTime": "09:50",
+          "endTime": "11:30"
+        },
+        {
           "subject": "English Studies",
           "startTime": "09:50",
           "endTime": "12:30"
         },
         {
-          "subject": "English EAL/D Paper 1 – Module A and Focus on Writing",
-          "startTime": "09:50",
-          "endTime": "11:30"
+          "subject": "Classical Greek Extension",
+          "startTime": "14:00",
+          "endTime": "16:00"
         }
       ]
     },
@@ -43,6 +48,11 @@
       "day": "Wednesday",
       "hscDay": 2,
       "exams": [
+        {
+          "subject": "English EAL/D Paper 2 – Module B and Module C",
+          "startTime": "09:25",
+          "endTime": "10:30"
+        },
         {
           "subject": "English Advanced Paper 2 – Modules",
           "startTime": "09:25",
@@ -54,13 +64,18 @@
           "endTime": "11:30"
         },
         {
-          "subject": "Modern History",
-          "startTime": "09:25",
-          "endTime": "12:30"
+          "subject": "English EAL/D Listening Paper",
+          "startTime": "10:40",
+          "endTime": "11:10"
         },
         {
-          "subject": "Agriculture",
+          "subject": "Music 1 Aural Skills",
           "startTime": "13:55",
+          "endTime": "15:00"
+        },
+        {
+          "subject": "Music 2 Musicology and Aural Skills",
+          "startTime": "15:25",
           "endTime": "17:00"
         }
       ]
@@ -71,9 +86,64 @@
       "hscDay": 3,
       "exams": [
         {
+          "subject": "Indonesian Beginners",
+          "startTime": "09:20",
+          "endTime": "12:00"
+        },
+        {
+          "subject": "Tourism, Travel and Events (VET)",
+          "startTime": "09:25",
+          "endTime": "11:30"
+        },
+        {
+          "subject": "Classical Hebrew Continuers",
+          "startTime": "09:25",
+          "endTime": "12:30"
+        },
+        {
           "subject": "Earth and Environmental Science",
           "startTime": "09:25",
           "endTime": "12:30"
+        },
+        {
+          "subject": "Indonesian Continuers",
+          "startTime": "09:30",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "Agriculture",
+          "startTime": "13:55",
+          "endTime": "17:00"
+        },
+        {
+          "subject": "Indonesian Extension",
+          "startTime": "14:00",
+          "endTime": "16:00"
+        },
+        {
+          "subject": "Chinese in Context",
+          "startTime": "14:00",
+          "endTime": "16:40"
+        },
+        {
+          "subject": "Japanese Beginners",
+          "startTime": "14:00",
+          "endTime": "16:40"
+        },
+        {
+          "subject": "Japanese in Context",
+          "startTime": "14:00",
+          "endTime": "16:40"
+        },
+        {
+          "subject": "Korean in Context",
+          "startTime": "14:00",
+          "endTime": "16:40"
+        },
+        {
+          "subject": "Arabic Continuers",
+          "startTime": "14:00",
+          "endTime": "17:00"
         },
         {
           "subject": "Japanese Continuers",
@@ -88,9 +158,64 @@
       "hscDay": 4,
       "exams": [
         {
-          "subject": "Hospitality (VET)",
+          "subject": "Modern History",
+          "startTime": "09:25",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "Japanese Extension",
+          "startTime": "09:30",
+          "endTime": "11:30"
+        },
+        {
+          "subject": "Hospitality (VET) – Kitchen Operations and Cookery, Food and Beverage",
           "startTime": "13:55",
           "endTime": "16:00"
+        },
+        {
+          "subject": "Classical Greek Continuers",
+          "startTime": "13:55",
+          "endTime": "17:00"
+        },
+        {
+          "subject": "Classical Hebrew Extension",
+          "startTime": "14:00",
+          "endTime": "16:00"
+        },
+        {
+          "subject": "German Extension",
+          "startTime": "14:00",
+          "endTime": "16:00"
+        },
+        {
+          "subject": "Armenian, Croatian, Dutch, Filipino, Hindi, Hungarian, Khmer, Macedonian, Persian, Polish, Portuguese, Punjabi, Russian, Serbian, Swedish, Tamil, and Turkish Continuers (CCAFL)",
+          "startTime": "14:00",
+          "endTime": "16:10"
+        },
+        {
+          "subject": "Spanish Beginners",
+          "startTime": "14:00",
+          "endTime": "16:40"
+        },
+        {
+          "subject": "German Continuers",
+          "startTime": "14:00",
+          "endTime": "17:00"
+        },
+        {
+          "subject": "Modern Hebrew Continuers",
+          "startTime": "14:00",
+          "endTime": "17:00"
+        },
+        {
+          "subject": "Spanish Continuers",
+          "startTime": "14:00",
+          "endTime": "17:00"
+        },
+        {
+          "subject": "Vietnamese Continuers",
+          "startTime": "14:00",
+          "endTime": "17:00"
         }
       ]
     },
@@ -100,14 +225,19 @@
       "hscDay": 5,
       "exams": [
         {
-          "subject": "Mathematics Advanced",
+          "subject": "Mathematics Standard 1",
           "startTime": "09:20",
-          "endTime": "12:30"
+          "endTime": "11:30"
         },
         {
           "subject": "Mathematics Standard 2",
           "startTime": "09:20",
           "endTime": "12:00"
+        },
+        {
+          "subject": "Mathematics Advanced",
+          "startTime": "09:20",
+          "endTime": "12:30"
         },
         {
           "subject": "Mathematics Extension 2",
@@ -122,18 +252,33 @@
       "hscDay": 6,
       "exams": [
         {
+          "subject": "German Beginners",
+          "startTime": "09:20",
+          "endTime": "12:00"
+        },
+        {
+          "subject": "Primary Industries (VET)",
+          "startTime": "09:25",
+          "endTime": "11:30"
+        },
+        {
           "subject": "Engineering Studies",
           "startTime": "09:25",
           "endTime": "12:30"
         },
         {
-          "subject": "Biology",
-          "startTime": "09:25",
-          "endTime": "12:30"
+          "subject": "Automotive (VET)",
+          "startTime": "13:55",
+          "endTime": "16:00"
         },
         {
           "subject": "Society and Culture",
           "startTime": "13:55",
+          "endTime": "16:00"
+        },
+        {
+          "subject": "Arabic Extension",
+          "startTime": "14:00",
           "endTime": "16:00"
         }
       ]
@@ -144,7 +289,22 @@
       "hscDay": 7,
       "exams": [
         {
-          "subject": "Studies of Religion II",
+          "subject": "Latin Extension",
+          "startTime": "09:20",
+          "endTime": "11:30"
+        },
+        {
+          "subject": "Textiles and Design",
+          "startTime": "09:25",
+          "endTime": "11:00"
+        },
+        {
+          "subject": "Biology",
+          "startTime": "09:25",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "Latin Continuers",
           "startTime": "09:25",
           "endTime": "12:30"
         },
@@ -152,6 +312,16 @@
           "subject": "History Extension",
           "startTime": "13:50",
           "endTime": "16:00"
+        },
+        {
+          "subject": "Business Services (VET)",
+          "startTime": "13:55",
+          "endTime": "16:00"
+        },
+        {
+          "subject": "Chinese and Literature",
+          "startTime": "14:00",
+          "endTime": "17:00"
         }
       ]
     },
@@ -161,7 +331,12 @@
       "hscDay": 8,
       "exams": [
         {
-          "subject": "Ancient History",
+          "subject": "Studies of Religion I",
+          "startTime": "09:25",
+          "endTime": "11:00"
+        },
+        {
+          "subject": "Studies of Religion II",
           "startTime": "09:25",
           "endTime": "12:30"
         },
@@ -169,6 +344,16 @@
           "subject": "Drama",
           "startTime": "13:55",
           "endTime": "15:30"
+        },
+        {
+          "subject": "Chinese Extension",
+          "startTime": "14:00",
+          "endTime": "16:00"
+        },
+        {
+          "subject": "Chinese Beginners",
+          "startTime": "14:00",
+          "endTime": "16:40"
         }
       ]
     },
@@ -178,9 +363,29 @@
       "hscDay": 9,
       "exams": [
         {
+          "subject": "Electrotechnology (VET)",
+          "startTime": "09:25",
+          "endTime": "11:30"
+        },
+        {
+          "subject": "Ancient History",
+          "startTime": "09:25",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "Spanish Extension",
+          "startTime": "09:30",
+          "endTime": "11:30"
+        },
+        {
           "subject": "Mathematics Extension 1",
           "startTime": "13:50",
           "endTime": "16:00"
+        },
+        {
+          "subject": "Chinese Continuers",
+          "startTime": "14:00",
+          "endTime": "17:00"
         }
       ]
     },
@@ -198,6 +403,11 @@
           "subject": "Science Extension",
           "startTime": "13:50",
           "endTime": "16:00"
+        },
+        {
+          "subject": "Construction (VET)",
+          "startTime": "13:55",
+          "endTime": "16:00"
         }
       ]
     },
@@ -207,9 +417,24 @@
       "hscDay": 11,
       "exams": [
         {
-          "subject": "Software Engineering",
-          "startTime": "09:50",
-          "endTime": "12:20"
+          "subject": "Modern Greek Beginners",
+          "startTime": "09:20",
+          "endTime": "12:00"
+        },
+        {
+          "subject": "Human Services (VET)",
+          "startTime": "09:25",
+          "endTime": "11:30"
+        },
+        {
+          "subject": "Italian Continuers",
+          "startTime": "09:30",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "Entertainment Industry (VET)",
+          "startTime": "13:55",
+          "endTime": "16:00"
         },
         {
           "subject": "Economics",
@@ -224,13 +449,43 @@
       "hscDay": 12,
       "exams": [
         {
+          "subject": "Korean Beginners",
+          "startTime": "09:20",
+          "endTime": "12:00"
+        },
+        {
           "subject": "Health and Movement Science",
           "startTime": "09:20",
           "endTime": "12:30"
         },
         {
+          "subject": "Dance Section I Core Appreciation",
+          "startTime": "09:25",
+          "endTime": "10:30"
+        },
+        {
+          "subject": "Modern Greek Extension",
+          "startTime": "09:30",
+          "endTime": "11:30"
+        },
+        {
+          "subject": "Software Engineering",
+          "startTime": "09:50",
+          "endTime": "12:20"
+        },
+        {
+          "subject": "Dance Section II Major Study Appreciation",
+          "startTime": "10:40",
+          "endTime": "12:00"
+        },
+        {
           "subject": "English Extension 1",
           "startTime": "13:50",
+          "endTime": "16:00"
+        },
+        {
+          "subject": "Information and Digital Technology (VET)",
+          "startTime": "13:55",
           "endTime": "16:00"
         }
       ]
@@ -241,14 +496,39 @@
       "hscDay": 13,
       "exams": [
         {
-          "subject": "Enterprise Computing",
-          "startTime": "09:50",
-          "endTime": "12:20"
+          "subject": "Italian Beginners",
+          "startTime": "09:20",
+          "endTime": "12:00"
+        },
+        {
+          "subject": "Financial Services (VET)",
+          "startTime": "09:25",
+          "endTime": "11:30"
+        },
+        {
+          "subject": "Chemistry",
+          "startTime": "09:25",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "Italian Extension",
+          "startTime": "09:30",
+          "endTime": "11:30"
+        },
+        {
+          "subject": "Korean Continuers",
+          "startTime": "09:30",
+          "endTime": "12:30"
         },
         {
           "subject": "Design and Technology",
           "startTime": "13:55",
           "endTime": "15:30"
+        },
+        {
+          "subject": "French Beginners",
+          "startTime": "14:00",
+          "endTime": "16:40"
         }
       ]
     },
@@ -258,14 +538,39 @@
       "hscDay": 14,
       "exams": [
         {
-          "subject": "Chemistry",
+          "subject": "Aboriginal Studies",
           "startTime": "09:25",
           "endTime": "12:30"
+        },
+        {
+          "subject": "Modern Greek Continuers",
+          "startTime": "09:30",
+          "endTime": "12:30"
+        },
+        {
+          "subject": "Enterprise Computing",
+          "startTime": "09:50",
+          "endTime": "12:20"
         },
         {
           "subject": "Visual Arts – Art Criticism and Art History",
           "startTime": "13:55",
           "endTime": "15:30"
+        },
+        {
+          "subject": "Retail Services (VET)",
+          "startTime": "13:55",
+          "endTime": "16:00"
+        },
+        {
+          "subject": "French Extension",
+          "startTime": "14:00",
+          "endTime": "16:00"
+        },
+        {
+          "subject": "Korean and Literature",
+          "startTime": "14:00",
+          "endTime": "17:00"
         }
       ]
     },
@@ -300,6 +605,11 @@
           "subject": "Investigating Science",
           "startTime": "13:55",
           "endTime": "17:00"
+        },
+        {
+          "subject": "French Continuers",
+          "startTime": "14:00",
+          "endTime": "17:00"
         }
       ]
     },
@@ -314,7 +624,7 @@
           "endTime": "12:30"
         },
         {
-          "subject": "Industrial Technology",
+          "subject": "Industrial Technology (Automotive Technologies, Electronics Technologies, Graphics Technologies, Metal and Engineering Technologies, Multimedia Technologies, Timber and Furniture Technologies)",
           "startTime": "13:55",
           "endTime": "15:30"
         }
