@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, Star, GraduationCap, Award, Database, Hash } from 'lucide-react';
+import { BookOpen, Star, GraduationCap, Award, Database, Hash, Calendar } from 'lucide-react';
 
 export default function Sidebar({
   subjects,
@@ -11,6 +11,8 @@ export default function Sidebar({
   setViewBookmarks,
   viewTextbooks,
   setViewTextbooks,
+  viewCalendar,
+  setViewCalendar,
   bookmarksCount,
   totalPapersCount,
   subjectCounts
@@ -30,7 +32,7 @@ export default function Sidebar({
       }}>
         {/* App Icon (Home) */}
         <div 
-          onClick={() => { setViewBookmarks(false); setViewTextbooks(false); setSelectedLevel(12); }}
+          onClick={() => { setViewBookmarks(false); setViewTextbooks(false); setViewCalendar(false); setSelectedLevel(12); }}
           style={{
             width: '48px',
             height: '48px',
@@ -51,29 +53,29 @@ export default function Sidebar({
 
         {/* Level 12 (Server 1) */}
         <div 
-          onClick={() => { setSelectedLevel(12); setViewBookmarks(false); setViewTextbooks(false); }}
+          onClick={() => { setSelectedLevel(12); setViewBookmarks(false); setViewTextbooks(false); setViewCalendar(false); }}
           style={{
             width: '48px',
             height: '48px',
-            backgroundColor: selectedLevel === 12 && !viewBookmarks ? 'var(--brand-experiment)' : 'var(--bg-primary)',
-            borderRadius: selectedLevel === 12 && !viewBookmarks ? '16px' : '50%',
+            backgroundColor: selectedLevel === 12 && !viewBookmarks && !viewCalendar ? 'var(--brand-experiment)' : 'var(--bg-primary)',
+            borderRadius: selectedLevel === 12 && !viewBookmarks && !viewCalendar ? '16px' : '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
             transition: 'all 0.2s ease-out',
             position: 'relative',
-            color: selectedLevel === 12 && !viewBookmarks ? 'white' : 'var(--text-normal)'
+            color: selectedLevel === 12 && !viewBookmarks && !viewCalendar ? 'white' : 'var(--text-normal)'
           }}
           onMouseEnter={(e) => {
-            if (selectedLevel !== 12 || viewBookmarks) {
+            if (selectedLevel !== 12 || viewBookmarks || viewCalendar) {
               e.currentTarget.style.borderRadius = '16px';
               e.currentTarget.style.backgroundColor = 'var(--brand-experiment)';
               e.currentTarget.style.color = 'white';
             }
           }}
           onMouseLeave={(e) => {
-            if (selectedLevel !== 12 || viewBookmarks) {
+            if (selectedLevel !== 12 || viewBookmarks || viewCalendar) {
               e.currentTarget.style.borderRadius = '50%';
               e.currentTarget.style.backgroundColor = 'var(--bg-primary)';
               e.currentTarget.style.color = 'var(--text-normal)';
@@ -82,7 +84,7 @@ export default function Sidebar({
           title="Year 12 (HSC)"
         >
           {/* Active indicator pip */}
-          {selectedLevel === 12 && !viewBookmarks && (
+          {selectedLevel === 12 && !viewBookmarks && !viewCalendar && (
             <div style={{ position: 'absolute', left: '-16px', top: '50%', transform: 'translateY(-50%)', width: '8px', height: '40px', backgroundColor: 'white', borderRadius: '0 4px 4px 0' }} />
           )}
           <Award size={24} />
@@ -90,29 +92,29 @@ export default function Sidebar({
 
         {/* Level 11 (Server 2) */}
         <div 
-          onClick={() => { setSelectedLevel(11); setViewBookmarks(false); setViewTextbooks(false); }}
+          onClick={() => { setSelectedLevel(11); setViewBookmarks(false); setViewTextbooks(false); setViewCalendar(false); }}
           style={{
             width: '48px',
             height: '48px',
-            backgroundColor: selectedLevel === 11 && !viewBookmarks ? 'var(--brand-experiment)' : 'var(--bg-primary)',
-            borderRadius: selectedLevel === 11 && !viewBookmarks ? '16px' : '50%',
+            backgroundColor: selectedLevel === 11 && !viewBookmarks && !viewCalendar ? 'var(--brand-experiment)' : 'var(--bg-primary)',
+            borderRadius: selectedLevel === 11 && !viewBookmarks && !viewCalendar ? '16px' : '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
             transition: 'all 0.2s ease-out',
             position: 'relative',
-            color: selectedLevel === 11 && !viewBookmarks ? 'white' : 'var(--text-normal)'
+            color: selectedLevel === 11 && !viewBookmarks && !viewCalendar ? 'white' : 'var(--text-normal)'
           }}
           onMouseEnter={(e) => {
-            if (selectedLevel !== 11 || viewBookmarks) {
+            if (selectedLevel !== 11 || viewBookmarks || viewCalendar) {
               e.currentTarget.style.borderRadius = '16px';
               e.currentTarget.style.backgroundColor = 'var(--brand-experiment)';
               e.currentTarget.style.color = 'white';
             }
           }}
           onMouseLeave={(e) => {
-            if (selectedLevel !== 11 || viewBookmarks) {
+            if (selectedLevel !== 11 || viewBookmarks || viewCalendar) {
               e.currentTarget.style.borderRadius = '50%';
               e.currentTarget.style.backgroundColor = 'var(--bg-primary)';
               e.currentTarget.style.color = 'var(--text-normal)';
@@ -121,7 +123,7 @@ export default function Sidebar({
           title="Year 11 (Prelim)"
         >
           {/* Active indicator pip */}
-          {selectedLevel === 11 && !viewBookmarks && (
+          {selectedLevel === 11 && !viewBookmarks && !viewCalendar && (
             <div style={{ position: 'absolute', left: '-16px', top: '50%', transform: 'translateY(-50%)', width: '8px', height: '40px', backgroundColor: 'white', borderRadius: '0 4px 4px 0' }} />
           )}
           <BookOpen size={24} />
@@ -131,7 +133,7 @@ export default function Sidebar({
 
         {/* Bookmarks (DM/Special) */}
         <div 
-          onClick={() => { setViewBookmarks(true); setViewTextbooks(false); }}
+          onClick={() => { setViewBookmarks(true); setViewTextbooks(false); setViewCalendar(false); }}
           style={{
             width: '48px',
             height: '48px',
@@ -193,7 +195,7 @@ export default function Sidebar({
 
         {/* Textbooks Server */}
         <div 
-          onClick={() => { setViewTextbooks(true); setViewBookmarks(false); }}
+          onClick={() => { setViewTextbooks(true); setViewBookmarks(false); setViewCalendar(false); }}
           style={{
             width: '48px',
             height: '48px',
@@ -205,7 +207,8 @@ export default function Sidebar({
             cursor: 'pointer',
             transition: 'all 0.2s ease-out',
             position: 'relative',
-            color: viewTextbooks ? 'white' : '#10b981'
+            color: viewTextbooks ? 'white' : '#10b981',
+            marginBottom: '8px'
           }}
           onMouseEnter={(e) => {
             if (!viewTextbooks) {
@@ -227,6 +230,44 @@ export default function Sidebar({
             <div style={{ position: 'absolute', left: '-16px', top: '50%', transform: 'translateY(-50%)', width: '8px', height: '40px', backgroundColor: 'white', borderRadius: '0 4px 4px 0' }} />
           )}
           <BookOpen size={24} />
+        </div>
+
+        {/* Calendar Server */}
+        <div 
+          onClick={() => { setViewCalendar(true); setViewBookmarks(false); setViewTextbooks(false); }}
+          style={{
+            width: '48px',
+            height: '48px',
+            backgroundColor: viewCalendar ? '#f59e0b' : 'var(--bg-primary)', // Amber color
+            borderRadius: viewCalendar ? '16px' : '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease-out',
+            position: 'relative',
+            color: viewCalendar ? 'white' : '#f59e0b'
+          }}
+          onMouseEnter={(e) => {
+            if (!viewCalendar) {
+              e.currentTarget.style.borderRadius = '16px';
+              e.currentTarget.style.backgroundColor = '#f59e0b';
+              e.currentTarget.style.color = 'white';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!viewCalendar) {
+              e.currentTarget.style.borderRadius = '50%';
+              e.currentTarget.style.backgroundColor = 'var(--bg-primary)';
+              e.currentTarget.style.color = '#f59e0b';
+            }
+          }}
+          title="Assessment Calendar"
+        >
+          {viewCalendar && (
+            <div style={{ position: 'absolute', left: '-16px', top: '50%', transform: 'translateY(-50%)', width: '8px', height: '40px', backgroundColor: 'white', borderRadius: '0 4px 4px 0' }} />
+          )}
+          <Calendar size={24} />
         </div>
 
       </div>

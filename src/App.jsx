@@ -5,7 +5,8 @@ import PaperCard from './components/PaperCard';
 import PracticeRoom from './components/PracticeRoom';
 import TextbooksView from './components/TextbooksView';
 import ExamCountdown from './components/ExamCountdown';
-import { Sparkles, Library, RefreshCw, Star, Trash2, Book, Menu } from 'lucide-react';
+import CustomCalendar from './components/CustomCalendar';
+import { Sparkles, Library, RefreshCw, Star, Trash2, Book, Menu, Calendar } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react';
 import './App.css';
 
@@ -36,6 +37,9 @@ export default function App() {
 
   // Textbooks State
   const [viewTextbooks, setViewTextbooks] = useState(false);
+
+  // Calendar State
+  const [viewCalendar, setViewCalendar] = useState(false);
 
   // active Paper for practice room
   const [activePaper, setActivePaper] = useState(null);
@@ -102,7 +106,8 @@ export default function App() {
     solutionsOnly,
     searchQuery,
     viewBookmarks,
-    viewTextbooks
+    viewTextbooks,
+    viewCalendar
   ]);
 
   // Compute subject counts based on current level dynamically
@@ -236,6 +241,8 @@ export default function App() {
         setViewBookmarks={setViewBookmarks}
         viewTextbooks={viewTextbooks}
         setViewTextbooks={setViewTextbooks}
+        viewCalendar={viewCalendar}
+        setViewCalendar={setViewCalendar}
         bookmarksCount={bookmarks.size}
         totalPapersCount={papers.length}
         subjectCounts={subjectCounts}
@@ -266,9 +273,9 @@ export default function App() {
             >
               <Menu size={18} />
             </button>
-            {viewTextbooks ? <Book size={24} color="var(--text-muted)" /> : <Library size={24} color="var(--text-muted)" />}
+            {viewCalendar ? <Calendar size={24} color="var(--text-muted)" /> : viewTextbooks ? <Book size={24} color="var(--text-muted)" /> : <Library size={24} color="var(--text-muted)" />}
             <h1 style={{ fontSize: '16px', color: 'var(--header-primary)', margin: 0, fontWeight: 600 }}>
-              {viewTextbooks ? 'textbooks' : viewBookmarks ? 'saved-library' : 'hsc-past-papers'}
+              {viewCalendar ? 'assessment-calendar' : viewTextbooks ? 'textbooks' : viewBookmarks ? 'saved-library' : 'hsc-past-papers'}
             </h1>
           </div>
 
@@ -290,7 +297,7 @@ export default function App() {
             )}
             
             {/* The Filters Search bar can sit up here or right below */}
-            {!viewTextbooks && (
+            {!viewTextbooks && !viewCalendar && (
               <Filters
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
@@ -316,7 +323,9 @@ export default function App() {
         {/* Scrollable Chat/Content Area */}
         <div className="scrollable-content">
           
-          {viewTextbooks ? (
+          {viewCalendar ? (
+            <CustomCalendar />
+          ) : viewTextbooks ? (
             <TextbooksView />
           ) : (
             <>
