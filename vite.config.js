@@ -9,6 +9,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
+
+      
+
       {
         name: 'openrouter-dev-route',
         configureServer(server) {
@@ -18,7 +21,11 @@ export default defineConfig(({ mode }) => {
               return
             }
 
-            await handleOpenRouterRequest(req, res, env.OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY)
+            await handleOpenRouterRequest(
+              req,
+              res,
+              env.OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY
+            )
           })
         },
       },
