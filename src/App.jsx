@@ -178,13 +178,6 @@ export default function App() {
     }
   };
 
-  const closeActivePaper = () => {
-    const url = new URL(window.location.href);
-    url.searchParams.delete('paper');
-    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
-    setActivePaper(null);
-  };
-
   useEffect(() => {
     if (!papers.length || loading) return;
     if (activePaper) return;
@@ -592,7 +585,7 @@ export default function App() {
           paper={activePaper}
           subjectName={subjects[activePaper.s]}
           schoolName={schools[activePaper.h]}
-          onClose={closeActivePaper}
+          onClose={() => setActivePaper(null)}
           allPapers={papers}
           subjects={subjects}
           schools={schools}
