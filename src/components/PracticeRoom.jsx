@@ -61,9 +61,9 @@ export default function PracticeRoom({
   const [aiOpen, setAiOpen] = useState(false);
   const [aiModel, setAiModel] = useState(() => {
     try {
-      return localStorage.getItem('hsc_openrouter_model') || 'deepseek/deepseek-v4-flash:free';
+      return localStorage.getItem('hsc_openrouter_model') || 'openrouter/free';
     } catch (e) {
-      return 'deepseek/deepseek-v4-flash:free';
+      return 'openrouter/free';
     }
   });
   const [aiExcerpt, setAiExcerpt] = useState('');

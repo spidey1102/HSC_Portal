@@ -1,4 +1,4 @@
-const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash:free';
+const DEFAULT_MODEL = 'openrouter/free';
 
 const SYSTEM_PROMPT = [
   'You are a calm HSC study coach for a student revision app.',
