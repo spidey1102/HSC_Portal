@@ -21,9 +21,9 @@ A modern all-in-one portal designed to help NSW HSC students manage study resour
 Depending on the current implementation, this project may include:
 
 - Frontend: HTML, CSS, JavaScript
-- Backend: Node.js 
+- Backend: Vite.js 
 - Database: SQL
-- Hosting: GitHub Pages / Vercel
+- Hosting: Vercel
 
 ---
 
