@@ -2,7 +2,9 @@
 import json
 import os
 import re
+import argparse
 from pathlib import Path
+from datetime import date
 
 def slugify(s):
     s = s.lower()
@@ -57,33 +59,48 @@ def main():
         subj = str(subj)
         subj_counts[subj] = subj_counts.get(subj, 0) + 1
 
+    parser = argparse.ArgumentParser(description='Generate per-subject pages and sitemap')
+    parser.add_argument('--base-url', default='', help='Base URL to prefix sitemap and og:url (e.g. https://example.com)')
+    args = parser.parse_args()
+
+    base = args.base_url.rstrip('/')
+
     out = Path('public')
     out.mkdir(exist_ok=True)
 
-    urls = set(['/'])
+    urls = []
+
+    # add homepage
+    home_url = (base + '/') if base else '/'
+    urls.append((home_url, date.today().isoformat()))
 
     for subj, count in sorted(subj_counts.items(), key=lambda x: (-x[1], x[0])):
-        slug = slugify(subj) or 'unknown'
+        slug = slugify(subj)
+        if not slug or slug == 'unknown' or subj.strip().lower() in ('unknown', 'none', ''):
+            # skip unknown or empty subjects
+            continue
         page_dir = out / slug
         page_dir.mkdir(parents=True, exist_ok=True)
         title = f"{subj} — HSC Past Papers"
         desc = f"Browse {count} past HSC papers for {subj}. Download PDFs, view marking guidelines, and practice exam questions."
-        og_url = f"/{slug}/"
+        og_path = f"/{slug}/"
+        og_url = (base + og_path) if base else og_path
         canonical = og_url
         html = HTML_TEMPLATE.format(title=title, description=desc, og_title=title, og_description=desc, og_url=og_url, canonical=canonical, slug=slug)
         (page_dir / 'index.html').write_text(html, encoding='utf-8')
-        urls.add(og_url)
+        urls.append((og_url, date.today().isoformat()))
 
     # write sitemap.xml
     sitemap = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
-    for u in sorted(urls):
+    for u, lastmod in sorted(urls, key=lambda x: x[0]):
         sitemap.append('  <url>')
         sitemap.append(f'    <loc>{u}</loc>')
+        sitemap.append(f'    <lastmod>{lastmod}</lastmod>')
         sitemap.append('  </url>')
     sitemap.append('</urlset>')
     (out / 'sitemap.xml').write_text('\n'.join(sitemap), encoding='utf-8')
 
-    print(f'Wrote {len(subj_counts)} subject pages and sitemap.xml')
+    print(f'Wrote {len(urls)-1} subject pages and sitemap.xml')
 
 if __name__ == '__main__':
     main()
