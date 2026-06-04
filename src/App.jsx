@@ -199,7 +199,40 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [papers, loading]);
 
+  // Helper: slugify subject names for path matching
+  const slugify = (s) => {
+    if (!s) return '';
+    return String(s)
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/[\s_]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+  };
+
+  // Restore selected subject from URL (query param `subject` or path `/slug`)
   useEffect(() => {
+    if (!subjects || !subjects.length) return;
+    const params = new URLSearchParams(window.location.search);
+    const subjectParam = params.get('subject');
+    if (subjectParam) {
+      const idx = subjects.findIndex(s => slugify(s) === subjectParam);
+      if (idx !== -1) setSelectedSubject(idx);
+      return;
+    }
+
+    // check path-based subject: e.g. /physics
+    const path = window.location.pathname || '/';
+    const seg = path.replace(/^\//, '').replace(/\/$/, '');
+    if (seg) {
+      const idx = subjects.findIndex(s => slugify(s) === seg);
+      if (idx !== -1) setSelectedSubject(idx);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subjects]);
+
+  useEffect(() => {
+    // Update `paper` query param without disturbing pathname (subject routes)
     const url = new URL(window.location.href);
     if (activePaper) {
       url.searchParams.set('paper', String(activePaper.v));
@@ -208,6 +241,28 @@ export default function App() {
     }
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
   }, [activePaper]);
+
+  // Update pathname when selectedSubject changes so URL reflects current subject
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const currentPath = url.pathname || '/';
+    if (selectedSubject === null) {
+      // revert to root
+      if (currentPath !== '/') {
+        window.history.replaceState({}, '', '/');
+      }
+      return;
+    }
+    const subjName = subjects[selectedSubject];
+    if (!subjName) return;
+    const slug = slugify(subjName);
+    const desiredPath = `/${slug}/`;
+    if (currentPath !== desiredPath) {
+      // preserve existing search (e.g., ?paper=123)
+      const search = url.search || '';
+      window.history.replaceState({}, '', `${desiredPath}${search}${url.hash}`);
+    }
+  }, [selectedSubject, subjects]);
 
   // Reset pagination limit when filters change
   useEffect(() => {
