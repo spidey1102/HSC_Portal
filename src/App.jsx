@@ -178,6 +178,10 @@ export default function App() {
     }
   };
 
+  // Restore active paper from URL on initial load / when papers are first available.
+  // Intentionally exclude `activePaper` from dependencies so this effect does not
+  // run when the user closes the PracticeRoom (which would immediately reopen it
+  // because the URL param still exists until the other effect removes it).
   useEffect(() => {
     if (!papers.length || loading) return;
     if (activePaper) return;
@@ -188,7 +192,8 @@ export default function App() {
 
     const match = papers.find((p) => String(p.v) === paperId);
     if (match) setActivePaper(match);
-  }, [papers, loading, activePaper]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [papers, loading]);
 
   useEffect(() => {
     const url = new URL(window.location.href);
