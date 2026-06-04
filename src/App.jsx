@@ -6,7 +6,8 @@ import PracticeRoom from './components/PracticeRoom';
 import TextbooksView from './components/TextbooksView';
 import ExamCountdown from './components/ExamCountdown';
 import CustomCalendar from './components/CustomCalendar';
-import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun } from 'lucide-react';
+import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock } from 'lucide-react';
+import PaperHistory from './components/PaperHistory';
 import { Analytics } from '@vercel/analytics/react';
 import './App.css';
 
@@ -37,6 +38,9 @@ export default function App() {
 
   // Textbooks State
   const [viewTextbooks, setViewTextbooks] = useState(false);
+
+  // History State
+  const [viewHistory, setViewHistory] = useState(false);
 
   // Calendar State
   const [viewCalendar, setViewCalendar] = useState(false);
@@ -219,6 +223,7 @@ export default function App() {
     searchQuery,
     viewBookmarks,
     viewTextbooks,
+    viewHistory,
     viewCalendar
   ]);
 
@@ -344,7 +349,9 @@ export default function App() {
       ? 'Textbooks'
       : viewBookmarks
         ? 'Saved library'
-        : 'HSC past papers';
+        : viewHistory
+          ? 'Paper History'
+          : 'HSC past papers';
 
   const currentViewDescription = viewCalendar
     ? 'Track assessment dates and keep the term visible at a glance.'
@@ -352,7 +359,9 @@ export default function App() {
       ? 'Open subject texts and reference material from one quiet library.'
       : viewBookmarks
         ? 'Return to the papers you have saved for practice.'
-        : 'Browse official papers, trial exams, and resources without the clutter.';
+        : viewHistory
+          ? 'Papers you opened and those you marked complete.'
+          : 'Browse official papers, trial exams, and resources without the clutter.';
 
   return (
     <div className={`app-container ${isSidebarOpen ? 'sidebar-visible' : ''}`}>
@@ -427,6 +436,24 @@ export default function App() {
                 <span>Clear</span>
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => {
+                setViewHistory((v) => !v);
+                // close other special views when opening history
+                if (!viewHistory) {
+                  setViewTextbooks(false);
+                  setViewCalendar(false);
+                  setViewBookmarks(false);
+                }
+              }}
+              className="btn-secondary"
+              style={{ padding: '10px 12px' }}
+              title="Open Paper History"
+            >
+              <Clock size={16} />
+              <span>History</span>
+            </button>
           </div>
         </div>
 
@@ -436,6 +463,13 @@ export default function App() {
               <CustomCalendar />
             ) : viewTextbooks ? (
               <TextbooksView />
+            ) : viewHistory ? (
+              <PaperHistory
+                allPapers={papers}
+                subjects={subjects}
+                schools={schools}
+                onSelectPaper={setActivePaper}
+              />
             ) : (
               <>
                 <section className="hero-band">
