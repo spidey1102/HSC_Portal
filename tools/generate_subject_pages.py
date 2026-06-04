@@ -18,14 +18,16 @@ def load_papers(path='public/papers.json'):
     if not p.exists():
         raise SystemExit('public/papers.json not found; run scraper first')
     data = json.loads(p.read_text(encoding='utf-8'))
+    # return both the raw data and the papers list when possible
+    subjects = data.get('subjects') if isinstance(data, dict) else None
     if isinstance(data, dict) and 'papers' in data:
-        return data['papers']
+        return data, data['papers']
     if isinstance(data, list):
-        return data
+        return {'subjects': subjects}, data
     # try to find the largest list
     for v in data.values():
         if isinstance(v, list):
-            return v
+            return data, v
     raise SystemExit('Could not parse papers.json')
 
 HTML_TEMPLATE = '''<!doctype html>
@@ -52,12 +54,23 @@ HTML_TEMPLATE = '''<!doctype html>
 '''
 
 def main():
-    papers = load_papers()
+    data, papers = load_papers()
+    subjects_list = data.get('subjects') if isinstance(data, dict) else None
+
     subj_counts = {}
     for p in papers:
-        subj = p.get('subject') or p.get('subjectName') or p.get('s') or 'Unknown'
-        subj = str(subj)
-        subj_counts[subj] = subj_counts.get(subj, 0) + 1
+        raw_subj = p.get('subject') or p.get('subjectName') or p.get('s') or 'Unknown'
+        # map numeric indexes to subject names when available
+        subj_name = None
+        if isinstance(raw_subj, int) and subjects_list and 0 <= raw_subj < len(subjects_list):
+            subj_name = subjects_list[raw_subj]
+        elif isinstance(raw_subj, str) and raw_subj.isdigit() and subjects_list:
+            idx = int(raw_subj)
+            if 0 <= idx < len(subjects_list):
+                subj_name = subjects_list[idx]
+        if not subj_name:
+            subj_name = str(raw_subj)
+        subj_counts[subj_name] = subj_counts.get(subj_name, 0) + 1
 
     parser = argparse.ArgumentParser(description='Generate per-subject pages and sitemap')
     parser.add_argument('--base-url', default='', help='Base URL to prefix sitemap and og:url (e.g. https://example.com)')
