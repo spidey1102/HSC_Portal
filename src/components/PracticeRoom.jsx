@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, X, ExternalLink, Edit3, BookOpen, Clock, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Share2, Sparkles, Send } from 'lucide-react';
+import { Play, Pause, RotateCcw, X, ExternalLink, Edit3, BookOpen, Clock, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Share2, Sparkles, Send, Check } from 'lucide-react';
 
 export default function PracticeRoom({
   paper,
@@ -72,6 +72,10 @@ export default function PracticeRoom({
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
 
+  const [actionMessage, setActionMessage] = useState('');
+  const actionTimerRef = useRef(null);
+  const [isCompleted, setIsCompleted] = useState(false);
+
   const getFormulaSheet = (sub) => {
     if (!sub) return null;
     const s = sub.toLowerCase();
@@ -122,6 +126,34 @@ export default function PracticeRoom({
     setAiError('');
   }, [paper.v]);
 
+  // Record that this paper was viewed (recently opened)
+  useEffect(() => {
+    try {
+      const key = 'hsc_viewed_papers';
+      const raw = localStorage.getItem(key) || '[]';
+      const arr = JSON.parse(raw);
+      const entry = { v: paper.v, n: paper.n, s: paper.s, h: paper.h, y: paper.y, dateViewed: Date.now() };
+      const filtered = (arr || []).filter(a => String(a.v) !== String(paper.v));
+      filtered.unshift(entry);
+      localStorage.setItem(key, JSON.stringify(filtered.slice(0, 200)));
+    } catch (e) {
+      // ignore
+    }
+  }, [paper.v]);
+
+  // Track whether this paper is marked completed locally
+  useEffect(() => {
+    try {
+      const key = 'hsc_completed_papers';
+      const raw = localStorage.getItem(key) || '[]';
+      const arr = JSON.parse(raw) || [];
+      const found = arr.some(a => String(a.paperId) === String(paper.v));
+      setIsCompleted(Boolean(found));
+    } catch (e) {
+      setIsCompleted(false);
+    }
+  }, [paper.v]);
+
   useEffect(() => {
     if (!allPapers || allPapers.length === 0) return;
 
@@ -164,6 +196,12 @@ export default function PracticeRoom({
   }, [timerRunning]);
 
   useEffect(() => {
+    return () => {
+      if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     try {
       localStorage.setItem('hsc_timer_collapsed', JSON.stringify(timerCollapsed));
     } catch (e) {
@@ -202,6 +240,56 @@ export default function PracticeRoom({
       localStorage.setItem('hsc_timer_duration_secs', String(total));
     } catch (e) {
       // ignore
+    }
+  };
+
+  const handleMarkCompleted = () => {
+    try {
+      const key = 'hsc_completed_papers';
+      const raw = localStorage.getItem(key) || '[]';
+      const arr = JSON.parse(raw);
+      const entryId = `${paper.v}_${Date.now()}`;
+      const entry = {
+        id: entryId,
+        paperId: paper.v,
+        paperName: paper.n,
+        subjectName: subjectName,
+        schoolName: schoolName,
+        dateCompleted: Date.now(),
+        timeSpent: totalSeconds - secondsLeft,
+        status: 'Completed'
+      };
+      const idx = (arr || []).findIndex(a => String(a.paperId) === String(paper.v));
+      if (idx >= 0) arr[idx] = { ...arr[idx], ...entry };
+      else arr.unshift(entry);
+      localStorage.setItem(key, JSON.stringify((arr || []).slice(0, 500)));
+      setActionMessage('Marked as completed');
+      setIsCompleted(true);
+      try { window.dispatchEvent(new CustomEvent('hsc:history-updated')); } catch (e) {}
+      if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+      actionTimerRef.current = setTimeout(() => setActionMessage(''), 1800);
+    } catch (e) {
+      setActionMessage('Failed to mark completed');
+      if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+      actionTimerRef.current = setTimeout(() => setActionMessage(''), 1800);
+    }
+  };
+
+  const handleUnmarkCompleted = () => {
+    try {
+      const key = 'hsc_completed_papers';
+      const raw = localStorage.getItem(key) || '[]';
+      const arr = (JSON.parse(raw) || []).filter(a => String(a.paperId) !== String(paper.v));
+      localStorage.setItem(key, JSON.stringify(arr));
+      setActionMessage('Marked as incomplete');
+      setIsCompleted(false);
+      try { window.dispatchEvent(new CustomEvent('hsc:history-updated')); } catch (e) {}
+      if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+      actionTimerRef.current = setTimeout(() => setActionMessage(''), 1800);
+    } catch (e) {
+      setActionMessage('Failed to update');
+      if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+      actionTimerRef.current = setTimeout(() => setActionMessage(''), 1800);
     }
   };
 
@@ -394,6 +482,32 @@ export default function PracticeRoom({
               <BookOpen size={16} />
               <span>{showFormula ? 'Hide Formula Sheet' : 'Formula Sheet'}</span>
             </button>
+          )}
+
+          {isCompleted ? (
+            <button
+              onClick={handleUnmarkCompleted}
+              className="btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              title="Unmark completed"
+            >
+              <X size={16} />
+              <span>Unmark Completed</span>
+            </button>
+          ) : (
+            <button
+              onClick={handleMarkCompleted}
+              className="btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              title="Mark exam completed"
+            >
+              <Check size={16} />
+              <span>Mark Completed</span>
+            </button>
+          )}
+
+          {actionMessage && (
+            <span className="pill subtle" style={{ padding: '6px 10px' }}>{actionMessage}</span>
           )}
 
           <a
