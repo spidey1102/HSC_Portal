@@ -19,16 +19,6 @@ export async function handleOpenRouterRequest(req, res, apiKey) {
     res.end(JSON.stringify({ error: 'Method not allowed' }));
     return;
   }
-
-  if (!apiKey) {
-    res.statusCode = 500;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({
-      error: 'OpenRouter is not configured yet. Set OPENROUTER_API_KEY in your environment.',
-    }));
-    return;
-  }
-
   try {
     let body = '';
     for await (const chunk of req) body += chunk;
@@ -39,6 +29,23 @@ export async function handleOpenRouterRequest(req, res, apiKey) {
     const cleanModel = String(parsed.model || DEFAULT_MODEL).trim() || DEFAULT_MODEL;
     const maxTokens = Number.isFinite(Number(parsed.max_tokens)) ? Number(parsed.max_tokens) : 700;
     const temperature = Number.isFinite(Number(parsed.temperature)) ? Number(parsed.temperature) : 0.4;
+
+    if (!apiKey) {
+      // Fallback to a local mock response when no API key is provided.
+      // This enables a fast prototype experience without external API access.
+      try {
+        const mockAnswer = generateMockAnswer(cleanPrompt || '', cleanContext || '');
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ answer: mockAnswer }));
+      } catch (e) {
+        console.error('Mock generation error:', e);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'OpenRouter is not configured and mock generation failed.' }));
+      }
+      return;
+    }
 
     if (!cleanPrompt) {
       res.statusCode = 400;
@@ -107,3 +114,28 @@ export async function handleOpenRouterRequest(req, res, apiKey) {
     res.end(JSON.stringify({ error: error?.message || 'Unexpected server error.' }));
   }
 }
+
+function generateMockAnswer(prompt, context) {
+  const p = String(prompt || '').toLowerCase();
+  const ctx = String(context || '').trim();
+
+  // Simple heuristics to create a plausible study-help reply.
+  if (p.includes('explain') || p.includes('simplify') || p.includes('what does')) {
+    const intro = ctx ? `Using the provided context, here's a concise explanation:` : `Here's a concise explanation:`;
+    const body = ctx ? `
+Context excerpt:
+${ctx.split('\n').slice(0,6).join('\n')}
+
+Explanation:` : '\nExplanation:';
+    return `${intro}${body}\n1) Read the question carefully.\n2) Identify key terms and definitions.\n3) Break the problem into smaller steps and solve each part.\n\nIf you paste a short excerpt or the specific question text I can give a more focused explanation.`;
+  }
+
+  if (p.includes('quiz') || p.includes('question')) {
+    return `I'll ask a short question based on the excerpt you provided. (Prototype)\nQ: What is the main concept tested in the excerpt?\nA: [Your answer here]`;
+  }
+
+  // Default fallback reply
+  return `Prototype AI response: I received your prompt. Provide a short excerpt or question and I'll explain it clearly, give a study note, or ask a follow-up question.`;
+}
+
+export { generateMockAnswer };
