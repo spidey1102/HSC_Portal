@@ -15,8 +15,17 @@ export default async function handler(req, res) {
       res.end(JSON.stringify({ error: 'paper not found' }))
       return
     }
+    // If a previously extracted JSON exists in public/extracted, return it.
+    const extractedPath = resolve(process.cwd(), 'public', 'extracted', `${pid}.json`)
+    if (fs.existsSync(extractedPath)) {
+      const extractedRaw = fs.readFileSync(extractedPath, 'utf-8')
+      res.statusCode = 200
+      res.setHeader('Content-Type', 'application/json')
+      res.end(extractedRaw)
+      return
+    }
 
-    // Fake question extraction: split title into up to 6 chunks as demo
+    // Fallback: Fake question extraction: split title into up to 6 chunks as demo
     const text = String(paper.n || '')
     const parts = text.split(/[:;-]|\.\s+/).map(s => s.trim()).filter(Boolean)
     const questions = parts.slice(0, 6).map((t, i) => ({ id: i+1, qnum: i+1, text: `Question ${i+1}: ${t}`, page: 1 }))
