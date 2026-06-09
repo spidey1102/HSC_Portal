@@ -397,7 +397,7 @@ export default function PracticeRoom({
     }
   };
 
-  const runAgentAsk = async (questionId, promptOverride) => {
+  const runAgentAsk = async (questionId, questionText, promptOverride) => {
     setAiLoading(true);
     setAiError('');
     setAiResponse('');
@@ -405,6 +405,7 @@ export default function PracticeRoom({
       const payload = {
         paperId: paper.v,
         questionId,
+        questionText,
         prompt: (promptOverride || aiPrompt || 'Explain this question in simple steps.'),
       };
 
@@ -831,7 +832,7 @@ export default function PracticeRoom({
                             <button
                               type="button"
                               className="btn-primary"
-                              onClick={() => runAgentAsk(q.id || idx)}
+                              onClick={() => runAgentAsk(q.id || idx, q.text)}
                               disabled={aiLoading}
                               style={{ padding: '6px 8px', fontSize: '12px' }}
                             >
