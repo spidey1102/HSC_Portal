@@ -6,9 +6,11 @@ import PracticeRoom from './components/PracticeRoom';
 import TextbooksView from './components/TextbooksView';
 import ExamCountdown from './components/ExamCountdown';
 import CustomCalendar from './components/CustomCalendar';
+import AgenticPaperFinder from './components/AgenticPaperFinder';
 import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock } from 'lucide-react';
 import PaperHistory from './components/PaperHistory';
 import { Analytics } from '@vercel/analytics/react';
+import { findAgenticPaperMatches } from './utils/agenticPaperSearch';
 import './App.css';
 
 export default function App() {
@@ -28,6 +30,7 @@ export default function App() {
   const [solutionsOnly, setSolutionsOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [yearSort, setYearSort] = useState('desc'); // desc = newest first, asc = oldest first, none = default order
+  const [agentQuery, setAgentQuery] = useState('');
 
   // Bookmarks State
   const [viewBookmarks, setViewBookmarks] = useState(false);
@@ -276,6 +279,7 @@ export default function App() {
     yearSort,
     solutionsOnly,
     searchQuery,
+    agentQuery,
     viewBookmarks,
     viewTextbooks,
     viewHistory,
@@ -378,6 +382,26 @@ export default function App() {
     return list;
   }, [filteredPapers, yearSort]);
 
+  const agentResult = useMemo(() => (
+    findAgenticPaperMatches(agentQuery, papers, subjects, schools)
+  ), [agentQuery, papers, subjects, schools]);
+
+  const agentSearchActive = Boolean(agentQuery.trim()) && agentResult.applied;
+
+  const visiblePaperRows = useMemo(() => {
+    if (agentSearchActive) {
+      return agentResult.papers.map((item) => ({
+        paper: item.paper,
+        matchReasons: item.reasons,
+      }));
+    }
+
+    return sortedPapers.map((paper) => ({
+      paper,
+      matchReasons: [],
+    }));
+  }, [agentResult, agentSearchActive, sortedPapers]);
+
   const hasActiveFilters = 
     selectedSubject !== null || 
     selectedCategory !== null || 
@@ -385,7 +409,8 @@ export default function App() {
     selectedYear !== null || 
     yearSort !== 'desc' ||
     solutionsOnly || 
-    searchQuery !== '';
+    searchQuery !== '' ||
+    agentQuery.trim() !== '';
 
   const resetFilters = () => {
     setSelectedSubject(null);
@@ -395,9 +420,10 @@ export default function App() {
     setYearSort('desc');
     setSolutionsOnly(false);
     setSearchQuery('');
+    setAgentQuery('');
   };
 
-  const paginatedPapers = sortedPapers.slice(0, renderLimit);
+  const paginatedPaperRows = visiblePaperRows.slice(0, renderLimit);
   const currentViewLabel = viewCalendar
     ? 'Assessment calendar'
     : viewTextbooks
@@ -571,6 +597,16 @@ export default function App() {
                 </section>
 
                 <section className="content-band">
+                  {!viewBookmarks && (
+                    <AgenticPaperFinder
+                      value={agentQuery}
+                      onSearch={(query) => setAgentQuery(query.trim())}
+                      onClear={() => setAgentQuery('')}
+                      result={agentResult}
+                      disabled={loading}
+                    />
+                  )}
+
                   <div className="tool-strip" style={{ marginBottom: '14px' }}>
                     <div>
                       <div className="eyebrow">Filters</div>
@@ -621,15 +657,16 @@ export default function App() {
                     <>
                       <div className="results-header">
                         <span>
-                          {sortedPapers.length.toLocaleString()} matches
-                          {selectedSubject !== null && ` in ${subjects[selectedSubject]}`}
+                          {visiblePaperRows.length.toLocaleString()} matches
+                          {!agentSearchActive && selectedSubject !== null && ` in ${subjects[selectedSubject]}`}
+                          {agentSearchActive && ' ranked by agent finder'}
                         </span>
-                        <span>Showing {Math.min(renderLimit, sortedPapers.length).toLocaleString()}</span>
+                        <span>Showing {Math.min(renderLimit, visiblePaperRows.length).toLocaleString()}</span>
                       </div>
 
-                      {sortedPapers.length > 0 ? (
+                      {visiblePaperRows.length > 0 ? (
                         <div className="papers-grid">
-                          {paginatedPapers.map((paper, idx) => (
+                          {paginatedPaperRows.map(({ paper, matchReasons }, idx) => (
                             <PaperCard
                               key={`${paper.v}-${idx}`}
                               paper={paper}
@@ -639,6 +676,7 @@ export default function App() {
                               toggleBookmark={() => toggleBookmark(paper.v + '_' + paper.n)}
                               sharePaper={() => sharePaper(paper)}
                               onSelectPaper={setActivePaper}
+                              matchReasons={matchReasons}
                             />
                           ))}
                         </div>
@@ -654,7 +692,7 @@ export default function App() {
                         </div>
                       )}
 
-                      {sortedPapers.length > renderLimit && (
+                      {visiblePaperRows.length > renderLimit && (
                         <div style={{ display: 'flex', justifyContent: 'center', margin: '28px 0 48px' }}>
                           <button
                             onClick={() => setRenderLimit((prev) => prev + 40)}

@@ -8,7 +8,8 @@ export default function PaperCard({
   isBookmarked,
   toggleBookmark,
   sharePaper,
-  onSelectPaper
+  onSelectPaper,
+  matchReasons = []
 }) {
   const getCategoryDetails = (code) => {
     switch (code) {
@@ -94,6 +95,14 @@ export default function PaperCard({
           <div className="pill" style={{ width: 'fit-content', backgroundColor: 'rgba(62,111,89,0.1)', color: 'var(--status-positive)', borderColor: 'rgba(62,111,89,0.14)' }}>
             <CheckCircle2 size={14} />
             <span>Solved</span>
+          </div>
+        )}
+
+        {matchReasons.length > 0 && (
+          <div className="match-reason-row" aria-label="Agent match reasons">
+            {matchReasons.map((reason) => (
+              <span key={reason} className="match-reason-chip">{reason}</span>
+            ))}
           </div>
         )}
 
