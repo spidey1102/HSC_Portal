@@ -333,3 +333,143 @@ export function findAgenticPaperMatches(query, papers = [], subjects = [], schoo
     summary: summaryParts.length ? summaryParts.join(' / ') : 'keyword-ranked papers',
   };
 }
+
+export async function findAgenticPaperMatchesAsync(query, papers = [], subjects = [], schools = [], { limit = 120, defaultLevel = null } = {}) {
+  const localIntent = analyzePaperQuery(query, subjects, schools);
+
+  if (localIntent.level === null && defaultLevel !== null) {
+    localIntent.level = defaultLevel;
+  }
+
+  if (!localIntent.rawQuery) {
+    return {
+      intent: localIntent,
+      papers: [],
+      total: 0,
+      applied: false,
+      summary: '',
+      isAiAssisted: false,
+    };
+  }
+
+  // If local parser found a subject match, consider it high confidence and skip LLM to save latency/tokens.
+  if (localIntent.subject !== null) {
+    const localResult = findAgenticPaperMatches(query, papers, subjects, schools, { limit, defaultLevel });
+    return {
+      ...localResult,
+      isAiAssisted: false,
+    };
+  }
+
+  // No subject matched locally. Fallback to OpenRouter LLM parsing.
+  try {
+    const res = await fetch('/api/agent-search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+        subjects,
+        schools,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`API returned status ${res.status}`);
+    }
+
+    const data = await res.json();
+    if (!data.intent) {
+      throw new Error('API response missing intent object');
+    }
+
+    const llmIntent = data.intent;
+
+    // Map string subject/school back to structured objects with indices
+    let subject = null;
+    if (llmIntent.subject) {
+      const normSubject = normalize(llmIntent.subject);
+      const idx = subjects.findIndex((s) => normalize(s) === normSubject);
+      if (idx !== -1) {
+        subject = {
+          index: idx,
+          name: subjects[idx],
+          normalized: normSubject,
+        };
+      }
+    }
+
+    let school = null;
+    if (llmIntent.school) {
+      const normSchool = normalize(llmIntent.school);
+      const idx = schools.findIndex((s) => normalize(s) === normSchool);
+      if (idx !== -1) {
+        school = {
+          index: idx,
+          name: schools[idx],
+          normalized: normSchool,
+        };
+      }
+    }
+
+    const intent = {
+      rawQuery: query,
+      normalizedQuery: normalize(query),
+      tokens: localIntent.tokens,
+      subject,
+      school,
+      years: Array.isArray(llmIntent.years) ? llmIntent.years.map(Number) : [],
+      minYear: llmIntent.minYear ? Number(llmIntent.minYear) : null,
+      maxYear: llmIntent.maxYear ? Number(llmIntent.maxYear) : null,
+      wantsSolutions: Boolean(llmIntent.wantsSolutions),
+      wantsRecent: Boolean(llmIntent.wantsRecent),
+      wantsOlder: Boolean(llmIntent.wantsOlder),
+      category: llmIntent.category || null,
+      level: llmIntent.level ? Number(llmIntent.level) : (defaultLevel || null),
+    };
+
+    const scored = papers
+      .map((paper) => {
+        const result = scorePaper(paper, intent, subjects, schools);
+        return result ? { paper, score: result.score, reasons: result.reasons } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        const ay = getYearNumber(a.paper) || 0;
+        const by = getYearNumber(b.paper) || 0;
+        return intent.wantsOlder ? ay - by : by - ay;
+      });
+
+    const summaryParts = [
+      intent.subject?.name,
+      intent.level ? `Year ${intent.level}` : null,
+      intent.category ? CATEGORY_DETAILS[intent.category] : null,
+      intent.school?.name,
+      intent.wantsSolutions ? 'with solutions' : null,
+      intent.minYear ? `from ${intent.minYear}` : null,
+      intent.maxYear ? `until ${intent.maxYear}` : null,
+      intent.years.length ? intent.years.join(', ') : null,
+      intent.wantsRecent ? 'newest first' : null,
+      intent.wantsOlder ? 'oldest first' : null,
+    ].filter(Boolean);
+
+    return {
+      intent,
+      papers: scored.slice(0, limit),
+      total: scored.length,
+      applied: true,
+      summary: summaryParts.length ? summaryParts.join(' / ') : 'AI-ranked papers',
+      isAiAssisted: true,
+    };
+  } catch (error) {
+    console.warn('Agentic search LLM fallback failed, using local parser:', error);
+    const localResult = findAgenticPaperMatches(query, papers, subjects, schools, { limit, defaultLevel });
+    return {
+      ...localResult,
+      isAiAssisted: false,
+      error: error.message,
+    };
+  }
+}

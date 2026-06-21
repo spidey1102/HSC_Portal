@@ -10,7 +10,7 @@ import AgenticPaperFinder from './components/AgenticPaperFinder';
 import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock } from 'lucide-react';
 import PaperHistory from './components/PaperHistory';
 import { Analytics } from '@vercel/analytics/react';
-import { findAgenticPaperMatches } from './utils/agenticPaperSearch';
+import { findAgenticPaperMatchesAsync } from './utils/agenticPaperSearch';
 import './App.css';
 
 export default function App() {
@@ -31,6 +31,15 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [yearSort, setYearSort] = useState('desc'); // desc = newest first, asc = oldest first, none = default order
   const [agentQuery, setAgentQuery] = useState('');
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentResult, setAgentResult] = useState({
+    intent: {},
+    papers: [],
+    total: 0,
+    applied: false,
+    summary: '',
+    isAiAssisted: false,
+  });
 
   // Bookmarks State
   const [viewBookmarks, setViewBookmarks] = useState(false);
@@ -106,6 +115,42 @@ export default function App() {
         setLoading(false);
       });
   }, []);
+
+  // Async Agentic Search Trigger
+  useEffect(() => {
+    let active = true;
+    const query = agentQuery.trim();
+
+    if (!query) {
+      setAgentResult({
+        intent: {},
+        papers: [],
+        total: 0,
+        applied: false,
+        summary: '',
+        isAiAssisted: false,
+      });
+      setAgentLoading(false);
+      return;
+    }
+
+    setAgentLoading(true);
+    findAgenticPaperMatchesAsync(query, papers, subjects, schools, { defaultLevel: selectedLevel })
+      .then((res) => {
+        if (!active) return;
+        setAgentResult(res);
+        setAgentLoading(false);
+      })
+      .catch((err) => {
+        if (!active) return;
+        console.error('Agentic search error:', err);
+        setAgentLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [agentQuery, papers, subjects, schools, selectedLevel]);
 
   // Save Bookmarks to localStorage
   const toggleBookmark = (viewno) => {
@@ -382,10 +427,6 @@ export default function App() {
     return list;
   }, [filteredPapers, yearSort]);
 
-  const agentResult = useMemo(() => (
-    findAgenticPaperMatches(agentQuery, papers, subjects, schools, { defaultLevel: selectedLevel })
-  ), [agentQuery, papers, subjects, schools, selectedLevel]);
-
   const agentSearchActive = agentResult.applied;
 
   const visiblePaperRows = useMemo(() => {
@@ -603,7 +644,8 @@ export default function App() {
                       onSearch={(query) => setAgentQuery(query.trim())}
                       onClear={() => setAgentQuery('')}
                       result={agentResult}
-                      disabled={loading}
+                      disabled={loading || agentLoading}
+                      loading={agentLoading}
                     />
                   )}
 
