@@ -118,8 +118,8 @@ const parseYearIntent = (query) => {
 
   return {
     years: unique(years),
-    minYear: afterMatch ? Number(afterMatch[1]) : null,
-    maxYear: beforeMatch ? Number(beforeMatch[1]) : null,
+    minYear: null,
+    maxYear: null,
   };
 };
 
@@ -281,8 +281,14 @@ const scorePaper = (paper, intent, subjects, schools) => {
   return { score, reasons: unique(reasons).slice(0, 4) };
 };
 
-export function findAgenticPaperMatches(query, papers = [], subjects = [], schools = [], limit = 120) {
+export function findAgenticPaperMatches(query, papers = [], subjects = [], schools = [], { limit = 120, defaultLevel = null } = {}) {
   const intent = analyzePaperQuery(query, subjects, schools);
+
+  // If the user's query didn't specify a year level, scope to the active sidebar level
+  if (intent.level === null && defaultLevel !== null) {
+    intent.level = defaultLevel;
+  }
+
   if (!intent.rawQuery) {
     return {
       intent,

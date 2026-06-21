@@ -25,7 +25,7 @@ export default function AgenticPaperFinder({
   const hasResult = hasSearch && result?.applied;
 
   return (
-    <section className="agent-finder">
+    <section className="agent-finder" aria-label="Agent paper finder">
       <div className="agent-finder-header">
         <div>
           <div className="eyebrow">Agent finder</div>
@@ -34,7 +34,7 @@ export default function AgenticPaperFinder({
         <Sparkles size={18} />
       </div>
 
-      <form className="agent-search-row" onSubmit={submitSearch}>
+      <form className="agent-search-row" onSubmit={submitSearch} aria-label="Natural-language paper search">
         <div className="agent-search-input">
           <input
             type="text"

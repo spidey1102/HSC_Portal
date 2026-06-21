@@ -383,10 +383,10 @@ export default function App() {
   }, [filteredPapers, yearSort]);
 
   const agentResult = useMemo(() => (
-    findAgenticPaperMatches(agentQuery, papers, subjects, schools)
-  ), [agentQuery, papers, subjects, schools]);
+    findAgenticPaperMatches(agentQuery, papers, subjects, schools, { defaultLevel: selectedLevel })
+  ), [agentQuery, papers, subjects, schools, selectedLevel]);
 
-  const agentSearchActive = Boolean(agentQuery.trim()) && agentResult.applied;
+  const agentSearchActive = agentResult.applied;
 
   const visiblePaperRows = useMemo(() => {
     if (agentSearchActive) {
@@ -682,9 +682,13 @@ export default function App() {
                         </div>
                       ) : (
                         <div className="empty-state">
-                          <h3 style={{ color: 'var(--header-primary)', marginBottom: '8px' }}>No matches found</h3>
+                          <h3 style={{ color: 'var(--header-primary)', marginBottom: '8px' }}>
+                            {agentSearchActive ? 'Agent couldn\'t find matches' : 'No matches found'}
+                          </h3>
                           <p style={{ marginBottom: '16px' }}>
-                            Try resetting your filters or searching for different terms.
+                            {agentSearchActive
+                              ? `No papers matched "${agentQuery}". Try rephrasing or use the normal filters.`
+                              : 'Try resetting your filters or searching for different terms.'}
                           </p>
                           <button onClick={resetFilters} className="btn-primary">
                             Reset filters
