@@ -8,6 +8,8 @@ import ExamCountdown from './components/ExamCountdown';
 import CustomCalendar from './components/CustomCalendar';
 import AgenticPaperFinder from './components/AgenticPaperFinder';
 import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock } from 'lucide-react';
+import GlobalStudyAgent from './components/GlobalStudyAgent';
+import PapersLoadingState from './components/PapersLoadingState';
 import PaperHistory from './components/PaperHistory';
 import { Analytics } from '@vercel/analytics/react';
 import { findAgenticPaperMatchesAsync } from './utils/agenticPaperSearch';
@@ -31,6 +33,7 @@ export default function App() {
   const [solutionsOnly, setSolutionsOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [yearSort, setYearSort] = useState('desc'); // desc = newest first, asc = oldest first, none = default order
+  const [sortMode, setSortMode] = useState('year-desc');
   const [agentQuery, setAgentQuery] = useState('');
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentResult, setAgentResult] = useState({
@@ -376,6 +379,7 @@ export default function App() {
     selectedSchool,
     selectedYear,
     yearSort,
+    sortMode,
     solutionsOnly,
     searchQuery,
     agentQuery,
@@ -470,15 +474,19 @@ export default function App() {
   };
 
   const sortedPapers = useMemo(() => {
-    if (yearSort === 'none') return filteredPapers;
     const list = [...filteredPapers];
+    const mode = sortMode || (yearSort === 'asc' ? 'year-asc' : yearSort === 'none' ? 'default' : 'year-desc');
+    if (mode === 'default') return filteredPapers;
     list.sort((a, b) => {
+      if (mode === 'name-asc') return String(a.n).localeCompare(String(b.n));
+      if (mode === 'school-asc') return String(schools[a.h] || '').localeCompare(String(schools[b.h] || ''));
+      if (mode === 'solutions-first') return (b.w || 0) - (a.w || 0) || getYearSortValue(b.y) - getYearSortValue(a.y);
       const ya = getYearSortValue(a.y);
       const yb = getYearSortValue(b.y);
-      return yearSort === 'desc' ? yb - ya : ya - yb;
+      return mode === 'year-asc' ? ya - yb : yb - ya;
     });
     return list;
-  }, [filteredPapers, yearSort]);
+  }, [filteredPapers, sortMode, yearSort, schools]);
 
   const agentSearchActive = agentResult.applied;
 
@@ -501,7 +509,7 @@ export default function App() {
     selectedCategory !== null || 
     selectedSchool !== null || 
     selectedYear !== null || 
-    yearSort !== 'desc' ||
+    (sortMode !== 'year-desc' && yearSort !== 'desc') ||
     solutionsOnly || 
     searchQuery !== '' ||
     agentQuery.trim() !== '';
@@ -512,6 +520,7 @@ export default function App() {
     setSelectedSchool(null);
     setSelectedYear(null);
     setYearSort('desc');
+    setSortMode('year-desc');
     setSolutionsOnly(false);
     setSearchQuery('');
     setAgentQuery('');
@@ -590,8 +599,8 @@ export default function App() {
           allPapers={papers}
           subjects={subjects}
           schools={schools}
-          onSharePaper={() => sharePaper(activePaper)}
           onSelectPaper={openPaper}
+          aiSlot={<GlobalStudyAgent papers={papers} subjects={subjects} schools={schools} currentPaper={activePaper} />}
         />
     );
   }
@@ -781,6 +790,8 @@ export default function App() {
                         setSelectedYear={setSelectedYear}
                         yearSort={yearSort}
                         setYearSort={setYearSort}
+                        sortMode={sortMode}
+                        setSortMode={setSortMode}
                         solutionsOnly={solutionsOnly}
                         setSolutionsOnly={setSolutionsOnly}
                         schools={schools}
@@ -792,17 +803,7 @@ export default function App() {
                   </div>
 
                   {loading ? (
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '40px 0',
-                      gap: '16px'
-                    }}>
-                      <RefreshCw size={28} color="var(--text-muted)" className="spin" />
-                      <h3 style={{ color: 'var(--text-normal)' }}>Loading resources</h3>
-                    </div>
+                    <PapersLoadingState />
                   ) : error ? (
                     <div style={{ padding: '24px', background: 'rgba(163,61,61,0.08)', borderRadius: '16px', color: 'var(--header-primary)', border: '1px solid rgba(163,61,61,0.16)' }}>
                       <h3 style={{ marginBottom: '8px', color: 'var(--status-danger)' }}>Load error</h3>
@@ -830,6 +831,8 @@ export default function App() {
                               isBookmarked={bookmarks.has(paper.v + '_' + paper.n)}
                               toggleBookmark={() => toggleBookmark(paper.v + '_' + paper.n)}
                               sharePaper={() => sharePaper(paper)}
+                              getShareUrl={buildPaperShareUrl}
+                              onShareNotice={flashShareNotice}
                               onSelectPaper={openPaper}
                               matchReasons={matchReasons}
                             />
@@ -869,6 +872,8 @@ export default function App() {
           </div>
         </div>
       </main>
+
+      <GlobalStudyAgent papers={papers} subjects={subjects} schools={schools} />
 
       {/* Vercel Web Analytics */}
       <Analytics />
