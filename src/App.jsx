@@ -89,6 +89,7 @@ export default function App() {
   const [renderLimit, setRenderLimit] = useState(40);
   const [shareNotice, setShareNotice] = useState('');
   const shareNoticeTimer = useRef(null);
+  const paperReturnToRef = useRef(null);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -238,6 +239,7 @@ export default function App() {
   };
 
   const openPaper = (paper, { replace = false } = {}) => {
+    paperReturnToRef.current = readLocation();
     const nextPath = getPaperPath(paper.v);
     window.history[replace ? 'replaceState' : 'pushState']({}, '', nextPath);
     setLocationSnapshot(readLocation());
@@ -245,9 +247,12 @@ export default function App() {
   };
 
   const closePaper = () => {
-    window.history.replaceState({}, '', '/');
+    const returnTo = paperReturnToRef.current;
+    const nextLocation = returnTo || { pathname: '/', search: '', hash: '' };
+    window.history.replaceState({}, '', `${nextLocation.pathname}${nextLocation.search}${nextLocation.hash}`);
     setLocationSnapshot(readLocation());
     setActivePaperId(null);
+    paperReturnToRef.current = null;
   };
 
   const sharePaper = async (paper) => {
