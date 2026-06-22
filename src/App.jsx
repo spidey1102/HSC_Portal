@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import Filters from './components/Filters';
 import PaperCard from './components/PaperCard';
@@ -58,7 +58,18 @@ export default function App() {
   const [viewCalendar, setViewCalendar] = useState(false);
 
   // active Paper for practice room
-  const [activePaper, setActivePaper] = useState(null);
+  const [activePaperId, setActivePaperId] = useState(() => {
+    const pathMatch = window.location.pathname.match(/^\/paper\/([^/]+)\/?$/);
+    if (pathMatch?.[1]) return decodeURIComponent(pathMatch[1]);
+
+    const params = new URLSearchParams(window.location.search);
+    return params.get('paper');
+  });
+  const [locationSnapshot, setLocationSnapshot] = useState(() => ({
+    pathname: window.location.pathname || '/',
+    search: window.location.search || '',
+    hash: window.location.hash || '',
+  }));
 
   // Mobile sidebar toggle
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -92,6 +103,31 @@ export default function App() {
     return () => {
       if (shareNoticeTimer.current) clearTimeout(shareNoticeTimer.current);
     };
+  }, []);
+
+  const readLocation = () => ({
+    pathname: window.location.pathname || '/',
+    search: window.location.search || '',
+    hash: window.location.hash || '',
+  });
+
+  const getPaperIdFromLocation = (location = locationSnapshot) => {
+    const pathMatch = location.pathname.match(/^\/paper\/([^/]+)\/?$/);
+    if (pathMatch?.[1]) return decodeURIComponent(pathMatch[1]);
+
+    const params = new URLSearchParams(location.search || '');
+    return params.get('paper');
+  };
+
+  const getPaperPath = (paperId) => `/paper/${encodeURIComponent(String(paperId))}/`;
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setLocationSnapshot(readLocation());
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   // Fetch compiled database
@@ -198,9 +234,20 @@ export default function App() {
   };
 
   const buildPaperShareUrl = (paper) => {
-    const url = new URL(window.location.href);
-    url.searchParams.set('paper', String(paper.v));
-    return url.toString();
+    return new URL(getPaperPath(paper.v), window.location.origin).toString();
+  };
+
+  const openPaper = (paper, { replace = false } = {}) => {
+    const nextPath = getPaperPath(paper.v);
+    window.history[replace ? 'replaceState' : 'pushState']({}, '', nextPath);
+    setLocationSnapshot(readLocation());
+    setActivePaperId(String(paper.v));
+  };
+
+  const closePaper = () => {
+    window.history.replaceState({}, '', '/');
+    setLocationSnapshot(readLocation());
+    setActivePaperId(null);
   };
 
   const sharePaper = async (paper) => {
@@ -230,22 +277,28 @@ export default function App() {
     }
   };
 
-  // Restore active paper from URL on initial load / when papers are first available.
-  // Intentionally exclude `activePaper` from dependencies so this effect does not
-  // run when the user closes the PracticeRoom (which would immediately reopen it
-  // because the URL param still exists until the other effect removes it).
+  const paperRouteId = getPaperIdFromLocation(locationSnapshot);
+
   useEffect(() => {
-    if (!papers.length || loading) return;
-    if (activePaper) return;
+    if (paperRouteId !== activePaperId) {
+      setActivePaperId(paperRouteId);
+    }
+  }, [paperRouteId, activePaperId]);
 
-    const params = new URLSearchParams(window.location.search);
-    const paperId = params.get('paper');
-    if (!paperId) return;
+  useEffect(() => {
+    if (!paperRouteId) return;
 
-    const match = papers.find((p) => String(p.v) === paperId);
-    if (match) setActivePaper(match);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [papers, loading]);
+    const canonicalPath = getPaperPath(paperRouteId);
+    if (locationSnapshot.pathname !== canonicalPath || locationSnapshot.search || locationSnapshot.hash) {
+      window.history.replaceState({}, '', canonicalPath);
+      setLocationSnapshot(readLocation());
+    }
+  }, [paperRouteId, locationSnapshot.pathname, locationSnapshot.search, locationSnapshot.hash]);
+
+  const activePaper = useMemo(() => {
+    if (!activePaperId) return null;
+    return papers.find((p) => String(p.v) === String(activePaperId)) || null;
+  }, [papers, activePaperId]);
 
   // Helper: slugify subject names for path matching
   const slugify = (s) => {
@@ -261,7 +314,7 @@ export default function App() {
   // Restore selected subject from URL (query param `subject` or path `/slug`)
   useEffect(() => {
     if (!subjects || !subjects.length) return;
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(locationSnapshot.search || '');
     const subjectParam = params.get('subject');
     if (subjectParam) {
       const idx = subjects.findIndex(s => slugify(s) === subjectParam);
@@ -270,34 +323,28 @@ export default function App() {
     }
 
     // check path-based subject: e.g. /physics
-    const path = window.location.pathname || '/';
+    const path = locationSnapshot.pathname || '/';
     const seg = path.replace(/^\//, '').replace(/\/$/, '');
     if (seg) {
       const idx = subjects.findIndex(s => slugify(s) === seg);
       if (idx !== -1) setSelectedSubject(idx);
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subjects]);
 
-  useEffect(() => {
-    // Update `paper` query param without disturbing pathname (subject routes)
-    const url = new URL(window.location.href);
-    if (activePaper) {
-      url.searchParams.set('paper', String(activePaper.v));
-    } else {
-      url.searchParams.delete('paper');
-    }
-    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
-  }, [activePaper]);
+    setSelectedSubject(null);
+  }, [subjects, locationSnapshot.pathname, locationSnapshot.search]);
 
   // Update pathname when selectedSubject changes so URL reflects current subject
   useEffect(() => {
+    if (paperRouteId) return;
+
     const url = new URL(window.location.href);
     const currentPath = url.pathname || '/';
     if (selectedSubject === null) {
       // revert to root
       if (currentPath !== '/') {
         window.history.replaceState({}, '', '/');
+        setLocationSnapshot(readLocation());
       }
       return;
     }
@@ -309,8 +356,9 @@ export default function App() {
       // preserve existing search (e.g., ?paper=123)
       const search = url.search || '';
       window.history.replaceState({}, '', `${desiredPath}${search}${url.hash}`);
+      setLocationSnapshot(readLocation());
     }
-  }, [selectedSubject, subjects]);
+  }, [selectedSubject, subjects, paperRouteId]);
 
   // Reset pagination limit when filters change
   useEffect(() => {
@@ -407,7 +455,6 @@ export default function App() {
     solutionsOnly,
     searchQuery,
     viewBookmarks,
-    viewTextbooks,
     bookmarks
   ]);
 
@@ -484,6 +531,64 @@ export default function App() {
         : viewHistory
           ? 'Papers you opened and those you marked complete.'
           : 'Browse official papers, trial exams, and resources without the clutter.';
+
+  if (paperRouteId) {
+    if (loading) {
+        return (
+          <div className="practice-surface animate-fade-in" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+            <div className="surface-card" style={{ padding: '24px', textAlign: 'center' }}>
+              <RefreshCw size={28} color="var(--text-muted)" className="spin" />
+              <h3 style={{ marginTop: '12px', color: 'var(--header-primary)' }}>Loading paper</h3>
+            </div>
+            <Analytics />
+          </div>
+        );
+    }
+
+    if (error) {
+        return (
+          <div className="practice-surface animate-fade-in" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '24px' }}>
+            <div className="surface-card" style={{ padding: '24px', maxWidth: '640px', width: '100%' }}>
+              <h3 style={{ marginBottom: '8px', color: 'var(--status-danger)' }}>Could not open this paper</h3>
+              <p>{error}</p>
+              <button type="button" className="btn-primary" style={{ marginTop: '16px' }} onClick={closePaper}>
+                Back to home
+              </button>
+            </div>
+            <Analytics />
+          </div>
+        );
+    }
+
+    if (!activePaper) {
+        return (
+          <div className="practice-surface animate-fade-in" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '24px' }}>
+            <div className="surface-card" style={{ padding: '24px', maxWidth: '640px', width: '100%' }}>
+              <h3 style={{ marginBottom: '8px', color: 'var(--header-primary)' }}>Paper not found</h3>
+              <p>This paper link does not match a resource in the library.</p>
+              <button type="button" className="btn-primary" style={{ marginTop: '16px' }} onClick={closePaper}>
+                Back to home
+              </button>
+            </div>
+            <Analytics />
+          </div>
+        );
+    }
+
+    return (
+        <PracticeRoom
+          paper={activePaper}
+          subjectName={subjects[activePaper.s]}
+          schoolName={schools[activePaper.h]}
+          onClose={closePaper}
+          allPapers={papers}
+          subjects={subjects}
+          schools={schools}
+          onSharePaper={() => sharePaper(activePaper)}
+          onSelectPaper={openPaper}
+        />
+    );
+  }
 
   return (
     <div className={`app-container ${isSidebarOpen ? 'sidebar-visible' : ''}`}>
@@ -590,7 +695,7 @@ export default function App() {
                 allPapers={papers}
                 subjects={subjects}
                 schools={schools}
-                onSelectPaper={setActivePaper}
+                onSelectPaper={openPaper}
               />
             ) : (
               <>
@@ -719,7 +824,7 @@ export default function App() {
                               isBookmarked={bookmarks.has(paper.v + '_' + paper.n)}
                               toggleBookmark={() => toggleBookmark(paper.v + '_' + paper.n)}
                               sharePaper={() => sharePaper(paper)}
-                              onSelectPaper={setActivePaper}
+                              onSelectPaper={openPaper}
                               matchReasons={matchReasons}
                             />
                           ))}
@@ -758,21 +863,6 @@ export default function App() {
           </div>
         </div>
       </main>
-
-      {/* Practice Exam split viewer portal Overlay */}
-      {activePaper && (
-        <PracticeRoom
-          paper={activePaper}
-          subjectName={subjects[activePaper.s]}
-          schoolName={schools[activePaper.h]}
-          onClose={() => setActivePaper(null)}
-          allPapers={papers}
-          subjects={subjects}
-          schools={schools}
-          onSharePaper={() => sharePaper(activePaper)}
-          onSelectPaper={setActivePaper}
-        />
-      )}
 
       {/* Vercel Web Analytics */}
       <Analytics />
