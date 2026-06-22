@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, RotateCcw, X, ExternalLink, Edit3, BookOpen, Clock, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Share2, Sparkles, Send, Check } from 'lucide-react';
+import { getPaperIdentity, getPaperStorageKey, getLegacyPaperStorageKey } from '../utils/paperIdentity';
 
 export default function PracticeRoom({
   paper,
@@ -12,6 +13,8 @@ export default function PracticeRoom({
   onSharePaper,
   onSelectPaper
 }) {
+  const paperKey = getPaperIdentity(paper);
+
   const loadSavedTimerSeconds = () => {
     try {
       const raw = localStorage.getItem('hsc_timer_duration_secs');
@@ -53,7 +56,9 @@ export default function PracticeRoom({
 
   // Scratchpad State
   const [notes, setNotes] = useState(() => {
-    return localStorage.getItem(`hsc_notes_${paper.v}`) || '';
+    return localStorage.getItem(getPaperStorageKey(paper, 'hsc_notes')) ||
+      localStorage.getItem(getLegacyPaperStorageKey(paper, 'hsc_notes')) ||
+      '';
   });
 
   // Formula Sheet states
@@ -103,8 +108,8 @@ export default function PracticeRoom({
   const [relatedResources, setRelatedResources] = useState([]);
 
   useEffect(() => {
-    localStorage.setItem(`hsc_notes_${paper.v}`, notes);
-  }, [notes, paper.v]);
+    localStorage.setItem(getPaperStorageKey(paper, 'hsc_notes'), notes);
+  }, [notes, paperKey]);
 
   useEffect(() => {
     try {
@@ -116,7 +121,11 @@ export default function PracticeRoom({
 
   useEffect(() => {
     try {
-      setNotes(localStorage.getItem(`hsc_notes_${paper.v}`) || '');
+      setNotes(
+        localStorage.getItem(getPaperStorageKey(paper, 'hsc_notes')) ||
+        localStorage.getItem(getLegacyPaperStorageKey(paper, 'hsc_notes')) ||
+        ''
+      );
     } catch (e) {
       setNotes('');
     }
@@ -124,7 +133,7 @@ export default function PracticeRoom({
     setAiPrompt('');
     setAiResponse('');
     setAiError('');
-  }, [paper.v]);
+  }, [paperKey]);
 
   // Record that this paper was viewed (recently opened)
   useEffect(() => {
@@ -132,14 +141,14 @@ export default function PracticeRoom({
       const key = 'hsc_viewed_papers';
       const raw = localStorage.getItem(key) || '[]';
       const arr = JSON.parse(raw);
-      const entry = { v: paper.v, n: paper.n, s: paper.s, h: paper.h, y: paper.y, dateViewed: Date.now() };
-      const filtered = (arr || []).filter(a => String(a.v) !== String(paper.v));
+      const entry = { key: paperKey, v: paper.v, n: paper.n, s: paper.s, h: paper.h, y: paper.y, dateViewed: Date.now() };
+      const filtered = (arr || []).filter(a => String(a.key || a.v) !== paperKey);
       filtered.unshift(entry);
       localStorage.setItem(key, JSON.stringify(filtered.slice(0, 200)));
     } catch (e) {
       // ignore
     }
-  }, [paper.v]);
+  }, [paperKey, paper]);
 
   // Track whether this paper is marked completed locally
   useEffect(() => {
@@ -147,12 +156,12 @@ export default function PracticeRoom({
       const key = 'hsc_completed_papers';
       const raw = localStorage.getItem(key) || '[]';
       const arr = JSON.parse(raw) || [];
-      const found = arr.some(a => String(a.paperId) === String(paper.v));
+      const found = arr.some(a => String(a.paperId || a.paperIdLegacy || a.v) === paperKey || String(a.paperId || a.paperIdLegacy || a.v) === String(paper.v));
       setIsCompleted(Boolean(found));
     } catch (e) {
       setIsCompleted(false);
     }
-  }, [paper.v]);
+  }, [paperKey, paper.v]);
 
   useEffect(() => {
     if (!allPapers || allPapers.length === 0) return;
@@ -160,7 +169,7 @@ export default function PracticeRoom({
     const cleanCurrentName = paper.n.toLowerCase();
     
     const related = allPapers.filter(p => {
-      if (p.s !== paper.s || p.y !== paper.y || p.v === paper.v) return false;
+      if (p.s !== paper.s || p.y !== paper.y || getPaperIdentity(p) === paperKey) return false;
       
       const otherName = p.n.toLowerCase();
       const isGuideline = otherName.includes('guidelines') || otherName.includes('marking') || otherName.includes('sol');
@@ -174,7 +183,7 @@ export default function PracticeRoom({
     });
 
     setRelatedResources(related.slice(0, 5));
-  }, [allPapers, paper]);
+  }, [allPapers, paper, paperKey]);
 
   useEffect(() => {
     if (timerRunning) {
@@ -248,10 +257,11 @@ export default function PracticeRoom({
       const key = 'hsc_completed_papers';
       const raw = localStorage.getItem(key) || '[]';
       const arr = JSON.parse(raw);
-      const entryId = `${paper.v}_${Date.now()}`;
+      const entryId = `${paperKey}_${Date.now()}`;
       const entry = {
         id: entryId,
-        paperId: paper.v,
+        paperId: paperKey,
+        paperIdLegacy: paper.v,
         paperName: paper.n,
         subjectName: subjectName,
         schoolName: schoolName,
@@ -259,7 +269,7 @@ export default function PracticeRoom({
         timeSpent: totalSeconds - secondsLeft,
         status: 'Completed'
       };
-      const idx = (arr || []).findIndex(a => String(a.paperId) === String(paper.v));
+      const idx = (arr || []).findIndex(a => String(a.paperId || a.paperIdLegacy || a.v) === paperKey || String(a.paperId || a.paperIdLegacy || a.v) === String(paper.v));
       if (idx >= 0) arr[idx] = { ...arr[idx], ...entry };
       else arr.unshift(entry);
       localStorage.setItem(key, JSON.stringify((arr || []).slice(0, 500)));
@@ -279,7 +289,7 @@ export default function PracticeRoom({
     try {
       const key = 'hsc_completed_papers';
       const raw = localStorage.getItem(key) || '[]';
-      const arr = (JSON.parse(raw) || []).filter(a => String(a.paperId) !== String(paper.v));
+      const arr = (JSON.parse(raw) || []).filter(a => String(a.paperId || a.paperIdLegacy || a.v) !== paperKey && String(a.paperId || a.paperIdLegacy || a.v) !== String(paper.v));
       localStorage.setItem(key, JSON.stringify(arr));
       setActionMessage('Marked as incomplete');
       setIsCompleted(false);

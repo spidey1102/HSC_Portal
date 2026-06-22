@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Trash2, X, ExternalLink } from 'lucide-react';
+import { findPaperByIdentifier } from '../utils/paperIdentity';
 
 const VIEWED_KEY = 'hsc_viewed_papers';
 const COMPLETED_KEY = 'hsc_completed_papers';
@@ -35,14 +36,32 @@ export default function PaperHistory({ allPapers = [], subjects = [], schools = 
     }
   }
 
-  function openPaperById(id) {
-    const p = allPapers.find(x => String(x.v) === String(id));
+  function resolvePaperFromHistory(entryOrId) {
+    if (entryOrId && typeof entryOrId === 'object') {
+      const exact = allPapers.find((paper) =>
+        String(paper.v) === String(entryOrId.key || entryOrId.v) &&
+        String(paper.s) === String(entryOrId.s) &&
+        String(paper.y) === String(entryOrId.y) &&
+        String(paper.h) === String(entryOrId.h) &&
+        String(paper.n) === String(entryOrId.n)
+      );
+      if (exact) return exact;
+      if (entryOrId.key) return findPaperByIdentifier(allPapers, entryOrId.key);
+      if (entryOrId.v) return findPaperByIdentifier(allPapers, entryOrId.v);
+      return null;
+    }
+
+    return findPaperByIdentifier(allPapers, entryOrId);
+  }
+
+  function openPaperById(entryOrId) {
+    const p = resolvePaperFromHistory(entryOrId);
     if (p && onSelectPaper) onSelectPaper(p);
   }
 
   function removeViewed(id) {
     try {
-      const arr = JSON.parse(localStorage.getItem(VIEWED_KEY) || '[]').filter(a => String(a.v) !== String(id));
+      const arr = JSON.parse(localStorage.getItem(VIEWED_KEY) || '[]').filter(a => String(a.key || a.v) !== String(id));
       localStorage.setItem(VIEWED_KEY, JSON.stringify(arr));
       setViewed(arr);
     } catch (e) {}
@@ -50,7 +69,7 @@ export default function PaperHistory({ allPapers = [], subjects = [], schools = 
 
   function removeCompleted(id) {
     try {
-      const arr = JSON.parse(localStorage.getItem(COMPLETED_KEY) || '[]').filter(a => String(a.id) !== String(id));
+      const arr = JSON.parse(localStorage.getItem(COMPLETED_KEY) || '[]').filter(a => String(a.id || a.paperId || a.paperIdLegacy || a.v) !== String(id));
       localStorage.setItem(COMPLETED_KEY, JSON.stringify(arr));
       setCompleted(arr);
     } catch (e) {}
@@ -91,7 +110,7 @@ export default function PaperHistory({ allPapers = [], subjects = [], schools = 
         ) : (
           <ul style={{ listStyle: 'none', padding: 0, marginTop: 12 }}>
             {viewed.map((v) => {
-              const paper = allPapers.find(p => String(p.v) === String(v.v));
+              const paper = resolvePaperFromHistory(v);
               return (
                 <li key={v.v} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--bg-modifier-accent)' }}>
                   <div style={{ minWidth: 0 }}>
@@ -99,8 +118,8 @@ export default function PaperHistory({ allPapers = [], subjects = [], schools = 
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{paper ? (subjects[paper.s] || '') : ''} • {v.y || ''} • {fmtDate(v.dateViewed)}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn-secondary" onClick={() => openPaperById(v.v)}>Open</button>
-                    <button className="btn-secondary" onClick={() => removeViewed(v.v)} title="Remove from viewed">Remove</button>
+                    <button className="btn-secondary" onClick={() => openPaperById(v)}>Open</button>
+                    <button className="btn-secondary" onClick={() => removeViewed(v.key || v.v)} title="Remove from viewed">Remove</button>
                   </div>
                 </li>
               );
@@ -120,7 +139,7 @@ export default function PaperHistory({ allPapers = [], subjects = [], schools = 
         ) : (
           <ul style={{ listStyle: 'none', padding: 0, marginTop: 12 }}>
             {completed.map((c) => {
-              const paper = allPapers.find(p => String(p.v) === String(c.paperId));
+              const paper = resolvePaperFromHistory(c);
               return (
                 <li key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--bg-modifier-accent)' }}>
                   <div style={{ minWidth: 0 }}>
@@ -128,8 +147,8 @@ export default function PaperHistory({ allPapers = [], subjects = [], schools = 
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{c.subjectName || (paper ? subjects[paper.s] : '')} • {c.timeSpent ? `${Math.round(c.timeSpent/60)} min` : ''} • {fmtDate(c.dateCompleted)}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn-secondary" onClick={() => openPaperById(c.paperId)}>Open</button>
-                    <button className="btn-secondary" onClick={() => removeCompleted(c.id)} title="Remove from completed">Remove</button>
+                    <button className="btn-secondary" onClick={() => openPaperById(c)}>Open</button>
+                    <button className="btn-secondary" onClick={() => removeCompleted(c.id || c.paperId || c.paperIdLegacy || c.v)} title="Remove from completed">Remove</button>
                   </div>
                 </li>
               );

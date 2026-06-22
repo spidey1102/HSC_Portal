@@ -11,6 +11,7 @@ import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock } fr
 import PaperHistory from './components/PaperHistory';
 import { Analytics } from '@vercel/analytics/react';
 import { findAgenticPaperMatchesAsync } from './utils/agenticPaperSearch';
+import { findPaperByIdentifier, getPaperRouteId } from './utils/paperIdentity';
 import './App.css';
 
 export default function App() {
@@ -120,7 +121,7 @@ export default function App() {
     return params.get('paper');
   };
 
-  const getPaperPath = (paperId) => `/paper/${encodeURIComponent(String(paperId))}/`;
+  const getPaperPath = (paper) => `/paper/${getPaperRouteId(paper)}/`;
 
   useEffect(() => {
     const handlePopState = () => {
@@ -235,15 +236,15 @@ export default function App() {
   };
 
   const buildPaperShareUrl = (paper) => {
-    return new URL(getPaperPath(paper.v), window.location.origin).toString();
+    return new URL(getPaperPath(paper), window.location.origin).toString();
   };
 
   const openPaper = (paper, { replace = false } = {}) => {
     paperReturnToRef.current = readLocation();
-    const nextPath = getPaperPath(paper.v);
+    const nextPath = getPaperPath(paper);
     window.history[replace ? 'replaceState' : 'pushState']({}, '', nextPath);
     setLocationSnapshot(readLocation());
-    setActivePaperId(String(paper.v));
+    setActivePaperId(getPaperRouteId(paper));
   };
 
   const closePaper = () => {
@@ -293,7 +294,7 @@ export default function App() {
   useEffect(() => {
     if (!paperRouteId) return;
 
-    const canonicalPath = getPaperPath(paperRouteId);
+    const canonicalPath = `/paper/${encodeURIComponent(String(paperRouteId))}/`;
     if (locationSnapshot.pathname !== canonicalPath || locationSnapshot.search || locationSnapshot.hash) {
       window.history.replaceState({}, '', canonicalPath);
       setLocationSnapshot(readLocation());
@@ -302,7 +303,7 @@ export default function App() {
 
   const activePaper = useMemo(() => {
     if (!activePaperId) return null;
-    return papers.find((p) => String(p.v) === String(activePaperId)) || null;
+    return findPaperByIdentifier(papers, activePaperId);
   }, [papers, activePaperId]);
 
   // Helper: slugify subject names for path matching
