@@ -474,6 +474,101 @@ textarea:focus,
   font-weight: 700;
 }
 
+.agent-finder {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  margin-bottom: 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  box-shadow: var(--elevation-low);
+}
+
+.agent-finder-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.agent-finder-header h3 {
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.agent-finder-header svg {
+  color: var(--brand-experiment);
+  flex-shrink: 0;
+}
+
+.agent-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.agent-search-input {
+  position: relative;
+  min-width: 0;
+}
+
+.agent-search-input input {
+  width: 100%;
+  padding-right: 42px;
+}
+
+.agent-search-input svg {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}
+
+.agent-example-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.agent-result-note {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(53, 91, 79, 0.07);
+  color: var(--text-normal);
+  font-size: 13px;
+}
+
+.agent-result-note strong {
+  color: var(--header-primary);
+}
+
+.match-reason-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.match-reason-chip {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(53, 91, 79, 0.08);
+  color: var(--brand-experiment);
+  border: 1px solid rgba(53, 91, 79, 0.12);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .papers-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -917,6 +1012,15 @@ textarea:focus,
 
   .search-field {
     min-width: 100%;
+  }
+
+  .agent-search-row {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-result-note {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 

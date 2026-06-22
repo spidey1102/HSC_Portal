@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import Filters from './components/Filters';
 import PaperCard from './components/PaperCard';
@@ -6,9 +6,11 @@ import PracticeRoom from './components/PracticeRoom';
 import TextbooksView from './components/TextbooksView';
 import ExamCountdown from './components/ExamCountdown';
 import CustomCalendar from './components/CustomCalendar';
+import AgenticPaperFinder from './components/AgenticPaperFinder';
 import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock } from 'lucide-react';
 import PaperHistory from './components/PaperHistory';
 import { Analytics } from '@vercel/analytics/react';
+import { findAgenticPaperMatchesAsync } from './utils/agenticPaperSearch';
 import './App.css';
 
 export default function App() {
@@ -28,6 +30,16 @@ export default function App() {
   const [solutionsOnly, setSolutionsOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [yearSort, setYearSort] = useState('desc'); // desc = newest first, asc = oldest first, none = default order
+  const [agentQuery, setAgentQuery] = useState('');
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentResult, setAgentResult] = useState({
+    intent: {},
+    papers: [],
+    total: 0,
+    applied: false,
+    summary: '',
+    isAiAssisted: false,
+  });
 
   // Bookmarks State
   const [viewBookmarks, setViewBookmarks] = useState(false);
@@ -46,7 +58,18 @@ export default function App() {
   const [viewCalendar, setViewCalendar] = useState(false);
 
   // active Paper for practice room
-  const [activePaper, setActivePaper] = useState(null);
+  const [activePaperId, setActivePaperId] = useState(() => {
+    const pathMatch = window.location.pathname.match(/^\/paper\/([^/]+)\/?$/);
+    if (pathMatch?.[1]) return decodeURIComponent(pathMatch[1]);
+
+    const params = new URLSearchParams(window.location.search);
+    return params.get('paper');
+  });
+  const [locationSnapshot, setLocationSnapshot] = useState(() => ({
+    pathname: window.location.pathname || '/',
+    search: window.location.search || '',
+    hash: window.location.hash || '',
+  }));
 
   // Mobile sidebar toggle
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -66,6 +89,7 @@ export default function App() {
   const [renderLimit, setRenderLimit] = useState(40);
   const [shareNotice, setShareNotice] = useState('');
   const shareNoticeTimer = useRef(null);
+  const paperReturnToRef = useRef(null);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -80,6 +104,31 @@ export default function App() {
     return () => {
       if (shareNoticeTimer.current) clearTimeout(shareNoticeTimer.current);
     };
+  }, []);
+
+  const readLocation = () => ({
+    pathname: window.location.pathname || '/',
+    search: window.location.search || '',
+    hash: window.location.hash || '',
+  });
+
+  const getPaperIdFromLocation = (location = locationSnapshot) => {
+    const pathMatch = location.pathname.match(/^\/paper\/([^/]+)\/?$/);
+    if (pathMatch?.[1]) return decodeURIComponent(pathMatch[1]);
+
+    const params = new URLSearchParams(location.search || '');
+    return params.get('paper');
+  };
+
+  const getPaperPath = (paperId) => `/paper/${encodeURIComponent(String(paperId))}/`;
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setLocationSnapshot(readLocation());
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   // Fetch compiled database
@@ -103,6 +152,42 @@ export default function App() {
         setLoading(false);
       });
   }, []);
+
+  // Async Agentic Search Trigger
+  useEffect(() => {
+    let active = true;
+    const query = agentQuery.trim();
+
+    if (!query) {
+      setAgentResult({
+        intent: {},
+        papers: [],
+        total: 0,
+        applied: false,
+        summary: '',
+        isAiAssisted: false,
+      });
+      setAgentLoading(false);
+      return;
+    }
+
+    setAgentLoading(true);
+    findAgenticPaperMatchesAsync(query, papers, subjects, schools, { defaultLevel: selectedLevel })
+      .then((res) => {
+        if (!active) return;
+        setAgentResult(res);
+        setAgentLoading(false);
+      })
+      .catch((err) => {
+        if (!active) return;
+        console.error('Agentic search error:', err);
+        setAgentLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [agentQuery, papers, subjects, schools, selectedLevel]);
 
   // Save Bookmarks to localStorage
   const toggleBookmark = (viewno) => {
@@ -150,9 +235,24 @@ export default function App() {
   };
 
   const buildPaperShareUrl = (paper) => {
-    const url = new URL(window.location.href);
-    url.searchParams.set('paper', String(paper.v));
-    return url.toString();
+    return new URL(getPaperPath(paper.v), window.location.origin).toString();
+  };
+
+  const openPaper = (paper, { replace = false } = {}) => {
+    paperReturnToRef.current = readLocation();
+    const nextPath = getPaperPath(paper.v);
+    window.history[replace ? 'replaceState' : 'pushState']({}, '', nextPath);
+    setLocationSnapshot(readLocation());
+    setActivePaperId(String(paper.v));
+  };
+
+  const closePaper = () => {
+    const returnTo = paperReturnToRef.current;
+    const nextLocation = returnTo || { pathname: '/', search: '', hash: '' };
+    window.history.replaceState({}, '', `${nextLocation.pathname}${nextLocation.search}${nextLocation.hash}`);
+    setLocationSnapshot(readLocation());
+    setActivePaperId(null);
+    paperReturnToRef.current = null;
   };
 
   const sharePaper = async (paper) => {
@@ -182,22 +282,28 @@ export default function App() {
     }
   };
 
-  // Restore active paper from URL on initial load / when papers are first available.
-  // Intentionally exclude `activePaper` from dependencies so this effect does not
-  // run when the user closes the PracticeRoom (which would immediately reopen it
-  // because the URL param still exists until the other effect removes it).
+  const paperRouteId = getPaperIdFromLocation(locationSnapshot);
+
   useEffect(() => {
-    if (!papers.length || loading) return;
-    if (activePaper) return;
+    if (paperRouteId !== activePaperId) {
+      setActivePaperId(paperRouteId);
+    }
+  }, [paperRouteId, activePaperId]);
 
-    const params = new URLSearchParams(window.location.search);
-    const paperId = params.get('paper');
-    if (!paperId) return;
+  useEffect(() => {
+    if (!paperRouteId) return;
 
-    const match = papers.find((p) => String(p.v) === paperId);
-    if (match) setActivePaper(match);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [papers, loading]);
+    const canonicalPath = getPaperPath(paperRouteId);
+    if (locationSnapshot.pathname !== canonicalPath || locationSnapshot.search || locationSnapshot.hash) {
+      window.history.replaceState({}, '', canonicalPath);
+      setLocationSnapshot(readLocation());
+    }
+  }, [paperRouteId, locationSnapshot.pathname, locationSnapshot.search, locationSnapshot.hash]);
+
+  const activePaper = useMemo(() => {
+    if (!activePaperId) return null;
+    return papers.find((p) => String(p.v) === String(activePaperId)) || null;
+  }, [papers, activePaperId]);
 
   // Helper: slugify subject names for path matching
   const slugify = (s) => {
@@ -213,7 +319,7 @@ export default function App() {
   // Restore selected subject from URL (query param `subject` or path `/slug`)
   useEffect(() => {
     if (!subjects || !subjects.length) return;
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(locationSnapshot.search || '');
     const subjectParam = params.get('subject');
     if (subjectParam) {
       const idx = subjects.findIndex(s => slugify(s) === subjectParam);
@@ -222,34 +328,28 @@ export default function App() {
     }
 
     // check path-based subject: e.g. /physics
-    const path = window.location.pathname || '/';
+    const path = locationSnapshot.pathname || '/';
     const seg = path.replace(/^\//, '').replace(/\/$/, '');
     if (seg) {
       const idx = subjects.findIndex(s => slugify(s) === seg);
       if (idx !== -1) setSelectedSubject(idx);
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subjects]);
 
-  useEffect(() => {
-    // Update `paper` query param without disturbing pathname (subject routes)
-    const url = new URL(window.location.href);
-    if (activePaper) {
-      url.searchParams.set('paper', String(activePaper.v));
-    } else {
-      url.searchParams.delete('paper');
-    }
-    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
-  }, [activePaper]);
+    setSelectedSubject(null);
+  }, [subjects, locationSnapshot.pathname, locationSnapshot.search]);
 
   // Update pathname when selectedSubject changes so URL reflects current subject
   useEffect(() => {
+    if (paperRouteId) return;
+
     const url = new URL(window.location.href);
     const currentPath = url.pathname || '/';
     if (selectedSubject === null) {
       // revert to root
       if (currentPath !== '/') {
         window.history.replaceState({}, '', '/');
+        setLocationSnapshot(readLocation());
       }
       return;
     }
@@ -261,8 +361,9 @@ export default function App() {
       // preserve existing search (e.g., ?paper=123)
       const search = url.search || '';
       window.history.replaceState({}, '', `${desiredPath}${search}${url.hash}`);
+      setLocationSnapshot(readLocation());
     }
-  }, [selectedSubject, subjects]);
+  }, [selectedSubject, subjects, paperRouteId]);
 
   // Reset pagination limit when filters change
   useEffect(() => {
@@ -276,6 +377,7 @@ export default function App() {
     yearSort,
     solutionsOnly,
     searchQuery,
+    agentQuery,
     viewBookmarks,
     viewTextbooks,
     viewHistory,
@@ -358,7 +460,6 @@ export default function App() {
     solutionsOnly,
     searchQuery,
     viewBookmarks,
-    viewTextbooks,
     bookmarks
   ]);
 
@@ -378,6 +479,22 @@ export default function App() {
     return list;
   }, [filteredPapers, yearSort]);
 
+  const agentSearchActive = agentResult.applied;
+
+  const visiblePaperRows = useMemo(() => {
+    if (agentSearchActive) {
+      return agentResult.papers.map((item) => ({
+        paper: item.paper,
+        matchReasons: item.reasons,
+      }));
+    }
+
+    return sortedPapers.map((paper) => ({
+      paper,
+      matchReasons: [],
+    }));
+  }, [agentResult, agentSearchActive, sortedPapers]);
+
   const hasActiveFilters = 
     selectedSubject !== null || 
     selectedCategory !== null || 
@@ -385,7 +502,8 @@ export default function App() {
     selectedYear !== null || 
     yearSort !== 'desc' ||
     solutionsOnly || 
-    searchQuery !== '';
+    searchQuery !== '' ||
+    agentQuery.trim() !== '';
 
   const resetFilters = () => {
     setSelectedSubject(null);
@@ -395,9 +513,10 @@ export default function App() {
     setYearSort('desc');
     setSolutionsOnly(false);
     setSearchQuery('');
+    setAgentQuery('');
   };
 
-  const paginatedPapers = sortedPapers.slice(0, renderLimit);
+  const paginatedPaperRows = visiblePaperRows.slice(0, renderLimit);
   const currentViewLabel = viewCalendar
     ? 'Assessment calendar'
     : viewTextbooks
@@ -417,6 +536,64 @@ export default function App() {
         : viewHistory
           ? 'Papers you opened and those you marked complete.'
           : 'Browse official papers, trial exams, and resources without the clutter.';
+
+  if (paperRouteId) {
+    if (loading) {
+        return (
+          <div className="practice-surface animate-fade-in" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+            <div className="surface-card" style={{ padding: '24px', textAlign: 'center' }}>
+              <RefreshCw size={28} color="var(--text-muted)" className="spin" />
+              <h3 style={{ marginTop: '12px', color: 'var(--header-primary)' }}>Loading paper</h3>
+            </div>
+            <Analytics />
+          </div>
+        );
+    }
+
+    if (error) {
+        return (
+          <div className="practice-surface animate-fade-in" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '24px' }}>
+            <div className="surface-card" style={{ padding: '24px', maxWidth: '640px', width: '100%' }}>
+              <h3 style={{ marginBottom: '8px', color: 'var(--status-danger)' }}>Could not open this paper</h3>
+              <p>{error}</p>
+              <button type="button" className="btn-primary" style={{ marginTop: '16px' }} onClick={closePaper}>
+                Back to home
+              </button>
+            </div>
+            <Analytics />
+          </div>
+        );
+    }
+
+    if (!activePaper) {
+        return (
+          <div className="practice-surface animate-fade-in" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '24px' }}>
+            <div className="surface-card" style={{ padding: '24px', maxWidth: '640px', width: '100%' }}>
+              <h3 style={{ marginBottom: '8px', color: 'var(--header-primary)' }}>Paper not found</h3>
+              <p>This paper link does not match a resource in the library.</p>
+              <button type="button" className="btn-primary" style={{ marginTop: '16px' }} onClick={closePaper}>
+                Back to home
+              </button>
+            </div>
+            <Analytics />
+          </div>
+        );
+    }
+
+    return (
+        <PracticeRoom
+          paper={activePaper}
+          subjectName={subjects[activePaper.s]}
+          schoolName={schools[activePaper.h]}
+          onClose={closePaper}
+          allPapers={papers}
+          subjects={subjects}
+          schools={schools}
+          onSharePaper={() => sharePaper(activePaper)}
+          onSelectPaper={openPaper}
+        />
+    );
+  }
 
   return (
     <div className={`app-container ${isSidebarOpen ? 'sidebar-visible' : ''}`}>
@@ -523,7 +700,7 @@ export default function App() {
                 allPapers={papers}
                 subjects={subjects}
                 schools={schools}
-                onSelectPaper={setActivePaper}
+                onSelectPaper={openPaper}
               />
             ) : (
               <>
@@ -573,6 +750,17 @@ export default function App() {
                 </section>
 
                 <section className="content-band">
+                  {!viewBookmarks && (
+                    <AgenticPaperFinder
+                      value={agentQuery}
+                      onSearch={(query) => setAgentQuery(query.trim())}
+                      onClear={() => setAgentQuery('')}
+                      result={agentResult}
+                      disabled={loading || agentLoading}
+                      loading={agentLoading}
+                    />
+                  )}
+
                   <div className="tool-strip" style={{ marginBottom: '14px' }}>
                     <div>
                       <div className="eyebrow">Filters</div>
@@ -623,15 +811,16 @@ export default function App() {
                     <>
                       <div className="results-header">
                         <span>
-                          {sortedPapers.length.toLocaleString()} matches
-                          {selectedSubject !== null && ` in ${subjects[selectedSubject]}`}
+                          {visiblePaperRows.length.toLocaleString()} matches
+                          {!agentSearchActive && selectedSubject !== null && ` in ${subjects[selectedSubject]}`}
+                          {agentSearchActive && ' ranked by agent finder'}
                         </span>
-                        <span>Showing {Math.min(renderLimit, sortedPapers.length).toLocaleString()}</span>
+                        <span>Showing {Math.min(renderLimit, visiblePaperRows.length).toLocaleString()}</span>
                       </div>
 
-                      {sortedPapers.length > 0 ? (
+                      {visiblePaperRows.length > 0 ? (
                         <div className="papers-grid">
-                          {paginatedPapers.map((paper, idx) => (
+                          {paginatedPaperRows.map(({ paper, matchReasons }, idx) => (
                             <PaperCard
                               key={`${paper.v}-${idx}`}
                               paper={paper}
@@ -640,15 +829,20 @@ export default function App() {
                               isBookmarked={bookmarks.has(paper.v + '_' + paper.n)}
                               toggleBookmark={() => toggleBookmark(paper.v + '_' + paper.n)}
                               sharePaper={() => sharePaper(paper)}
-                              onSelectPaper={setActivePaper}
+                              onSelectPaper={openPaper}
+                              matchReasons={matchReasons}
                             />
                           ))}
                         </div>
                       ) : (
                         <div className="empty-state">
-                          <h3 style={{ color: 'var(--header-primary)', marginBottom: '8px' }}>No matches found</h3>
+                          <h3 style={{ color: 'var(--header-primary)', marginBottom: '8px' }}>
+                            {agentSearchActive ? 'Agent couldn\'t find matches' : 'No matches found'}
+                          </h3>
                           <p style={{ marginBottom: '16px' }}>
-                            Try resetting your filters or searching for different terms.
+                            {agentSearchActive
+                              ? `No papers matched "${agentQuery}". Try rephrasing or use the normal filters.`
+                              : 'Try resetting your filters or searching for different terms.'}
                           </p>
                           <button onClick={resetFilters} className="btn-primary">
                             Reset filters
@@ -656,7 +850,7 @@ export default function App() {
                         </div>
                       )}
 
-                      {sortedPapers.length > renderLimit && (
+                      {visiblePaperRows.length > renderLimit && (
                         <div style={{ display: 'flex', justifyContent: 'center', margin: '28px 0 48px' }}>
                           <button
                             onClick={() => setRenderLimit((prev) => prev + 40)}
@@ -674,21 +868,6 @@ export default function App() {
           </div>
         </div>
       </main>
-
-      {/* Practice Exam split viewer portal Overlay */}
-      {activePaper && (
-        <PracticeRoom
-          paper={activePaper}
-          subjectName={subjects[activePaper.s]}
-          schoolName={schools[activePaper.h]}
-          onClose={() => setActivePaper(null)}
-          allPapers={papers}
-          subjects={subjects}
-          schools={schools}
-          onSharePaper={() => sharePaper(activePaper)}
-          onSelectPaper={setActivePaper}
-        />
-      )}
 
       {/* Vercel Web Analytics */}
       <Analytics />
