@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, X, ExternalLink, Edit3, BookOpen, Clock, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Share2, Sparkles, Send, Check } from 'lucide-react';
+import { Play, Pause, RotateCcw, X, ExternalLink, Edit3, BookOpen, Clock, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Sparkles, Send, Check } from 'lucide-react';
+import ShareMenu from './ShareMenu';
 
 export default function PracticeRoom({
   paper,
@@ -9,8 +10,8 @@ export default function PracticeRoom({
   allPapers,
   subjects,
   schools,
-  onSharePaper,
-  onSelectPaper
+  onSelectPaper,
+  aiSlot
 }) {
   const loadSavedTimerSeconds = () => {
     try {
@@ -265,7 +266,9 @@ export default function PracticeRoom({
       localStorage.setItem(key, JSON.stringify((arr || []).slice(0, 500)));
       setActionMessage('Marked as completed');
       setIsCompleted(true);
-      try { window.dispatchEvent(new CustomEvent('hsc:history-updated')); } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('hsc:history-updated')); } catch (_e) {
+        // ignore event dispatch failure
+      }
       if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
       actionTimerRef.current = setTimeout(() => setActionMessage(''), 1800);
     } catch (e) {
@@ -283,7 +286,9 @@ export default function PracticeRoom({
       localStorage.setItem(key, JSON.stringify(arr));
       setActionMessage('Marked as incomplete');
       setIsCompleted(false);
-      try { window.dispatchEvent(new CustomEvent('hsc:history-updated')); } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('hsc:history-updated')); } catch (_e) {
+        // ignore event dispatch failure
+      }
       if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
       actionTimerRef.current = setTimeout(() => setActionMessage(''), 1800);
     } catch (e) {
@@ -439,15 +444,12 @@ export default function PracticeRoom({
         </div>
 
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <button
-            onClick={onSharePaper}
-            className="btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-            title="Share this test"
-          >
-            <Share2 size={16} />
-            <span>Share</span>
-          </button>
+          <ShareMenu
+            paper={paper}
+            getUrl={(p) => new URL(`/paper/${encodeURIComponent(String(p.v))}/`, window.location.origin).toString()}
+            buttonClassName="btn-secondary"
+            buttonLabel="Share"
+          />
 
           <button
             onClick={() => setAiOpen(prev => !prev)}
@@ -1072,6 +1074,7 @@ export default function PracticeRoom({
 
         </div>
       </div>
+      {aiSlot}
     </div>
   );
 }

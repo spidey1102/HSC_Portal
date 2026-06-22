@@ -1,5 +1,6 @@
 import React from 'react';
-import { Star, FileText, CheckCircle2, Share2 } from 'lucide-react';
+import { Star, FileText, CheckCircle2 } from 'lucide-react';
+import ShareMenu from './ShareMenu';
 
 export default function PaperCard({
   paper,
@@ -7,7 +8,8 @@ export default function PaperCard({
   schoolName,
   isBookmarked,
   toggleBookmark,
-  sharePaper,
+  getShareUrl,
+  onShareNotice,
   onSelectPaper,
   matchReasons = []
 }) {
@@ -43,21 +45,12 @@ export default function PaperCard({
           </span>
 
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                sharePaper();
-              }}
-              className="btn-secondary"
-              style={{
-                padding: '8px 10px',
-                minWidth: '40px',
-                justifyContent: 'center',
-              }}
-              title="Share test link"
-            >
-              <Share2 size={16} />
-            </button>
+            <ShareMenu
+              paper={paper}
+              getUrl={getShareUrl}
+              onCopied={onShareNotice}
+              buttonClassName="btn-secondary icon-button"
+            />
 
             <button
               onClick={(e) => {
