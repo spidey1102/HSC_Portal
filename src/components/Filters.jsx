@@ -12,6 +12,8 @@ export default function Filters({
   setSelectedYear,
   yearSort,
   setYearSort,
+  sortMode,
+  setSortMode,
   solutionsOnly,
   setSolutionsOnly,
   schools,
@@ -57,15 +59,21 @@ export default function Filters({
       </select>
 
       <select
-        value={yearSort}
-        onChange={(e) => setYearSort(e.target.value)}
+        value={sortMode || (yearSort === 'asc' ? 'year-asc' : yearSort === 'none' ? 'default' : 'year-desc')}
+        onChange={(e) => {
+          setSortMode(e.target.value);
+          setYearSort(e.target.value === 'year-asc' ? 'asc' : e.target.value === 'default' ? 'none' : 'desc');
+        }}
         className="field"
-        style={{ padding: '0 12px', minWidth: '150px' }}
-        title="Sort papers by year"
+        style={{ padding: '0 12px', minWidth: '170px' }}
+        title="Sort papers"
       >
-        <option value="desc">Newest first</option>
-        <option value="asc">Oldest first</option>
-        <option value="none">Default order</option>
+        <option value="year-desc">Newest first</option>
+        <option value="year-asc">Oldest first</option>
+        <option value="name-asc">Name A-Z</option>
+        <option value="school-asc">School A-Z</option>
+        <option value="solutions-first">Solutions first</option>
+        <option value="default">Default order</option>
       </select>
 
       <select
