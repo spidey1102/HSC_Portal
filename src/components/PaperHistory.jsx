@@ -45,7 +45,9 @@ export default function PaperHistory({ allPapers = [], subjects = [], schools = 
       const arr = JSON.parse(localStorage.getItem(VIEWED_KEY) || '[]').filter(a => String(a.v) !== String(id));
       localStorage.setItem(VIEWED_KEY, JSON.stringify(arr));
       setViewed(arr);
-    } catch (e) {}
+    } catch (_e) {
+      // ignore local storage failure
+    }
   }
 
   function removeCompleted(id) {
@@ -53,7 +55,9 @@ export default function PaperHistory({ allPapers = [], subjects = [], schools = 
       const arr = JSON.parse(localStorage.getItem(COMPLETED_KEY) || '[]').filter(a => String(a.id) !== String(id));
       localStorage.setItem(COMPLETED_KEY, JSON.stringify(arr));
       setCompleted(arr);
-    } catch (e) {}
+    } catch (_e) {
+      // ignore local storage failure
+    }
   }
 
   function clearViewed() {
