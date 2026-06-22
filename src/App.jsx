@@ -598,9 +598,11 @@ export default function App() {
                   <div className="hero-stack">
                     <div className="hero-title">
                       <div className="eyebrow">{viewBookmarks ? 'Saved library' : 'Study workspace'}</div>
-                      <h2 className="page-title">
-                        {viewBookmarks ? 'Your saved papers, ready when you are.' : 'A quieter place to work through papers, notes, and exam prep.'}
-                      </h2>
+                       {viewBookmarks && (
+                        <h2 className="page-title">
+                          Your saved papers, ready when you are.
+                        </h2>
+                      )}
                       <p className="page-copy">
                         {viewBookmarks
                           ? `You have ${bookmarks.size.toLocaleString()} saved paper${bookmarks.size === 1 ? '' : 's'}.`
