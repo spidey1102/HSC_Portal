@@ -1,4 +1,4 @@
-const AGENT_MODEL = 'google/gemini-2.0-flash-001';
+const AGENT_MODEL = 'openrouter/free';
 
 const AGENT_SYSTEM_PROMPT = [
   'You are a smart, efficient HSC study assistant operating inside the HSC Portal.',
