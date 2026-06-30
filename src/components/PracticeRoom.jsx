@@ -76,6 +76,8 @@ export default function PracticeRoom({
   const [aiResponse, setAiResponse] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [extractedQuestions, setExtractedQuestions] = useState([]);
+  const [extractLoading, setExtractLoading] = useState(false);
 
   const [actionMessage, setActionMessage] = useState('');
   const actionTimerRef = useRef(null);
@@ -383,6 +385,65 @@ export default function PracticeRoom({
       setAiLoading(false);
     }
   };
+
+  const loadExtractedQuestions = async () => {
+    setExtractLoading(true);
+    setAiError('');
+    try {
+      const resp = await fetch(`/api/agent/extract?paperId=${encodeURIComponent(paper.v)}`);
+      const text = await resp.text();
+      let payload = null;
+      try { payload = JSON.parse(text); } catch (e) { payload = null; }
+      if (!resp.ok) {
+        throw new Error(payload?.error || text || `Request failed with status ${resp.status}`);
+      }
+      const questions = (payload && payload.questions) || [];
+      setExtractedQuestions(questions);
+      if (!questions.length) setAiError('No questions were extracted for this paper.');
+    } catch (error) {
+      setAiError(error?.message || 'Failed to extract questions.');
+    } finally {
+      setExtractLoading(false);
+    }
+  };
+
+  const runAgentAsk = async (questionId, promptOverride) => {
+    setAiLoading(true);
+    setAiError('');
+    setAiResponse('');
+    try {
+      const payload = {
+        paperId: paper.v,
+        questionId,
+        prompt: (promptOverride || aiPrompt || 'Explain this question in simple steps.'),
+      };
+
+      const resp = await fetch('/api/agent/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const text = await resp.text();
+      let body = null;
+      try { body = JSON.parse(text); } catch (e) { body = null; }
+      if (!resp.ok) throw new Error(body?.error || text || `Request failed (${resp.status})`);
+      const answer = (body && (body.answer || body.result || body.output)) || text;
+      setAiResponse(String(answer));
+    } catch (error) {
+      setAiError(error?.message || 'Agent ask failed.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Auto-load extracted questions whenever a different paper is opened
+    if (paper && paper.v) {
+      loadExtractedQuestions();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paper.v]);
 
   const useClipboardExcerpt = async () => {
     try {
@@ -747,7 +808,53 @@ export default function PracticeRoom({
                     lineHeight: 1.45
                   }}
                 />
+                <div style={{ marginTop: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--header-secondary)' }}>Extracted Questions</div>
+                    <div>
+                      <button
+                        type="button"
+                        onClick={loadExtractedQuestions}
+                        className="btn-secondary"
+                        disabled={extractLoading}
+                        style={{ padding: '6px 10px', fontSize: '12px' }}
+                      >
+                        {extractLoading ? 'Loading...' : 'Load questions'}
+                      </button>
+                    </div>
+                  </div>
 
+                  {extractedQuestions.length > 0 ? (
+                    <div style={{ marginTop: '8px', maxHeight: '140px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {extractedQuestions.map((q, idx) => (
+                        <div key={q.id || idx} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                          <div style={{ flex: 1, fontSize: '13px', color: 'var(--text-normal)', whiteSpace: 'pre-wrap' }}>{q.text}</div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              onClick={() => { setAiExcerpt(q.text); setAiPrompt('Explain this question in simple steps.'); }}
+                              style={{ padding: '6px 8px', fontSize: '12px' }}
+                            >
+                              Set excerpt
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-primary"
+                              onClick={() => runAgentAsk(q.id || idx)}
+                              disabled={aiLoading}
+                              style={{ padding: '6px 8px', fontSize: '12px' }}
+                            >
+                              {aiLoading ? 'Asking...' : 'Ask AI'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: '8px', fontSize: '13px', color: 'var(--text-muted)' }}>No extracted questions yet.</div>
+                  )}
+                </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
                     type="button"
