@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import Filters from './components/Filters';
 import PaperCard from './components/PaperCard';
@@ -7,7 +7,8 @@ import TextbooksView from './components/TextbooksView';
 import ExamCountdown from './components/ExamCountdown';
 import CustomCalendar from './components/CustomCalendar';
 import AgenticPaperFinder from './components/AgenticPaperFinder';
-import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock } from 'lucide-react';
+import AgentCommandCenter from './components/AgentCommandCenter';
+import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock, BotMessageSquare } from 'lucide-react';
 import PaperHistory from './components/PaperHistory';
 import { Analytics } from '@vercel/analytics/react';
 import { findAgenticPaperMatchesAsync } from './utils/agenticPaperSearch';
@@ -85,6 +86,9 @@ export default function App() {
     }
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
+
+  // Agent Command Center state
+  const [isAgentOpen, setIsAgentOpen] = useState(false);
 
   // Pagination Limit
   const [renderLimit, setRenderLimit] = useState(40);
@@ -210,6 +214,28 @@ export default function App() {
       localStorage.removeItem('hsc_bookmarks');
     }
   };
+
+  /**
+   * addCalendarEvent — bridges the agent harness into CustomCalendar's localStorage format.
+   * The agent provides { title, date, description, color }; we map to { subject, day, period, topics, weight }.
+   */
+  const addCalendarEvent = useCallback(({ title, date, description = '', color = 'blue' }) => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('hsc_assessments') || '[]');
+      const newEvent = {
+        id: Date.now(),
+        subject: title,
+        day: date.split('T')[0], // store date-only part
+        period: description || 'Agent-scheduled',
+        topics: description || title,
+        weight: '',
+        agentColor: color,
+      };
+      localStorage.setItem('hsc_assessments', JSON.stringify([...saved, newEvent]));
+    } catch (e) {
+      console.warn('addCalendarEvent failed:', e);
+    }
+  }, []);
 
   const flashShareNotice = (message) => {
     setShareNotice(message);
@@ -382,7 +408,8 @@ export default function App() {
     viewBookmarks,
     viewTextbooks,
     viewHistory,
-    viewCalendar
+    viewCalendar,
+    isAgentOpen
   ]);
 
   // Compute subject counts based on current level dynamically
@@ -651,6 +678,17 @@ export default function App() {
 
             <button
               type="button"
+              onClick={() => setIsAgentOpen(true)}
+              className="btn-secondary"
+              id="agent-command-center-trigger"
+              style={{ padding: '10px 12px', color: 'var(--brand-experiment)' }}
+              title="Open AI Agent"
+            >
+              <BotMessageSquare size={16} />
+              <span>AI Agent</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
               className="btn-secondary"
               style={{ padding: '10px 12px' }}
@@ -872,6 +910,21 @@ export default function App() {
 
       {/* Vercel Web Analytics */}
       <Analytics />
+
+      {/* AI Agent Command Center */}
+      <AgentCommandCenter
+        isOpen={isAgentOpen}
+        onClose={() => setIsAgentOpen(false)}
+        appContext={{
+          papers,
+          subjects,
+          schools,
+          bookmarks,
+          toggleBookmark,
+          addCalendarEvent,
+          selectedLevel,
+        }}
+      />
 
     </div>
   );
