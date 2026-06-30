@@ -1,4 +1,4 @@
-const AGENT_MODEL = 'openai/gpt-oss-120b:free';
+const AGENT_MODEL = 'google/gemma-4-31b-it:free';
 
 const AGENT_SYSTEM_PROMPT = [
   'You are a smart, efficient HSC study assistant operating inside the HSC Portal.',
