@@ -262,7 +262,10 @@ export default function App() {
   };
 
   const buildPaperShareUrl = (paper) => {
-    return new URL(getPaperPath(paper), window.location.origin).toString();
+    const paperId = getPaperRouteId(paper);
+    const url = new URL(window.location.origin);
+    url.searchParams.set('paper', paperId);
+    return url.toString();
   };
 
   const openPaper = (paper, { replace = false } = {}) => {

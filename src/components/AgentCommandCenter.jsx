@@ -72,6 +72,7 @@ const SUGGESTIONS = [
  */
 export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
   const [input, setInput] = useState('');
+  const [conversation, setConversation] = useState([]);
   const [steps, setSteps] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
   const [hasRun, setHasRun] = useState(false);
@@ -97,6 +98,7 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
     const trimmed = (query || input).trim();
     if (!trimmed || isRunning) return;
 
+    setConversation((prev) => [...prev, { role: 'user', content: trimmed }]);
     setInput('');
     setSteps([{ type: 'thinking', label: 'Starting agent…' }]);
     setIsRunning(true);
@@ -106,7 +108,7 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
     abortRef.current = controller;
 
     try {
-      await runAgent(trimmed, appContext, {
+      const result = await runAgent(trimmed, appContext, {
         signal: controller.signal,
         onStep: (step) => {
           setSteps((prev) => {
@@ -123,8 +125,12 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
           });
         },
       });
+
+      setConversation((prev) => [...prev, { role: 'assistant', content: result.answer }]);
+      setSteps([]);
     } catch (err) {
       if (err.name !== 'AbortError') {
+        setConversation((prev) => [...prev, { role: 'error', content: err.message || 'Something went wrong.' }]);
         setSteps((prev) => [
           ...prev.filter((s) => s.type !== 'thinking'),
           { type: 'error', label: err.message || 'Something went wrong.' },
@@ -146,6 +152,7 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
   };
 
   const handleClear = () => {
+    setConversation([]);
     setSteps([]);
     setHasRun(false);
     setInput('');
@@ -164,10 +171,9 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  const answerStep = steps.find((s) => s.type === 'answer');
   const hasError = steps.some((s) => s.type === 'error');
-  const executionSteps = steps.filter((s) => s.type !== 'answer');
   const lastStepIdx = steps.length - 1;
+  const hasConversation = conversation.length > 0;
 
   return (
     <>
@@ -206,13 +212,28 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
 
         {/* Body */}
         <div className="agent-body">
-          {/* Execution Log */}
-          {hasRun ? (
+          {/* Conversation History */}
+          {hasConversation ? (
             <div className="agent-log" ref={logRef}>
-              {/* Tool steps */}
-              {executionSteps.length > 0 && (
+              <div className="agent-chat-history">
+                {conversation.map((message, idx) => (
+                  <div
+                    key={`${message.role}-${idx}`}
+                    className={`agent-message agent-message-${message.role}`}
+                  >
+                    <div className="agent-message-label">
+                      {message.role === 'user' ? 'You' : message.role === 'assistant' ? 'AI Agent' : 'Error'}
+                    </div>
+                    <div className="agent-message-bubble">
+                      {message.content}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {isRunning && steps.length > 0 && (
                 <div className="agent-log-steps">
-                  {executionSteps.map((step, idx) => (
+                  {steps.map((step, idx) => (
                     <AgentStep
                       key={idx}
                       step={step}
@@ -222,16 +243,7 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
                 </div>
               )}
 
-              {/* Final answer */}
-              {answerStep && (
-                <div className="agent-answer-bubble">
-                  <div className="agent-answer-icon"><IconSparkle /></div>
-                  <p className="agent-answer-text">{answerStep.label}</p>
-                </div>
-              )}
-
-              {/* Error state */}
-              {hasError && !isRunning && !answerStep && (
+              {hasError && !isRunning && (
                 <div className="agent-error-notice">
                   <span>⚠</span>
                   <span>{steps.find(s => s.type === 'error')?.label}</span>
