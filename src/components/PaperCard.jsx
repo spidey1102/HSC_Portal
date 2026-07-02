@@ -92,9 +92,13 @@ export default function PaperCard({
         </h3>
 
         {paper.w === 1 && (
-          <div className="pill" style={{ width: 'fit-content', backgroundColor: 'rgba(62,111,89,0.1)', color: 'var(--status-positive)', borderColor: 'rgba(62,111,89,0.14)' }}>
+          <div
+            className="pill"
+            style={{ width: 'fit-content', backgroundColor: 'rgba(62,111,89,0.1)', color: 'var(--status-positive)', borderColor: 'rgba(62,111,89,0.14)' }}
+            title="Solutions available"
+          >
             <CheckCircle2 size={14} />
-            <span>Solved</span>
+            <span>Solutions</span>
           </div>
         )}
 
