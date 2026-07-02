@@ -1,4 +1,4 @@
-const DEFAULT_MODEL = 'google/gemini-2.5-flash:free';
+const DEFAULT_MODEL = 'openrouter/free';
 
 const SYSTEM_PROMPT = `You are a search query parser for an HSC (Higher School Certificate) exam portal.
 Analyze the user's natural language request and extract the search intent as a JSON object matching this schema:

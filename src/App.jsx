@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import Filters from './components/Filters';
 import PaperCard from './components/PaperCard';
@@ -7,11 +7,22 @@ import TextbooksView from './components/TextbooksView';
 import ExamCountdown from './components/ExamCountdown';
 import CustomCalendar from './components/CustomCalendar';
 import AgenticPaperFinder from './components/AgenticPaperFinder';
-import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock } from 'lucide-react';
+import AgentCommandCenter from './components/AgentCommandCenter';
+import CustomizationMenu from './components/CustomizationMenu';
+import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock, BotMessageSquare, Palette } from 'lucide-react';
 import PaperHistory from './components/PaperHistory';
 import { Analytics } from '@vercel/analytics/react';
 import { findAgenticPaperMatchesAsync } from './utils/agenticPaperSearch';
 import { findPaperByIdentifier, getPaperRouteId } from './utils/paperIdentity';
+import {
+  ACCENT_OPTIONS,
+  APPEARANCE_DEFAULTS,
+  APPEARANCE_PRESETS,
+  APPEARANCE_STORAGE_KEY,
+  APPEARANCE_VARIABLE_KEYS,
+  getAppearanceVars,
+  loadAppearanceSettings,
+} from './utils/appearancePresets';
 import './App.css';
 
 export default function App() {
@@ -75,16 +86,18 @@ export default function App() {
   // Mobile sidebar toggle
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Theme state
-  const [theme, setTheme] = useState(() => {
-    try {
-      const saved = localStorage.getItem('hsc_theme');
-      if (saved === 'light' || saved === 'dark') return saved;
-    } catch (e) {
-      // ignore
-    }
-    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
+  // Appearance state
+  const [appearance, setAppearance] = useState(loadAppearanceSettings);
+  const [systemPrefersDark, setSystemPrefersDark] = useState(() => (
+    window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+  ));
+  const theme = appearance.mode === 'system'
+    ? (systemPrefersDark ? 'dark' : 'light')
+    : appearance.mode;
+  const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
+
+  // Agent Command Center state
+  const [isAgentOpen, setIsAgentOpen] = useState(false);
 
   // Pagination Limit
   const [renderLimit, setRenderLimit] = useState(40);
@@ -93,13 +106,58 @@ export default function App() {
   const paperReturnToRef = useRef(null);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
+    const mediaQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+    const updateSystemPreference = (event) => {
+      setSystemPrefersDark(event.matches);
+    };
+
+    if (mediaQuery) {
+      setSystemPrefersDark(mediaQuery.matches);
+      mediaQuery.addEventListener('change', updateSystemPreference);
+    }
+
+    return () => {
+      if (mediaQuery) {
+        mediaQuery.removeEventListener('change', updateSystemPreference);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const presetVars = getAppearanceVars(appearance.preset, theme);
+    const accent = ACCENT_OPTIONS[appearance.accent] || ACCENT_OPTIONS[APPEARANCE_DEFAULTS.accent];
+
+    root.setAttribute('data-theme', theme);
+    root.setAttribute('data-palette', appearance.preset);
+    root.setAttribute('data-density', appearance.density);
+
+    APPEARANCE_VARIABLE_KEYS.forEach((key) => root.style.removeProperty(key));
+    Object.entries(presetVars || {}).forEach(([key, value]) => {
+      root.style.setProperty(key, value);
+    });
+    root.style.setProperty('--accent-brand', accent.accent);
+    root.style.setProperty('--brand-experiment', accent.accent);
+    root.style.setProperty('--brand-experiment-hover', accent.hover);
+    root.style.setProperty('--brand-experiment-active', accent.active);
+    root.style.setProperty('--status-positive', accent.positive);
+    root.style.setProperty('--status-positive-background', accent.positive);
+
     try {
       localStorage.setItem('hsc_theme', theme);
+      localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(appearance));
     } catch (e) {
       // ignore
     }
-  }, [theme]);
+  }, [appearance, theme]);
+
+  const updateAppearance = useCallback((patch) => {
+    setAppearance((current) => ({
+      ...current,
+      ...patch,
+    }));
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -211,6 +269,28 @@ export default function App() {
     }
   };
 
+  /**
+   * addCalendarEvent — bridges the agent harness into CustomCalendar's localStorage format.
+   * The agent provides { title, date, description, color }; we map to { subject, day, period, topics, weight }.
+   */
+  const addCalendarEvent = useCallback(({ title, date, description = '', color = 'blue' }) => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('hsc_assessments') || '[]');
+      const newEvent = {
+        id: Date.now(),
+        subject: title,
+        day: date.split('T')[0], // store date-only part
+        period: description || 'Agent-scheduled',
+        topics: description || title,
+        weight: '',
+        agentColor: color,
+      };
+      localStorage.setItem('hsc_assessments', JSON.stringify([...saved, newEvent]));
+    } catch (e) {
+      console.warn('addCalendarEvent failed:', e);
+    }
+  }, []);
+
   const flashShareNotice = (message) => {
     setShareNotice(message);
     if (shareNoticeTimer.current) clearTimeout(shareNoticeTimer.current);
@@ -236,7 +316,10 @@ export default function App() {
   };
 
   const buildPaperShareUrl = (paper) => {
-    return new URL(getPaperPath(paper), window.location.origin).toString();
+    const paperId = getPaperRouteId(paper);
+    const url = new URL(window.location.origin);
+    url.searchParams.set('paper', paperId);
+    return url.toString();
   };
 
   const openPaper = (paper, { replace = false } = {}) => {
@@ -382,7 +465,8 @@ export default function App() {
     viewBookmarks,
     viewTextbooks,
     viewHistory,
-    viewCalendar
+    viewCalendar,
+    isAgentOpen
   ]);
 
   // Compute subject counts based on current level dynamically
@@ -651,12 +735,33 @@ export default function App() {
 
             <button
               type="button"
-              onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+              onClick={() => setIsAgentOpen(true)}
+              className="btn-secondary"
+              id="agent-command-center-trigger"
+              style={{ padding: '10px 12px', color: 'var(--brand-experiment)' }}
+              title="Open AI Agent"
+            >
+              <BotMessageSquare size={16} />
+              <span>AI Agent</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => updateAppearance({ mode: theme === 'dark' ? 'light' : 'dark' })}
               className="btn-secondary"
               style={{ padding: '10px 12px' }}
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsCustomizationOpen(true)}
+              className="btn-secondary"
+              style={{ padding: '10px 12px' }}
+              title="Open customisation menu"
+            >
+              <Palette size={16} />
+              <span>Customise</span>
             </button>
             {viewBookmarks && bookmarks.size > 0 && (
               <button
@@ -689,6 +794,13 @@ export default function App() {
             </button>
           </div>
         </div>
+
+        <CustomizationMenu
+          isOpen={isCustomizationOpen}
+          settings={appearance}
+          onChange={updateAppearance}
+          onClose={() => setIsCustomizationOpen(false)}
+        />
 
         <div className="scrollable-content">
           <div className="content-stack">
@@ -872,6 +984,21 @@ export default function App() {
 
       {/* Vercel Web Analytics */}
       <Analytics />
+
+      {/* AI Agent Command Center */}
+      <AgentCommandCenter
+        isOpen={isAgentOpen}
+        onClose={() => setIsAgentOpen(false)}
+        appContext={{
+          papers,
+          subjects,
+          schools,
+          bookmarks,
+          toggleBookmark,
+          addCalendarEvent,
+          selectedLevel,
+        }}
+      />
 
     </div>
   );

@@ -2,6 +2,9 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { handleOpenRouterRequest } from './openrouterHandler.js'
 import { handleAgentSearchRequest } from './agentSearchHandler.js'
+import findAgentHandler from './api/agent/find.js'
+import extractAgentHandler from './api/agent/extract.js'
+import askAgentHandler from './api/agent/ask.js'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -10,12 +13,10 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
-
-      
-
       {
         name: 'openrouter-dev-route',
         configureServer(server) {
+          // OpenRouter proxy / mock
           server.middlewares.use('/api/openrouter', async (req, res, next) => {
             if (req.method !== 'POST') {
               next()
@@ -40,6 +41,33 @@ export default defineConfig(({ mode }) => {
               res,
               env.OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY
             )
+          })
+
+          server.middlewares.use('/api/agent/find', async (req, res, next) => {
+            if (req.method !== 'GET') {
+              next()
+              return
+            }
+
+            await findAgentHandler(req, res)
+          })
+
+          server.middlewares.use('/api/agent/extract', async (req, res, next) => {
+            if (req.method !== 'GET') {
+              next()
+              return
+            }
+
+            await extractAgentHandler(req, res)
+          })
+
+          server.middlewares.use('/api/agent/ask', async (req, res, next) => {
+            if (req.method !== 'POST') {
+              next()
+              return
+            }
+
+            await askAgentHandler(req, res)
           })
         },
       },
