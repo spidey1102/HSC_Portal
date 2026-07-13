@@ -193,8 +193,8 @@ def parse_papers(html, subject_name, level, page_url):
         view_url = f"https://thsconline.github.io/s/v/{viewno}/{urllib.parse.quote(label)}"
         download_url = f"https://thsconline.github.io/s/d/{viewno}/{urllib.parse.quote(label)}"
         
-        # Direct Apps Script Iframe viewer path (so we can embed it inside our premium website!)
-        direct_iframe_url = f"https://script.google.com/macros/s/AKfycbx69GPoJtf9sSevsUbWtPr46vpa01u4oNkHjFmkkWxmj62AZ0q-/exec?export=view&field={urllib.parse.quote(label)}&base={viewno}"
+        # Direct viewer page URL (THSC Online's pdf.js viewer handles hash auth internally)
+        direct_iframe_url = f"https://thsconline.github.io/s/viewer.html?field={urllib.parse.quote(label)}&base={viewno}"
         
         papers_list.append({
             'name': label,

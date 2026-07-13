@@ -466,7 +466,7 @@ export default function PracticeRoom({
   };
 
   const viewUrl = `https://thsconline.github.io/s/v/${paper.v}/${encodeURIComponent(paper.n)}`;
-  const directIframeUrl = `https://script.google.com/macros/s/AKfycbx69GPoJtf9sSevsUbWtPr46vpa01u4oNkHjFmkkWxmj62AZ0q-/exec?export=view&field=${encodeURIComponent(paper.n)}&base=${paper.v}`;
+  const directIframeUrl = `https://thsconline.github.io/s/viewer.html?field=${encodeURIComponent(paper.n)}&base=${paper.v}`;
 
   return (
     <div style={{

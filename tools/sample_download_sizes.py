@@ -31,7 +31,7 @@ def construct_download_url(entry):
     name = entry.get('n') or entry.get('name') or ''
     if not v:
         return None
-    return f"{BASE}/s/d/{v}/{urllib.parse.quote(name)}"
+    return f"https://script.google.com/macros/s/AKfycbx69GPoJtf9sSevsUbWtPr46vpa01u4oNkHjFmkkWxmj62AZ0q-/exec?export=download&field={urllib.parse.quote(name)}&base={v}"
 
 def probe_head(url, timeout=20):
     try:
