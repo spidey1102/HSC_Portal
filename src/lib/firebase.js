@@ -1,5 +1,13 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signInWithRedirect, 
+  getRedirectResult, 
+  signOut, 
+  onAuthStateChanged 
+} from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -10,6 +18,23 @@ export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
+export const signInWithGoogle = async () => {
+  try {
+    return await signInWithPopup(auth, googleProvider);
+  } catch (error) {
+    if (error.code === 'auth/popup-blocked') {
+      try {
+        return await signInWithRedirect(auth, googleProvider);
+      } catch (redirectError) {
+        console.error("signInWithRedirect error:", redirectError);
+        throw redirectError;
+      }
+    }
+    console.error("signInWithGoogle error:", error);
+    throw error;
+  }
+};
+
 export const logOut = () => signOut(auth);
-export { onAuthStateChanged };
+export { onAuthStateChanged, getRedirectResult };
+
