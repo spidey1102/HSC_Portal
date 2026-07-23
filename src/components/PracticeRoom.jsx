@@ -39,9 +39,9 @@ export default function PracticeRoom({
   const [toolsCollapsed, setToolsCollapsed] = useState(() => {
     try {
       const raw = localStorage.getItem('hsc_tools_collapsed');
-      return raw ? JSON.parse(raw) : false;
+      return raw ? JSON.parse(raw) : true;
     } catch (e) {
-      return false;
+      return true;
     }
   });
   // Collapsed timer state (persisted)
@@ -63,6 +63,7 @@ export default function PracticeRoom({
 
   // Formula Sheet states
   const [showFormula, setShowFormula] = useState(false);
+  const [mobileTab, setMobileTab] = useState('paper');
   const [aiOpen, setAiOpen] = useState(false);
   const [aiModel, setAiModel] = useState(() => {
     try {
@@ -277,7 +278,7 @@ export default function PracticeRoom({
       localStorage.setItem(key, JSON.stringify((arr || []).slice(0, 500)));
       setActionMessage('Marked as completed');
       setIsCompleted(true);
-      try { window.dispatchEvent(new CustomEvent('hsc:history-updated')); } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('hsc:history-updated')); } catch (e) { /* ignore */ }
       if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
       actionTimerRef.current = setTimeout(() => setActionMessage(''), 1800);
     } catch (e) {
@@ -295,7 +296,7 @@ export default function PracticeRoom({
       localStorage.setItem(key, JSON.stringify(arr));
       setActionMessage('Marked as incomplete');
       setIsCompleted(false);
-      try { window.dispatchEvent(new CustomEvent('hsc:history-updated')); } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('hsc:history-updated')); } catch (e) { /* ignore */ }
       if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
       actionTimerRef.current = setTimeout(() => setActionMessage(''), 1800);
     } catch (e) {
@@ -605,10 +606,72 @@ export default function PracticeRoom({
       </header>
 
       {/* Main Workspace */}
-      <div style={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, overflow: 'hidden' }}>
+
+        {toolsCollapsed && (
+          <button
+            type="button"
+            onClick={() => setToolsCollapsed(false)}
+            className="mobile-tools-fab"
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              right: '24px',
+              zIndex: 1500,
+              backgroundColor: 'var(--brand-experiment)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '50px',
+              padding: '12px 20px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              alignItems: 'center',
+              gap: '8px',
+              fontWeight: 600,
+              fontSize: '14px',
+              cursor: 'pointer'
+            }}
+          >
+            <Clock size={18} />
+            <span>Timer & Tools</span>
+          </button>
+        )}
         
+        {/* Mobile Pane Switcher (only when formula sheet is available and shown) */}
+        {showFormula && sheetUrl && (
+          <div className="mobile-pane-switcher" style={{ display: 'none', background: 'var(--bg-tertiary)', padding: '8px 16px', borderBottom: '1px solid var(--bg-modifier-accent)', justifyContent: 'center', gap: '8px', zIndex: 10 }}>
+            <button
+              onClick={() => setMobileTab('paper')}
+              className="btn-secondary"
+              style={{
+                fontSize: '12px',
+                padding: '6px 16px',
+                backgroundColor: mobileTab === 'paper' ? 'var(--brand-experiment)' : 'var(--bg-secondary)',
+                color: mobileTab === 'paper' ? '#fff' : 'var(--text-normal)',
+                fontWeight: mobileTab === 'paper' ? 600 : 400,
+                border: mobileTab === 'paper' ? 'none' : '1px solid var(--bg-modifier-accent)'
+              }}
+            >
+              Exam Paper
+            </button>
+            <button
+              onClick={() => setMobileTab('formula')}
+              className="btn-secondary"
+              style={{
+                fontSize: '12px',
+                padding: '6px 16px',
+                backgroundColor: mobileTab === 'formula' ? 'var(--brand-experiment)' : 'var(--bg-secondary)',
+                color: mobileTab === 'formula' ? '#fff' : 'var(--text-normal)',
+                fontWeight: mobileTab === 'formula' ? 600 : 400,
+                border: mobileTab === 'formula' ? 'none' : '1px solid var(--bg-modifier-accent)'
+              }}
+            >
+              Formula Sheet
+            </button>
+          </div>
+        )}
+
         {/* Split View Container */}
-        <div style={{
+        <div className="practice-split-container" style={{
           display: 'flex',
           flexGrow: 1,
           overflow: 'hidden',
@@ -618,7 +681,7 @@ export default function PracticeRoom({
         }}>
           
           {/* Left: Exam Paper Panel */}
-          <div style={{
+          <div className={`practice-pane practice-pane-paper ${mobileTab === 'paper' ? 'mobile-active' : 'mobile-hidden'}`} style={{
             width: showFormula && sheetUrl ? '50%' : '100%',
             height: '100%',
             position: 'relative',
@@ -641,7 +704,7 @@ export default function PracticeRoom({
 
           {/* Right: Formula Sheet Panel */}
           {showFormula && sheetUrl && (
-            <div style={{
+            <div className={`practice-pane practice-pane-formula ${mobileTab === 'formula' ? 'mobile-active' : 'mobile-hidden'}`} style={{
               width: '50%',
               height: '100%',
               position: 'relative',
@@ -665,6 +728,21 @@ export default function PracticeRoom({
           
         </div>
 
+        {/* Mobile backdrop when tools panel is open */}
+        {!toolsCollapsed && (
+          <div
+            className="tools-mobile-backdrop"
+            onClick={() => setToolsCollapsed(true)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.4)',
+              zIndex: 1290,
+              display: 'none'
+            }}
+          />
+        )}
+
         {/* Tools panel */}
         <div
           className={`tools-panel ${toolsCollapsed ? 'collapsed' : ''}`}
@@ -681,6 +759,18 @@ export default function PracticeRoom({
           }}
           aria-hidden={toolsCollapsed}
         >
+          {/* Mobile top bar with close button */}
+          <div className="tools-mobile-topbar" style={{ display: 'none', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--bg-modifier-accent)', backgroundColor: 'var(--bg-tertiary)' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-normal)' }}>Study Tools & Timer</span>
+            <button
+              onClick={() => setToolsCollapsed(true)}
+              className="btn-secondary"
+              style={{ padding: '6px 10px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <X size={14} />
+              <span>Close</span>
+            </button>
+          </div>
           
           {/* Study AI */}
           <div style={{ padding: '16px', borderBottom: '1px solid var(--bg-modifier-accent)' }}>
@@ -693,10 +783,20 @@ export default function PracticeRoom({
               <button
                 onClick={() => setAiOpen(prev => !prev)}
                 className="btn-secondary"
-                title={aiOpen ? 'Hide study helper' : 'Show study helper'}
-                style={{ padding: '6px 8px' }}
+                title={aiOpen ? 'Hide doubt clarifier' : 'Show doubt clarifier'}
+                style={{ padding: '6px 10px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                {aiOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                {aiOpen ? (
+                  <>
+                    <X size={14} />
+                    <span>Close</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={14} />
+                    <span>Open</span>
+                  </>
+                )}
               </button>
             </div>
 
@@ -913,6 +1013,16 @@ export default function PracticeRoom({
                     {aiResponse}
                   </div>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => setAiOpen(false)}
+                  className="btn-secondary"
+                  style={{ width: '100%', marginTop: '6px', justifyContent: 'center', gap: '6px', fontSize: '12px' }}
+                >
+                  <X size={14} />
+                  <span>Close Doubt Clarifier</span>
+                </button>
               </div>
             )}
           </div>

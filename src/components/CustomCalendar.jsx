@@ -1,11 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Plus, Trash2, Edit2, Save, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useSync } from './SyncContext';
 
 export default function CustomCalendar() {
+  const { data, updateRemote } = useSync();
+  
   const [assessments, setAssessments] = useState(() => {
     const saved = localStorage.getItem('hsc_assessments');
     return saved ? JSON.parse(saved) : [];
   });
+  
+  // Flag to avoid uploading assessments if they just came from remote sync
+  const isSyncing = useRef(false);
+
+  useEffect(() => {
+    if (data && data.assessments) {
+      isSyncing.current = true;
+      setAssessments(data.assessments);
+      localStorage.setItem('hsc_assessments', JSON.stringify(data.assessments));
+    }
+  }, [data?.assessments]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -20,7 +34,12 @@ export default function CustomCalendar() {
 
   useEffect(() => {
     localStorage.setItem('hsc_assessments', JSON.stringify(assessments));
-  }, [assessments]);
+    if (isSyncing.current) {
+      isSyncing.current = false;
+    } else {
+      updateRemote('assessments', assessments);
+    }
+  }, [assessments, updateRemote]);
 
   const handleSubmit = (e) => {
     e.preventDefault();

@@ -5,7 +5,7 @@ import { generateMockAnswer } from '../../openrouterHandler.js'
 async function readJsonBody(req) {
   let body = ''
   for await (const chunk of req) body += chunk
-  try { return body ? JSON.parse(body) : {} } catch { return {} }
+  try { return body ? JSON.parse(body) : {} } catch (err) { return {} }
 }
 
 export default async function handler(req, res) {
@@ -63,7 +63,7 @@ export default async function handler(req, res) {
 
     const rawText = await response.text()
     let payload = null
-    try { payload = JSON.parse(rawText) } catch {}
+    try { payload = JSON.parse(rawText) } catch (err) { /* ignore */ }
 
     if (!response.ok) {
       const message = payload?.error?.message || rawText || `OpenRouter request failed with status ${response.status}.`

@@ -8,7 +8,7 @@ const COMPLETED_KEY = 'hsc_completed_papers';
 function fmtDate(ts) {
   try {
     return new Date(ts).toLocaleString();
-  } catch (e) {
+  } catch {
     return '';
   }
 }
@@ -64,7 +64,7 @@ export default function PaperHistory({ allPapers = [], subjects = [], schools = 
       const arr = JSON.parse(localStorage.getItem(VIEWED_KEY) || '[]').filter(a => String(a.key || a.v) !== String(id));
       localStorage.setItem(VIEWED_KEY, JSON.stringify(arr));
       setViewed(arr);
-    } catch (e) {}
+    } catch (e) { /* ignore */ }
   }
 
   function removeCompleted(id) {
@@ -72,7 +72,7 @@ export default function PaperHistory({ allPapers = [], subjects = [], schools = 
       const arr = JSON.parse(localStorage.getItem(COMPLETED_KEY) || '[]').filter(a => String(a.id || a.paperId || a.paperIdLegacy || a.v) !== String(id));
       localStorage.setItem(COMPLETED_KEY, JSON.stringify(arr));
       setCompleted(arr);
-    } catch (e) {}
+    } catch (e) { /* ignore */ }
   }
 
   function clearViewed() {

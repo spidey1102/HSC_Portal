@@ -107,6 +107,7 @@
   scrollbar-color: rgba(55, 78, 70, 0.35) transparent;
 }
 
+
 html {
   background:
     radial-gradient(circle at top left, var(--page-gradient-top), transparent 32%),
@@ -444,6 +445,7 @@ textarea:focus,
 
 .search-field {
   position: relative;
+  display: block;
   min-width: min(360px, 100%);
   flex: 1 1 320px;
 }
@@ -1313,7 +1315,24 @@ textarea:focus,
   border-left: none !important;
 }
 
+.mobile-sidebar-close {
+  display: none;
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1150;
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
 @media (max-width: 768px) {
+  .mobile-sidebar-close {
+    display: inline-flex !important;
+  }
+
   body {
     font-size: 15px;
   }
@@ -1366,10 +1385,21 @@ textarea:focus,
 
   .topbar {
     padding: 12px 14px;
+    flex-wrap: wrap;
   }
 
-  .tool-strip {
+  .control-strip {
     align-items: stretch;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .control-strip select,
+  .control-strip button,
+  .search-field {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
   }
 
   .search-field {
@@ -1384,9 +1414,45 @@ textarea:focus,
     align-items: flex-start;
     flex-direction: column;
   }
+
+  .practice-split-container {
+    flex-direction: column !important;
+  }
+
+  .practice-pane {
+    width: 100% !important;
+    height: 100% !important;
+  }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
+  .mobile-pane-switcher {
+    display: flex !important;
+  }
+
+  .practice-split-container {
+    flex-direction: column !important;
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+
+  .practice-pane {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+    border: none !important;
+  }
+
+  .practice-pane.mobile-hidden {
+    display: none !important;
+  }
+
+  .practice-pane.mobile-active {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
   .tools-panel {
     position: absolute;
     top: 64px;
@@ -1407,6 +1473,22 @@ textarea:focus,
   .tools-panel.collapsed {
     transform: translateX(100%);
   }
+
+  .tools-mobile-backdrop {
+    display: block !important;
+  }
+
+  .tools-mobile-topbar {
+    display: flex !important;
+  }
+
+  .mobile-tools-fab {
+    display: flex !important;
+  }
+}
+
+.mobile-tools-fab {
+  display: none;
 }
 
 /* ═══════════════════════════════════════════════════════════

@@ -85,7 +85,7 @@ export async function handleOpenRouterRequest(req, res, apiKey) {
     let payload = null;
     try {
       payload = JSON.parse(raw);
-    } catch {
+    } catch (err) {
       // keep raw text fallback
     }
 

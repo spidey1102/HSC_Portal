@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
-import Filters from './components/Filters';
 import PaperCard from './components/PaperCard';
 import PracticeRoom from './components/PracticeRoom';
 import TextbooksView from './components/TextbooksView';
@@ -24,8 +23,40 @@ import {
   loadAppearanceSettings,
 } from './utils/appearancePresets';
 import './App.css';
+import { useSync } from './components/SyncContext';
+import { useAuth } from './components/AuthContext';
+import UserButton from './components/UserButton';
 
 export default function App() {
+  const { data, updateRemote } = useSync();
+  const { user, loading: authLoading, signInWithGoogle } = useAuth();
+  
+  const [showSignInPrompt, setShowSignInPrompt] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading) {
+      const hasSeenPrompt = localStorage.getItem('hsc_has_seen_signin_prompt');
+      if (!hasSeenPrompt && !user) {
+        setShowSignInPrompt(true);
+      }
+    }
+  }, [authLoading, user]);
+
+  const handleSignIn = async () => {
+    try {
+      await signInWithGoogle();
+      localStorage.setItem('hsc_has_seen_signin_prompt', 'true');
+      setShowSignInPrompt(false);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSkipSignIn = () => {
+    localStorage.setItem('hsc_has_seen_signin_prompt', 'true');
+    setShowSignInPrompt(false);
+  };
+
   // DB States
   const [subjects, setSubjects] = useState([]);
   const [schools, setSchools] = useState([]);
@@ -33,15 +64,9 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Filter States
+  // States
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [selectedLevel, setSelectedLevel] = useState(12); // Year 12 (HSC) by default
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [selectedSchool, setSelectedSchool] = useState(null);
-  const [selectedYear, setSelectedYear] = useState(null);
-  const [solutionsOnly, setSolutionsOnly] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [yearSort, setYearSort] = useState('desc'); // desc = newest first, asc = oldest first, none = default order
   const [agentQuery, setAgentQuery] = useState('');
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentResult, setAgentResult] = useState({
@@ -59,6 +84,13 @@ export default function App() {
     const saved = localStorage.getItem('hsc_bookmarks');
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
+
+  useEffect(() => {
+    if (data && data.bookmarks) {
+      setBookmarks(new Set(data.bookmarks));
+      localStorage.setItem('hsc_bookmarks', JSON.stringify(data.bookmarks));
+    }
+  }, [data?.bookmarks]);
 
   // Textbooks State
   const [viewTextbooks, setViewTextbooks] = useState(false);
@@ -88,6 +120,14 @@ export default function App() {
 
   // Appearance state
   const [appearance, setAppearance] = useState(loadAppearanceSettings);
+
+  useEffect(() => {
+    if (data && data.appearance && Object.keys(data.appearance).length > 0) {
+      setAppearance(data.appearance);
+      localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(data.appearance));
+    }
+  }, [data?.appearance]);
+
   const [systemPrefersDark, setSystemPrefersDark] = useState(() => (
     window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
   ));
@@ -153,11 +193,12 @@ export default function App() {
   }, [appearance, theme]);
 
   const updateAppearance = useCallback((patch) => {
-    setAppearance((current) => ({
-      ...current,
-      ...patch,
-    }));
-  }, []);
+    setAppearance((current) => {
+      const next = { ...current, ...patch };
+      updateRemote('appearance', next);
+      return next;
+    });
+  }, [updateRemote]);
 
   useEffect(() => {
     return () => {
@@ -257,7 +298,9 @@ export default function App() {
       } else {
         next.add(viewno);
       }
-      localStorage.setItem('hsc_bookmarks', JSON.stringify(Array.from(next)));
+      const arr = Array.from(next);
+      localStorage.setItem('hsc_bookmarks', JSON.stringify(arr));
+      updateRemote('bookmarks', arr);
       return next;
     });
   };
@@ -266,6 +309,7 @@ export default function App() {
     if (window.confirm("Are you sure you want to clear all your bookmarks?")) {
       setBookmarks(new Set());
       localStorage.removeItem('hsc_bookmarks');
+      updateRemote('bookmarks', []);
     }
   };
 
@@ -285,11 +329,13 @@ export default function App() {
         weight: '',
         agentColor: color,
       };
-      localStorage.setItem('hsc_assessments', JSON.stringify([...saved, newEvent]));
+      const next = [...saved, newEvent];
+      localStorage.setItem('hsc_assessments', JSON.stringify(next));
+      updateRemote('assessments', next);
     } catch (e) {
       console.warn('addCalendarEvent failed:', e);
     }
-  }, []);
+  }, [updateRemote]);
 
   const flashShareNotice = (message) => {
     setShareNotice(message);
@@ -455,12 +501,6 @@ export default function App() {
   }, [
     selectedSubject,
     selectedLevel,
-    selectedCategory,
-    selectedSchool,
-    selectedYear,
-    yearSort,
-    solutionsOnly,
-    searchQuery,
     agentQuery,
     viewBookmarks,
     viewTextbooks,
@@ -480,17 +520,6 @@ export default function App() {
     return counts;
   }, [papers, selectedLevel]);
 
-  // Extract unique active years for select box (descending order)
-  const activeYears = useMemo(() => {
-    const yearsSet = new Set();
-    papers.forEach(p => {
-      if (p.l === selectedLevel && p.y !== "Other") {
-        yearsSet.add(p.y.toString());
-      }
-    });
-    return Array.from(yearsSet).sort((a, b) => b.localeCompare(a));
-  }, [papers, selectedLevel]);
-
   // Filter papers array
   const filteredPapers = useMemo(() => {
     return papers.filter(p => {
@@ -503,66 +532,25 @@ export default function App() {
       // 3. Subject filter
       if (selectedSubject !== null && p.s !== selectedSubject) return false;
       
-      // 4. Category filter
-      if (selectedCategory !== null && p.c !== selectedCategory) return false;
-      
-      // 5. School filter
-      if (selectedSchool !== null && p.h !== selectedSchool) return false;
-      
-      // 6. Year filter
-      if (selectedYear !== null && p.y.toString() !== selectedYear) return false;
-      
-      // 7. Solutions filter
-      if (solutionsOnly && p.w !== 1) return false;
-      
-      // 8. Search Query match
-      if (searchQuery.trim() !== '') {
-        const query = searchQuery.toLowerCase();
-        const sName = subjects[p.s]?.toLowerCase() || '';
-        const hName = schools[p.h]?.toLowerCase() || '';
-        const pName = p.n.toLowerCase();
-        const yVal = p.y.toString();
-        
-        const matchesQuery = pName.includes(query) || 
-                             sName.includes(query) || 
-                             hName.includes(query) || 
-                             yVal.includes(query);
-                             
-        if (!matchesQuery) return false;
-      }
-      
       return true;
     });
   }, [
     papers,
-    subjects,
-    schools,
     selectedSubject,
     selectedLevel,
-    selectedCategory,
-    selectedSchool,
-    selectedYear,
-    solutionsOnly,
-    searchQuery,
     viewBookmarks,
     bookmarks
   ]);
 
-  const getYearSortValue = (year) => {
-    const n = parseInt(String(year), 10);
-    return Number.isFinite(n) ? n : -1;
-  };
-
   const sortedPapers = useMemo(() => {
-    if (yearSort === 'none') return filteredPapers;
     const list = [...filteredPapers];
     list.sort((a, b) => {
-      const ya = getYearSortValue(a.y);
-      const yb = getYearSortValue(b.y);
-      return yearSort === 'desc' ? yb - ya : ya - yb;
+      const ya = parseInt(String(a.y), 10) || -1;
+      const yb = parseInt(String(b.y), 10) || -1;
+      return yb - ya;
     });
     return list;
-  }, [filteredPapers, yearSort]);
+  }, [filteredPapers]);
 
   const agentSearchActive = agentResult.applied;
 
@@ -580,24 +568,8 @@ export default function App() {
     }));
   }, [agentResult, agentSearchActive, sortedPapers]);
 
-  const hasActiveFilters = 
-    selectedSubject !== null || 
-    selectedCategory !== null || 
-    selectedSchool !== null || 
-    selectedYear !== null || 
-    yearSort !== 'desc' ||
-    solutionsOnly || 
-    searchQuery !== '' ||
-    agentQuery.trim() !== '';
-
   const resetFilters = () => {
     setSelectedSubject(null);
-    setSelectedCategory(null);
-    setSelectedSchool(null);
-    setSelectedYear(null);
-    setYearSort('desc');
-    setSolutionsOnly(false);
-    setSearchQuery('');
     setAgentQuery('');
   };
 
@@ -682,24 +654,34 @@ export default function App() {
 
   return (
     <div className={`app-container ${isSidebarOpen ? 'sidebar-visible' : ''}`}>
-      
-      {/* Sidebar Navigation (Server List & Channel List) */}
-      <Sidebar
-        subjects={subjects}
-        selectedSubject={selectedSubject}
-        setSelectedSubject={setSelectedSubject}
-        selectedLevel={selectedLevel}
-        setSelectedLevel={setSelectedLevel}
-        viewBookmarks={viewBookmarks}
-        setViewBookmarks={setViewBookmarks}
-        viewTextbooks={viewTextbooks}
-        setViewTextbooks={setViewTextbooks}
-        viewCalendar={viewCalendar}
-        setViewCalendar={setViewCalendar}
-        bookmarksCount={bookmarks.size}
-        totalPapersCount={papers.length}
-        subjectCounts={subjectCounts}
-      />
+      {/* Mobile Sidebar Backdrop */}
+      {isSidebarOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar Navigation */}
+      <div className={`app-sidebar ${isSidebarOpen ? 'sidebar-visible' : ''}`}>
+        <Sidebar
+          subjects={subjects}
+          selectedSubject={selectedSubject}
+          setSelectedSubject={setSelectedSubject}
+          selectedLevel={selectedLevel}
+          setSelectedLevel={setSelectedLevel}
+          viewBookmarks={viewBookmarks}
+          setViewBookmarks={setViewBookmarks}
+          viewTextbooks={viewTextbooks}
+          setViewTextbooks={setViewTextbooks}
+          viewCalendar={viewCalendar}
+          setViewCalendar={setViewCalendar}
+          bookmarksCount={bookmarks.size}
+          totalPapersCount={papers.length}
+          subjectCounts={subjectCounts}
+          onCloseMobile={() => setIsSidebarOpen(false)}
+        />
+      </div>
 
       {/* Main Panel Area */}
       <main
@@ -729,6 +711,7 @@ export default function App() {
           </div>
 
           <div className="control-group">
+            <UserButton />
             {shareNotice && (
               <span className="pill subtle" style={{ padding: '8px 12px' }}>{shareNotice}</span>
             )}
@@ -874,34 +857,7 @@ export default function App() {
                     />
                   )}
 
-                  <div className="tool-strip" style={{ marginBottom: '14px' }}>
-                    <div>
-                      <div className="eyebrow">Filters</div>
-                      <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>
-                        Narrow by type, year, school, and solution status.
-                      </p>
-                    </div>
-                    {!viewTextbooks && !viewCalendar && (
-                      <Filters
-                        searchQuery={searchQuery}
-                        setSearchQuery={setSearchQuery}
-                        selectedCategory={selectedCategory}
-                        setSelectedCategory={setSelectedCategory}
-                        selectedSchool={selectedSchool}
-                        setSelectedSchool={setSelectedSchool}
-                        selectedYear={selectedYear}
-                        setSelectedYear={setSelectedYear}
-                        yearSort={yearSort}
-                        setYearSort={setYearSort}
-                        solutionsOnly={solutionsOnly}
-                        setSolutionsOnly={setSolutionsOnly}
-                        schools={schools}
-                        years={activeYears}
-                        resetFilters={resetFilters}
-                        hasActiveFilters={hasActiveFilters}
-                      />
-                    )}
-                  </div>
+
 
                   {loading ? (
                     <div style={{
@@ -1000,6 +956,25 @@ export default function App() {
         }}
       />
 
+      {/* Sign In Prompt Overlay */}
+      {showSignInPrompt && (
+        <div className="modal-overlay" style={{ zIndex: 9999 }}>
+          <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center', padding: '32px' }}>
+            <h2 style={{ marginTop: 0, marginBottom: '8px' }}>Sign In to Sync</h2>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', lineHeight: 1.5 }}>
+              Sign in with Google to save your bookmarks, assessments, and preferences across devices.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <button className="btn-primary" onClick={handleSignIn} style={{ padding: '12px', justifyContent: 'center' }}>
+                Sign In with Google
+              </button>
+              <button className="btn-secondary" onClick={handleSkipSignIn} style={{ padding: '12px', justifyContent: 'center' }}>
+                Skip for now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
