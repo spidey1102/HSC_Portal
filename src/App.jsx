@@ -92,6 +92,32 @@ export default function App() {
     }
   }, [data?.bookmarks]);
 
+  // Restore selectedSubject from Firestore (only when URL doesn't already specify a subject)
+  const hasRestoredSubject = useRef(false);
+  useEffect(() => {
+    if (!data || hasRestoredSubject.current) return;
+    // Check if URL already specifies a subject — if so, don't override it
+    const params = new URLSearchParams(window.location.search || '');
+    const hasUrlSubject = params.has('subject') || (
+      window.location.pathname.length > 1 &&
+      !window.location.pathname.startsWith('/paper/')
+    );
+    if (!hasUrlSubject) {
+      if (typeof data.selectedSubject === 'number' || data.selectedSubject === null) {
+        setSelectedSubject(data.selectedSubject);
+      }
+      if (typeof data.selectedLevel === 'number') {
+        setSelectedLevel(data.selectedLevel);
+      }
+    }
+    hasRestoredSubject.current = true;
+  }, [data]);
+
+  // Reset restoration flag when user logs out so next login restores again
+  useEffect(() => {
+    if (!user) hasRestoredSubject.current = false;
+  }, [user]);
+
   // Textbooks State
   const [viewTextbooks, setViewTextbooks] = useState(false);
 
@@ -199,6 +225,26 @@ export default function App() {
       return next;
     });
   }, [updateRemote]);
+
+  // Persist selectedSubject to Firestore whenever it changes (after initial restore)
+  const prevSelectedSubjectRef = useRef(undefined);
+  useEffect(() => {
+    if (!user) return;
+    if (!hasRestoredSubject.current) return; // don't save before restore completes
+    if (prevSelectedSubjectRef.current === selectedSubject) return;
+    prevSelectedSubjectRef.current = selectedSubject;
+    updateRemote('selectedSubject', selectedSubject);
+  }, [selectedSubject, user, updateRemote]);
+
+  // Persist selectedLevel to Firestore whenever it changes
+  const prevSelectedLevelRef = useRef(undefined);
+  useEffect(() => {
+    if (!user) return;
+    if (!hasRestoredSubject.current) return;
+    if (prevSelectedLevelRef.current === selectedLevel) return;
+    prevSelectedLevelRef.current = selectedLevel;
+    updateRemote('selectedLevel', selectedLevel);
+  }, [selectedLevel, user, updateRemote]);
 
   useEffect(() => {
     return () => {

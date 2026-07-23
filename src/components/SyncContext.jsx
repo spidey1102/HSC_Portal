@@ -21,7 +21,7 @@ export function SyncProvider({ children }) {
         setData(docSnap.data());
       } else {
         // Initialize if doesn't exist
-        setDoc(userRef, { bookmarks: [], assessments: [], appearance: {}, updatedAt: new Date() });
+        setDoc(userRef, { bookmarks: [], assessments: [], appearance: {}, selectedSubject: null, selectedLevel: 12, updatedAt: new Date() });
       }
     });
 
