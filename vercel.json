@@ -3,11 +3,7 @@
   "trailingSlash": false,
   "rewrites": [
     {
-      "source": "/paper/:path*",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/((?!.*\\.).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
