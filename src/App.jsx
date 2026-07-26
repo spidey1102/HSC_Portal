@@ -98,10 +98,7 @@ export default function App() {
     if (!data || hasRestoredSubject.current) return;
     // Check if URL already specifies a subject — if so, don't override it
     const params = new URLSearchParams(window.location.search || '');
-    const hasUrlSubject = params.has('subject') || (
-      window.location.pathname.length > 1 &&
-      !window.location.pathname.startsWith('/paper/')
-    );
+    const hasUrlSubject = params.has('subject');
     if (!hasUrlSubject) {
       if (typeof data.selectedSubject === 'number' || data.selectedSubject === null) {
         setSelectedSubject(data.selectedSubject);
@@ -129,9 +126,6 @@ export default function App() {
 
   // active Paper for practice room
   const [activePaperId, setActivePaperId] = useState(() => {
-    const pathMatch = window.location.pathname.match(/^\/paper\/([^/]+)\/?$/);
-    if (pathMatch?.[1]) return decodeURIComponent(pathMatch[1]);
-
     const params = new URLSearchParams(window.location.search);
     return params.get('paper');
   });
@@ -259,14 +253,15 @@ export default function App() {
   });
 
   const getPaperIdFromLocation = (location = locationSnapshot) => {
-    const pathMatch = location.pathname.match(/^\/paper\/([^/]+)\/?$/);
-    if (pathMatch?.[1]) return decodeURIComponent(pathMatch[1]);
-
     const params = new URLSearchParams(location.search || '');
     return params.get('paper');
   };
 
-  const getPaperPath = (paper) => `/paper/${getPaperRouteId(paper)}/`;
+  const getPaperPath = (paper) => {
+    const params = new URLSearchParams(window.location.search);
+    params.set('paper', getPaperRouteId(paper));
+    return `/?${params.toString()}`;
+  };
 
   useEffect(() => {
     const handlePopState = () => {
@@ -424,8 +419,11 @@ export default function App() {
 
   const closePaper = () => {
     const returnTo = paperReturnToRef.current;
-    const nextLocation = returnTo || { pathname: '/', search: '', hash: '' };
-    window.history.replaceState({}, '', `${nextLocation.pathname}${nextLocation.search}${nextLocation.hash}`);
+    let nextLocation = returnTo || { pathname: '/', search: '', hash: '' };
+    const params = new URLSearchParams(nextLocation.search);
+    if (params.has('paper')) params.delete('paper');
+    const searchString = params.toString() ? `?${params.toString()}` : '';
+    window.history.replaceState({}, '', `/${searchString}${nextLocation.hash}`);
     setLocationSnapshot(readLocation());
     setActivePaperId(null);
     paperReturnToRef.current = null;
@@ -466,15 +464,7 @@ export default function App() {
     }
   }, [paperRouteId, activePaperId]);
 
-  useEffect(() => {
-    if (!paperRouteId) return;
 
-    const canonicalPath = `/paper/${encodeURIComponent(String(paperRouteId))}/`;
-    if (locationSnapshot.pathname !== canonicalPath || locationSnapshot.search || locationSnapshot.hash) {
-      window.history.replaceState({}, '', canonicalPath);
-      setLocationSnapshot(readLocation());
-    }
-  }, [paperRouteId, locationSnapshot.pathname, locationSnapshot.search, locationSnapshot.hash]);
 
   const activePaper = useMemo(() => {
     if (!activePaperId) return null;
@@ -503,28 +493,21 @@ export default function App() {
       return;
     }
 
-    // check path-based subject: e.g. /physics
-    const path = locationSnapshot.pathname || '/';
-    const seg = path.replace(/^\//, '').replace(/\/$/, '');
-    if (seg) {
-      const idx = subjects.findIndex(s => slugify(s) === seg);
-      if (idx !== -1) setSelectedSubject(idx);
-      return;
-    }
-
     setSelectedSubject(null);
-  }, [subjects, locationSnapshot.pathname, locationSnapshot.search]);
+  }, [subjects, locationSnapshot.search]);
 
-  // Update pathname when selectedSubject changes so URL reflects current subject
+  // Update query string when selectedSubject changes
   useEffect(() => {
     if (paperRouteId) return;
 
     const url = new URL(window.location.href);
-    const currentPath = url.pathname || '/';
+    const params = new URLSearchParams(url.search);
+    
     if (selectedSubject === null) {
-      // revert to root
-      if (currentPath !== '/') {
-        window.history.replaceState({}, '', '/');
+      if (params.has('subject')) {
+        params.delete('subject');
+        const searchString = params.toString() ? `?${params.toString()}` : '';
+        window.history.replaceState({}, '', `/${searchString}${url.hash}`);
         setLocationSnapshot(readLocation());
       }
       return;
@@ -532,11 +515,10 @@ export default function App() {
     const subjName = subjects[selectedSubject];
     if (!subjName) return;
     const slug = slugify(subjName);
-    const desiredPath = `/${slug}/`;
-    if (currentPath !== desiredPath) {
-      // preserve existing search (e.g., ?paper=123)
-      const search = url.search || '';
-      window.history.replaceState({}, '', `${desiredPath}${search}${url.hash}`);
+    if (params.get('subject') !== slug) {
+      params.set('subject', slug);
+      const searchString = params.toString() ? `?${params.toString()}` : '';
+      window.history.replaceState({}, '', `/${searchString}${url.hash}`);
       setLocationSnapshot(readLocation());
     }
   }, [selectedSubject, subjects, paperRouteId]);

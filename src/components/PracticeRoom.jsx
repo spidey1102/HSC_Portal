@@ -683,7 +683,7 @@ export default function PracticeRoom({
           {/* Left: Exam Paper Panel */}
           <div className={`practice-pane practice-pane-paper ${mobileTab === 'paper' ? 'mobile-active' : 'mobile-hidden'}`} style={{
             width: showFormula && sheetUrl ? '50%' : '100%',
-            height: '100%',
+            flexGrow: 1,
             position: 'relative',
             transition: 'width 0.22s ease',
             borderRadius: showFormula && sheetUrl ? '8px' : '0',
@@ -692,6 +692,9 @@ export default function PracticeRoom({
             <iframe
               src={directIframeUrl}
               style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
                 width: '100%',
                 height: '100%',
                 border: 'none',
@@ -706,7 +709,7 @@ export default function PracticeRoom({
           {showFormula && sheetUrl && (
             <div className={`practice-pane practice-pane-formula ${mobileTab === 'formula' ? 'mobile-active' : 'mobile-hidden'}`} style={{
               width: '50%',
-              height: '100%',
+              flexGrow: 1,
               position: 'relative',
               transition: 'width 0.22s ease',
               borderRadius: '8px',
@@ -716,6 +719,9 @@ export default function PracticeRoom({
               <iframe
                 src={sheetUrl}
                 style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
                   width: '100%',
                   height: '100%',
                   border: 'none',
