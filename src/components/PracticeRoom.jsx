@@ -606,7 +606,7 @@ export default function PracticeRoom({
       </header>
 
       {/* Main Workspace */}
-      <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flexDirection: 'row', flexGrow: 1, overflow: 'hidden', position: 'relative' }}>
 
         {toolsCollapsed && (
           <button
