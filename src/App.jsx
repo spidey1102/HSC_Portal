@@ -282,9 +282,7 @@ export default function App() {
       .then(data => {
         setSubjects(data.subjects || []);
         setSchools(data.schools || []);
-        // Filter out HSC category ('H') because HSC papers currently do not open
-        const nonHscPapers = (data.papers || []).filter(p => p.c !== 'H');
-        setPapers(nonHscPapers);
+        setPapers(data.papers || []);
         setLoading(false);
       })
       .catch(err => {
