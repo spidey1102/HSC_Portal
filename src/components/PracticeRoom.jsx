@@ -786,7 +786,6 @@ export default function PracticeRoom({
                 border: 'none',
                 backgroundColor: 'var(--bg-primary)'
               }}
-              sandbox="allow-scripts allow-popups allow-pointer-lock allow-presentation allow-same-origin allow-modals allow-top-navigation allow-downloads"
               title="PDF Practice Viewer"
             />
           </div>
