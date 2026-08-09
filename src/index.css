@@ -1300,8 +1300,9 @@ textarea:focus,
   }
 }
 
-.spin {
-  animation: spin 2s linear infinite;
+.spin,
+.animate-spin {
+  animation: spin 1s linear infinite;
 }
 
 .tools-panel {
