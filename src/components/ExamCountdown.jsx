@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Calendar, ExternalLink, Settings2, Check, Download } from 'lucide-react';
 import { getNextExamState, formatExamDate, normalizeConfig } from '../utils/examDates';
 import { filterExamsForPortalSubject, filterExamsForPortalSubjects, getSchedulableSubjects } from '../utils/examSubjectMatch';
-import { loadMySubjects, saveMySubjects, MAX_MY_SUBJECTS } from '../utils/mySubjects';
+import { loadMySubjects, saveMySubjects } from '../utils/mySubjects';
 import { exportExamsToIcs } from '../utils/exportIcs';
 
 function CountdownUnit({ value, label, urgent }) {
@@ -148,7 +148,6 @@ export default function ExamCountdown({ subjectName = null, portalSubjects = [] 
   const toggleDraftSubject = (name) => {
     setDraftSubjects((prev) => {
       if (prev.includes(name)) return prev.filter((s) => s !== name);
-      if (prev.length >= MAX_MY_SUBJECTS) return prev;
       return [...prev, name];
     });
   };
@@ -211,10 +210,10 @@ export default function ExamCountdown({ subjectName = null, portalSubjects = [] 
         flexWrap: 'wrap',
       }}>
         <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--header-secondary)', textTransform: 'uppercase' }}>
-          My subjects (up to {MAX_MY_SUBJECTS})
+          My subjects
         </div>
         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-          {draftSubjects.length}/{MAX_MY_SUBJECTS} selected
+          {draftSubjects.length} selected
         </span>
       </div>
       <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 12px 0' }}>
@@ -223,14 +222,12 @@ export default function ExamCountdown({ subjectName = null, portalSubjects = [] 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
         {portalSubjects.map((name) => {
           const selected = draftSubjects.includes(name);
-          const atMax = draftSubjects.length >= MAX_MY_SUBJECTS && !selected;
           const hasTimetableExam = schedulableSubjects.includes(name);
           return (
             <button
               key={name}
               type="button"
               onClick={() => toggleDraftSubject(name)}
-              disabled={atMax}
               title={hasTimetableExam ? undefined : 'Not on the loaded written exam timetable'}
               style={{
                 padding: '6px 10px',
@@ -238,8 +235,8 @@ export default function ExamCountdown({ subjectName = null, portalSubjects = [] 
                 border: hasTimetableExam ? 'none' : '1px dashed var(--interactive-muted)',
                 fontSize: '12px',
                 fontWeight: 600,
-                cursor: atMax ? 'not-allowed' : 'pointer',
-                opacity: atMax ? 0.45 : 1,
+                cursor: 'pointer',
+                opacity: 1,
                 backgroundColor: selected ? 'var(--brand-experiment)' : 'var(--bg-elevated)',
                 color: selected ? '#fff' : 'var(--interactive-normal)',
               }}
@@ -252,13 +249,8 @@ export default function ExamCountdown({ subjectName = null, portalSubjects = [] 
       <button
         type="button"
         onClick={applyMySubjects}
-        disabled={draftSubjects.length === 0}
         className="btn-primary"
-        style={{
-          fontSize: '13px',
-          opacity: draftSubjects.length === 0 ? 0.5 : 1,
-          cursor: draftSubjects.length === 0 ? 'not-allowed' : 'pointer',
-        }}
+        style={{ fontSize: '13px' }}
       >
         <Check size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
         Save my subjects

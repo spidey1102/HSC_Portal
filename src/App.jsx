@@ -13,6 +13,7 @@ import PaperHistory from './components/PaperHistory';
 import { Analytics } from '@vercel/analytics/react';
 import { findAgenticPaperMatchesAsync } from './utils/agenticPaperSearch';
 import { findPaperByIdentifier, getPaperRouteId } from './utils/paperIdentity';
+import { loadMySubjects } from './utils/mySubjects';
 import {
   ACCENT_OPTIONS,
   APPEARANCE_DEFAULTS,
@@ -67,6 +68,7 @@ export default function App() {
   // States
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [selectedLevel, setSelectedLevel] = useState(12); // Year 12 (HSC) by default
+  const [mySubjects, setMySubjects] = useState(() => loadMySubjects());
   const [agentQuery, setAgentQuery] = useState('');
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentResult, setAgentResult] = useState({
@@ -91,6 +93,31 @@ export default function App() {
       localStorage.setItem('hsc_bookmarks', JSON.stringify(data.bookmarks));
     }
   }, [data?.bookmarks]);
+
+  useEffect(() => {
+    const syncMySubjects = () => setMySubjects(loadMySubjects());
+    const handleStorage = (event) => {
+      if (event.key === 'hsc_my_subjects') {
+        syncMySubjects();
+      }
+    };
+
+    window.addEventListener('hsc:my-subjects-updated', syncMySubjects);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('hsc:my-subjects-updated', syncMySubjects);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (selectedSubject === null) return;
+    if (!subjects[selectedSubject]) return;
+    if (mySubjects.length === 0) return;
+    if (mySubjects.includes(subjects[selectedSubject])) return;
+    setSelectedSubject(null);
+  }, [mySubjects, selectedSubject, subjects]);
 
   // Restore selectedSubject from Firestore (only when URL doesn't already specify a subject)
   const hasRestoredSubject = useRef(false);
@@ -546,6 +573,24 @@ export default function App() {
     return counts;
   }, [papers, selectedLevel]);
 
+  const subjectFilterIds = useMemo(() => {
+    if (!subjects.length) return new Set();
+    if (selectedSubject !== null && mySubjects.includes(subjects[selectedSubject])) {
+      return new Set([selectedSubject]);
+    }
+
+    return new Set(
+      mySubjects
+        .map((name) => subjects.indexOf(name))
+        .filter((idx) => idx !== -1)
+    );
+  }, [mySubjects, selectedSubject, subjects]);
+
+  const matchesSubjectFilter = useCallback((paper) => {
+    if (subjectFilterIds.size === 0) return true;
+    return subjectFilterIds.has(paper.s);
+  }, [subjectFilterIds]);
+
   // Filter papers array
   const filteredPapers = useMemo(() => {
     return papers.filter(p => {
@@ -556,7 +601,7 @@ export default function App() {
       if (viewBookmarks && !bookmarks.has(p.v + '_' + p.n)) return false;
       
       // 3. Subject filter
-      if (selectedSubject !== null && p.s !== selectedSubject) return false;
+      if (!matchesSubjectFilter(p)) return false;
       
       return true;
     });
@@ -565,7 +610,8 @@ export default function App() {
     selectedSubject,
     selectedLevel,
     viewBookmarks,
-    bookmarks
+    bookmarks,
+    matchesSubjectFilter
   ]);
 
   const sortedPapers = useMemo(() => {
@@ -582,17 +628,19 @@ export default function App() {
 
   const visiblePaperRows = useMemo(() => {
     if (agentSearchActive) {
-      return agentResult.papers.map((item) => ({
-        paper: item.paper,
-        matchReasons: item.reasons,
-      }));
+      return agentResult.papers
+        .filter((item) => matchesSubjectFilter(item.paper))
+        .map((item) => ({
+          paper: item.paper,
+          matchReasons: item.reasons,
+        }));
     }
 
     return sortedPapers.map((paper) => ({
       paper,
       matchReasons: [],
     }));
-  }, [agentResult, agentSearchActive, sortedPapers]);
+  }, [agentResult, agentSearchActive, matchesSubjectFilter, sortedPapers]);
 
   const resetFilters = () => {
     setSelectedSubject(null);
@@ -692,6 +740,7 @@ export default function App() {
       <div className={`app-sidebar ${isSidebarOpen ? 'sidebar-visible' : ''}`}>
         <Sidebar
           subjects={subjects}
+          mySubjects={mySubjects}
           selectedSubject={selectedSubject}
           setSelectedSubject={setSelectedSubject}
           selectedLevel={selectedLevel}

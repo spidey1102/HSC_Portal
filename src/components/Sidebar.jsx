@@ -17,6 +17,7 @@ function SidebarButton({ active, icon: Icon, label, onClick, color = 'var(--text
 
 export default function Sidebar({
   subjects,
+  mySubjects = [],
   selectedSubject,
   setSelectedSubject,
   selectedLevel,
@@ -33,6 +34,15 @@ export default function Sidebar({
   onCloseMobile
 }) {
   const [showInstallModal, setShowInstallModal] = useState(false);
+  const visibleSubjectIndexes = mySubjects.length > 0
+    ? mySubjects
+        .map((name) => subjects.findIndex((subject) => subject === name))
+        .filter((idx) => idx !== -1)
+    : subjects.map((_, idx) => idx);
+
+  const visibleSubjectTotal = visibleSubjectIndexes.reduce((sum, idx) => {
+    return sum + (subjectCounts[idx] || 0);
+  }, 0);
 
   return (
     <aside className="study-sidebar">
@@ -150,12 +160,13 @@ export default function Sidebar({
           }}
         >
           <span className="sidebar-subject-name">All papers</span>
-          <span className="sidebar-subject-count">{totalPapersCount.toLocaleString()}</span>
+          <span className="sidebar-subject-count">{visibleSubjectTotal.toLocaleString()}</span>
         </button>
 
-        {!viewTextbooks && subjects.map((sub, idx) => {
+        {!viewTextbooks && visibleSubjectIndexes.map((idx) => {
+          const sub = subjects[idx];
           const count = subjectCounts[idx] || 0;
-          if (count === 0) return null;
+          if (!sub || count === 0) return null;
           const isSelected = selectedSubject === idx;
 
           return (
