@@ -146,6 +146,8 @@ def parse_papers(html, subject_name, level, page_url):
                 school = "Independent"
         
         school = school.replace(" w.", "").strip()
+        # Construct THSC fallback URLs — used when cf field is absent.
+        # Cloudflare Pages (via paper.cf) is now the primary PDF source.
         view_url = f"https://thsconline.github.io/s/v/{viewno}/{urllib.parse.quote(label)}"
         download_url = f"https://thsconline.github.io/s/d/{viewno}/{urllib.parse.quote(label)}"
         

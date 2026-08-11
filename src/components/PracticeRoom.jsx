@@ -481,33 +481,21 @@ export default function PracticeRoom({
       };
     }
 
-    if (paper.pdfUrl) {
-      if (!isCancelled) {
-        setPdfBlobUrl(paper.pdfUrl);
-        setPdfLoading(false);
-      }
-      return () => {
-        isCancelled = true;
-      };
-    }
-
-    if (paper.v) {
-      if (!isCancelled) {
-        setPdfBlobUrl(null);
-        setPdfLoading(false);
-      }
-    } else {
-      if (!isCancelled) {
-        setPdfLoading(false);
-      }
+    if (!isCancelled) {
+      setPdfBlobUrl(null);
+      setPdfLoading(false);
     }
 
     return () => {
       isCancelled = true;
     };
-  }, [paper?.v, paper?.n, paper?.pdfUrl]);
+  }, [paper?.v, paper?.n, paper?.cf]);
 
-  const directIframeUrl = paper?.pdfUrl || 'https://hscportal.pages.dev/yr12/Maths/Advanced/Sydney%20Tech%202025%20w.%20sol%20[5328-fec7a23b].pdf';
+  // Build the PDF URL: prefer Cloudflare Pages if paper.cf is present,
+  // otherwise fall back to the old THSC Online viewer so unmatched papers still work.
+  const directIframeUrl = paper?.cf
+    ? `https://hscportal.pages.dev/${encodeURI(paper.cf)}`
+    : `https://thsconline.github.io/s/viewer.html?field=${encodeURIComponent(paper?.n ?? '')}&base=${paper?.v ?? ''}`;
   const viewUrl = pdfBlobUrl || directIframeUrl;
 
   return (

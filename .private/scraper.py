@@ -189,12 +189,14 @@ def parse_papers(html, subject_name, level, page_url):
         # Keep clean names
         school = school.replace(" w.", "").strip()
         
-        # Construct dynamic links
+        # Construct dynamic links (THSC fallback URLs — used when cf field is absent)
         view_url = f"https://thsconline.github.io/s/v/{viewno}/{urllib.parse.quote(label)}"
         download_url = f"https://thsconline.github.io/s/d/{viewno}/{urllib.parse.quote(label)}"
         
-        # Direct Apps Script Iframe viewer path (so we can embed it inside our premium website!)
-        direct_iframe_url = f"https://script.google.com/macros/s/AKfycbx69GPoJtf9sSevsUbWtPr46vpa01u4oNkHjFmkkWxmj62AZ0q-/exec?export=view&field={urllib.parse.quote(label)}&base={viewno}"
+        # Direct viewer URL — Cloudflare Pages is now the primary PDF source.
+        # The cf field (relative path) is populated by a separate matching step.
+        # Falls back to the old THSC Online viewer for unmatched papers.
+        direct_iframe_url = f"https://thsconline.github.io/s/viewer.html?field={urllib.parse.quote(label)}&base={viewno}"
         
         papers_list.append({
             'name': label,
