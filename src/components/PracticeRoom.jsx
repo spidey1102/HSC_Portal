@@ -474,59 +474,40 @@ export default function PracticeRoom({
     setPdfLoading(true);
     setPdfBlobUrl(null);
 
-    async function loadPdfBlob() {
-      try {
-        const viewno = String(paper.v);
-        const msgUint8 = new TextEncoder().encode(viewno);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    if (!paper) {
+      setPdfLoading(false);
+      return () => {
+        isCancelled = true;
+      };
+    }
 
-        const apiUrl = `https://script.google.com/macros/s/AKfycbx69GPoJtf9sSevsUbWtPr46vpa01u4oNkHjFmkkWxmj62AZ0q-/exec?export=data&field=${encodeURIComponent(paper.n)}&base=${viewno}&hash=${hashHex}`;
-        const res = await fetch(apiUrl);
-        const text = await res.text();
-
-        if (isCancelled) return;
-
-        const match = text.match(/downloadfile\(([\s\S]*)\)/);
-        if (match && match[1]) {
-          const payload = JSON.parse(match[1]);
-          if (payload.data) {
-            const byteCharacters = atob(payload.data);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-              byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: 'application/pdf' });
-            const blobUrl = URL.createObjectURL(blob);
-            if (!isCancelled) {
-              setPdfBlobUrl(blobUrl);
-              setPdfLoading(false);
-              return;
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('Direct PDF fetch failed, using fallback THSC viewer:', err);
+    if (paper.pdfUrl) {
+      if (!isCancelled) {
+        setPdfBlobUrl(paper.pdfUrl);
+        setPdfLoading(false);
       }
+      return () => {
+        isCancelled = true;
+      };
+    }
+
+    if (paper.v) {
+      if (!isCancelled) {
+        setPdfBlobUrl(null);
+        setPdfLoading(false);
+      }
+    } else {
       if (!isCancelled) {
         setPdfLoading(false);
       }
     }
 
-    if (paper && paper.v) {
-      loadPdfBlob();
-    } else {
-      setPdfLoading(false);
-    }
-
     return () => {
       isCancelled = true;
     };
-  }, [paper.v, paper.n]);
+  }, [paper?.v, paper?.n, paper?.pdfUrl]);
 
-  const directIframeUrl = `https://thsconline.github.io/s/viewer.html?field=${encodeURIComponent(paper.n)}&base=${paper.v}`;
+  const directIframeUrl = paper?.pdfUrl || 'https://hscportal.pages.dev/yr12/Maths/Advanced/Sydney%20Tech%202025%20w.%20sol%20[5328-fec7a23b].pdf';
   const viewUrl = pdfBlobUrl || directIframeUrl;
 
   return (
@@ -776,7 +757,7 @@ export default function PracticeRoom({
               </div>
             )}
             <iframe
-              src={pdfBlobUrl || directIframeUrl}
+              src={viewUrl}
               style={{
                 position: 'absolute',
                 top: 0,
