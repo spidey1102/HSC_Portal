@@ -1,5 +1,4 @@
 export const MY_SUBJECTS_STORAGE_KEY = 'hsc_my_subjects';
-export const MAX_MY_SUBJECTS = 6;
 
 /** @returns {string[]} */
 export function loadMySubjects() {
@@ -8,7 +7,7 @@ export function loadMySubjects() {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((s) => typeof s === 'string').slice(0, MAX_MY_SUBJECTS);
+    return parsed.filter((s) => typeof s === 'string');
   } catch (e) {
     return [];
   }
@@ -16,9 +15,14 @@ export function loadMySubjects() {
 
 /** @param {string[]} names @returns {string[]} */
 export function saveMySubjects(names) {
-  const unique = [...new Set(names)].slice(0, MAX_MY_SUBJECTS);
+  const unique = [...new Set(names)];
   try {
     localStorage.setItem(MY_SUBJECTS_STORAGE_KEY, JSON.stringify(unique));
+  } catch (e) {
+    // ignore
+  }
+  try {
+    window.dispatchEvent(new CustomEvent('hsc:my-subjects-updated', { detail: unique }));
   } catch (e) {
     // ignore
   }

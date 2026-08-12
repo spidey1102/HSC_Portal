@@ -540,26 +540,6 @@ export default function PracticeRoom({
         </div>
 
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <button
-            onClick={onSharePaper}
-            className="btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-            title="Share this test"
-          >
-            <Share2 size={16} />
-            <span>Share</span>
-          </button>
-
-          <button
-            onClick={() => setAiOpen(prev => !prev)}
-            className="btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-            title={aiOpen ? 'Hide study helper' : 'Show study helper'}
-          >
-            <Sparkles size={16} />
-            <span>Study AI</span>
-          </button>
-
           {sheetUrl && (
             <button
               onClick={() => setShowFormula(prev => !prev)}
@@ -611,17 +591,6 @@ export default function PracticeRoom({
             <span className="pill subtle" style={{ padding: '6px 10px' }}>{actionMessage}</span>
           )}
 
-          <a
-            href={viewUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-secondary"
-            style={{ textDecoration: 'none' }}
-          >
-            <span>Open in Browser</span>
-            <ExternalLink size={16} />
-          </a>
-
           <button
             onClick={() => setToolsCollapsed(s => !s)}
             className="btn-secondary"
@@ -638,31 +607,60 @@ export default function PracticeRoom({
       <div style={{ display: 'flex', flexDirection: 'row', flexGrow: 1, overflow: 'hidden', position: 'relative' }}>
 
         {toolsCollapsed && (
-          <button
-            type="button"
-            onClick={() => setToolsCollapsed(false)}
-            className="mobile-tools-fab"
+          <div
             style={{
               position: 'fixed',
               bottom: '24px',
               right: '24px',
               zIndex: 1500,
-              backgroundColor: 'var(--brand-experiment)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '50px',
-              padding: '12px 20px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              fontWeight: 600,
-              fontSize: '14px',
-              cursor: 'pointer'
+              gap: '8px'
             }}
           >
-            <Clock size={18} />
-            <span>Timer & Tools</span>
-          </button>
+            <button
+              type="button"
+              onClick={onSharePaper}
+              className="btn-secondary mobile-tools-fab"
+              title="Share this test"
+              style={{
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-normal)',
+                border: '1px solid var(--bg-modifier-accent)',
+                borderRadius: '999px',
+                padding: '10px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.18)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              <Share2 size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setToolsCollapsed(false)}
+              className="mobile-tools-fab"
+              style={{
+                backgroundColor: 'var(--brand-experiment)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '50px',
+                padding: '12px 20px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontWeight: 600,
+                fontSize: '14px',
+                cursor: 'pointer'
+              }}
+            >
+              <Clock size={18} />
+              <span>Timer & Tools</span>
+            </button>
+          </div>
         )}
         
         {/* Mobile Pane Switcher (only when formula sheet is available and shown) */}
@@ -822,14 +820,39 @@ export default function PracticeRoom({
           {/* Mobile top bar with close button */}
           <div className="tools-mobile-topbar" style={{ display: 'none', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--bg-modifier-accent)', backgroundColor: 'var(--bg-tertiary)' }}>
             <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-normal)' }}>Study Tools & Timer</span>
-            <button
-              onClick={() => setToolsCollapsed(true)}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <a
+                href={viewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-secondary"
+                style={{ textDecoration: 'none', padding: '6px 10px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <ExternalLink size={14} />
+                <span>Open in Browser</span>
+              </a>
+              <button
+                onClick={() => setToolsCollapsed(true)}
+                className="btn-secondary"
+                style={{ padding: '6px 10px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <X size={14} />
+                <span>Close</span>
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 16px 0' }}>
+            <a
+              href={viewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               className="btn-secondary"
-              style={{ padding: '6px 10px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              style={{ textDecoration: 'none', padding: '6px 10px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             >
-              <X size={14} />
-              <span>Close</span>
-            </button>
+              <ExternalLink size={14} />
+              <span>Open in Browser</span>
+            </a>
           </div>
           
           {/* Study AI */}
