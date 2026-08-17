@@ -2,18 +2,18 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
+import PasswordGate from './components/PasswordGate.jsx'
 import { AuthProvider } from './components/AuthContext.jsx'
 import { SyncProvider } from './components/SyncContext.jsx'
-import HiddenAccessGate from './components/HiddenAccessGate.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <AuthProvider>
-      <SyncProvider>
-        <HiddenAccessGate>
+    <PasswordGate>
+      <AuthProvider>
+        <SyncProvider>
           <App />
-        </HiddenAccessGate>
-      </SyncProvider>
-    </AuthProvider>
+        </SyncProvider>
+      </AuthProvider>
+    </PasswordGate>
   </StrictMode>,
 )
