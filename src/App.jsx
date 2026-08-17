@@ -8,7 +8,7 @@ import CustomCalendar from './components/CustomCalendar';
 import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock, Palette, Search, X } from 'lucide-react';
 import PaperHistory from './components/PaperHistory';
 import { Analytics } from '@vercel/analytics/react';
-import { searchPapersAlgorithmic } from './utils/algorithmicSearch';
+// Hidden site: simple name-based search (no algorithmic search)
 import { findPaperByIdentifier, getPaperRouteId } from './utils/paperIdentity';
 import { loadMySubjects } from './utils/mySubjects';
 import {
@@ -68,6 +68,8 @@ export default function App() {
   // Search and Sort states
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOption, setSortOption] = useState('year-desc');
+  // Collection filter: null = all, 'U' = unlisted, 'L' = low quality, 'E' = external
+  const [selectedCollection, setSelectedCollection] = useState(null);
 
   // Bookmarks State
   const [viewBookmarks, setViewBookmarks] = useState(false);
@@ -513,7 +515,8 @@ export default function App() {
     viewBookmarks,
     viewTextbooks,
     viewHistory,
-    viewCalendar
+    viewCalendar,
+    selectedCollection,
   ]);
 
   // Compute subject counts based on current level dynamically
@@ -556,6 +559,9 @@ export default function App() {
       
       // 3. Subject filter
       if (!matchesSubjectFilter(p)) return false;
+
+      // 4. Collection filter (U / L / E)
+      if (selectedCollection && p.col !== selectedCollection) return false;
       
       return true;
     });
@@ -565,15 +571,17 @@ export default function App() {
     selectedLevel,
     viewBookmarks,
     bookmarks,
-    matchesSubjectFilter
+    matchesSubjectFilter,
+    selectedCollection,
   ]);
 
   const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return filteredPapers.map((p) => ({ paper: p, score: 0 }));
-    }
-    return searchPapersAlgorithmic(filteredPapers, subjects, searchQuery);
-  }, [filteredPapers, subjects, searchQuery]);
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return filteredPapers.map((p) => ({ paper: p, score: 0 }));
+    return filteredPapers
+      .filter((p) => (p.n || '').toLowerCase().includes(q))
+      .map((p) => ({ paper: p, score: 0 }));
+  }, [filteredPapers, searchQuery]);
 
   const visiblePaperRows = useMemo(() => {
     const list = [...searchResults];
@@ -905,7 +913,7 @@ export default function App() {
                     borderRadius: '16px',
                     border: '1px solid var(--border-subtle, rgba(255,255,255,0.08))'
                   }}>
-                    {/* Algorithmic Search Input */}
+                    {/* Name Search Input */}
                     <div style={{
                       position: 'relative',
                       flex: '1 1 280px',
@@ -920,16 +928,9 @@ export default function App() {
                       }} />
                       <input
                         type="text"
-                        placeholder="Search by school, year, subject, trial, solutions (e.g. 'James Ruse 2020 Biology w. sol')..."
+                        placeholder="Search paper name…"
                         value={searchQuery}
-                        onChange={(e) => {
-                          setSearchQuery(e.target.value);
-                          if (e.target.value.trim() && sortOption !== 'relevance') {
-                            setSortOption('relevance');
-                          } else if (!e.target.value.trim() && sortOption === 'relevance') {
-                            setSortOption('year-desc');
-                          }
-                        }}
+                        onChange={(e) => setSearchQuery(e.target.value)}
                         style={{
                           width: '100%',
                           padding: '10px 36px 10px 40px',
@@ -943,10 +944,7 @@ export default function App() {
                       />
                       {searchQuery && (
                         <button
-                          onClick={() => {
-                            setSearchQuery('');
-                            if (sortOption === 'relevance') setSortOption('year-desc');
-                          }}
+                          onClick={() => setSearchQuery('')}
                           style={{
                             position: 'absolute',
                             right: '12px',
@@ -965,6 +963,30 @@ export default function App() {
                       )}
                     </div>
 
+                    {/* Collection Filter */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, flexWrap: 'wrap' }}>
+                      {[{code: null, label: 'All'}, {code: 'U', label: 'Unlisted'}, {code: 'L', label: 'Low Quality'}, {code: 'E', label: 'External'}].map(({ code, label }) => (
+                        <button
+                          key={code ?? 'all'}
+                          onClick={() => setSelectedCollection(code)}
+                          style={{
+                            padding: '7px 12px',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            border: '1px solid var(--border-subtle)',
+                            background: selectedCollection === code ? 'var(--brand-experiment)' : 'var(--bg-elevated)',
+                            color: selectedCollection === code ? '#fff' : 'var(--text-muted)',
+                            transition: 'background 0.15s, color 0.15s',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+
                     {/* Sorting Controls */}
                     <div style={{
                       display: 'flex',
@@ -973,7 +995,7 @@ export default function App() {
                       flexShrink: 0
                     }}>
                       <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: '500' }}>
-                        Sort by:
+                        Sort:
                       </span>
                       <select
                         value={sortOption}
@@ -990,12 +1012,11 @@ export default function App() {
                           cursor: 'pointer'
                         }}
                       >
-                        {searchQuery.trim() && <option value="relevance">⚡ Search Relevance</option>}
-                        <option value="year-desc">📅 Year (Newest first)</option>
-                        <option value="year-asc">⌛ Year (Oldest first)</option>
-                        <option value="name-asc">🔤 Name (A → Z)</option>
-                        <option value="name-desc">🔠 Name (Z → A)</option>
-                        <option value="category">🏆 Category (Trials / Assessments)</option>
+                        <option value="year-desc">📅 Newest first</option>
+                        <option value="year-asc">⌛ Oldest first</option>
+                        <option value="name-asc">🔤 Name A → Z</option>
+                        <option value="name-desc">🔠 Name Z → A</option>
+                        <option value="category">🏆 Category</option>
                       </select>
                     </div>
                   </div>
@@ -1023,9 +1044,10 @@ export default function App() {
                     <>
                       <div className="results-header">
                         <span>
-                          {visiblePaperRows.length.toLocaleString()} matches
-                          {selectedSubject !== null && ` in ${subjects[selectedSubject]}`}
-                          {searchQuery.trim() && ' (algorithmic search)'}
+                          {visiblePaperRows.length.toLocaleString()} papers
+                          {selectedSubject !== null && ` · ${subjects[selectedSubject]}`}
+                          {selectedCollection && ` · ${selectedCollection === 'U' ? 'Unlisted' : selectedCollection === 'L' ? 'Low Quality' : 'External'}`}
+                          {searchQuery.trim() && ` · matching "${searchQuery.trim()}"`}
                         </span>
                         <span>Showing {Math.min(renderLimit, visiblePaperRows.length).toLocaleString()}</span>
                       </div>
