@@ -4,12 +4,15 @@ import './index.css'
 import App from './App.jsx'
 import { AuthProvider } from './components/AuthContext.jsx'
 import { SyncProvider } from './components/SyncContext.jsx'
+import HiddenAccessGate from './components/HiddenAccessGate.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <AuthProvider>
       <SyncProvider>
-        <App />
+        <HiddenAccessGate>
+          <App />
+        </HiddenAccessGate>
       </SyncProvider>
     </AuthProvider>
   </StrictMode>,
