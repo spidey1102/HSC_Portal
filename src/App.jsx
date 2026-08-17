@@ -5,13 +5,10 @@ import PracticeRoom from './components/PracticeRoom';
 import TextbooksView from './components/TextbooksView';
 import ExamCountdown from './components/ExamCountdown';
 import CustomCalendar from './components/CustomCalendar';
-import AgenticPaperFinder from './components/AgenticPaperFinder';
-import AgentCommandCenter from './components/AgentCommandCenter';
-import CustomizationMenu from './components/CustomizationMenu';
-import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock, BotMessageSquare, Palette } from 'lucide-react';
+import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock, Palette, Search, X } from 'lucide-react';
 import PaperHistory from './components/PaperHistory';
 import { Analytics } from '@vercel/analytics/react';
-import { findAgenticPaperMatchesAsync } from './utils/agenticPaperSearch';
+import { searchPapersAlgorithmic } from './utils/algorithmicSearch';
 import { findPaperByIdentifier, getPaperRouteId } from './utils/paperIdentity';
 import { loadMySubjects } from './utils/mySubjects';
 import {
@@ -68,17 +65,9 @@ export default function App() {
   // States
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [selectedLevel, setSelectedLevel] = useState(12); // Year 12 (HSC) by default
-  const [mySubjects, setMySubjects] = useState(() => loadMySubjects());
-  const [agentQuery, setAgentQuery] = useState('');
-  const [agentLoading, setAgentLoading] = useState(false);
-  const [agentResult, setAgentResult] = useState({
-    intent: {},
-    papers: [],
-    total: 0,
-    applied: false,
-    summary: '',
-    isAiAssisted: false,
-  });
+  // Search and Sort states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOption, setSortOption] = useState('year-desc');
 
   // Bookmarks State
   const [viewBookmarks, setViewBookmarks] = useState(false);
@@ -183,8 +172,7 @@ export default function App() {
     : appearance.mode;
   const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
 
-  // Agent Command Center state
-  const [isAgentOpen, setIsAgentOpen] = useState(false);
+
 
   // Pagination Limit
   const [renderLimit, setRenderLimit] = useState(40);
@@ -319,41 +307,7 @@ export default function App() {
       });
   }, []);
 
-  // Async Agentic Search Trigger
-  useEffect(() => {
-    let active = true;
-    const query = agentQuery.trim();
 
-    if (!query) {
-      setAgentResult({
-        intent: {},
-        papers: [],
-        total: 0,
-        applied: false,
-        summary: '',
-        isAiAssisted: false,
-      });
-      setAgentLoading(false);
-      return;
-    }
-
-    setAgentLoading(true);
-    findAgenticPaperMatchesAsync(query, papers, subjects, schools, { defaultLevel: selectedLevel })
-      .then((res) => {
-        if (!active) return;
-        setAgentResult(res);
-        setAgentLoading(false);
-      })
-      .catch((err) => {
-        if (!active) return;
-        console.error('Agentic search error:', err);
-        setAgentLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [agentQuery, papers, subjects, schools, selectedLevel]);
 
   // Save Bookmarks to localStorage
   const toggleBookmark = (viewno) => {
@@ -554,12 +508,12 @@ export default function App() {
   }, [
     selectedSubject,
     selectedLevel,
-    agentQuery,
+    searchQuery,
+    sortOption,
     viewBookmarks,
     viewTextbooks,
     viewHistory,
-    viewCalendar,
-    isAgentOpen
+    viewCalendar
   ]);
 
   // Compute subject counts based on current level dynamically
@@ -614,37 +568,65 @@ export default function App() {
     matchesSubjectFilter
   ]);
 
-  const sortedPapers = useMemo(() => {
-    const list = [...filteredPapers];
-    list.sort((a, b) => {
-      const ya = parseInt(String(a.y), 10) || -1;
-      const yb = parseInt(String(b.y), 10) || -1;
-      return yb - ya;
-    });
-    return list;
-  }, [filteredPapers]);
-
-  const agentSearchActive = agentResult.applied;
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return filteredPapers.map((p) => ({ paper: p, score: 0 }));
+    }
+    return searchPapersAlgorithmic(filteredPapers, subjects, searchQuery);
+  }, [filteredPapers, subjects, searchQuery]);
 
   const visiblePaperRows = useMemo(() => {
-    if (agentSearchActive) {
-      return agentResult.papers
-        .filter((item) => matchesSubjectFilter(item.paper))
-        .map((item) => ({
-          paper: item.paper,
-          matchReasons: item.reasons,
-        }));
+    const list = [...searchResults];
+
+    if (searchQuery.trim() && sortOption === 'relevance') {
+      return list;
     }
 
-    return sortedPapers.map((paper) => ({
-      paper,
-      matchReasons: [],
-    }));
-  }, [agentResult, agentSearchActive, matchesSubjectFilter, sortedPapers]);
+    list.sort((aItem, bItem) => {
+      const a = aItem.paper;
+      const b = bItem.paper;
+
+      if (sortOption === 'year-desc') {
+        const ya = parseInt(String(a.y), 10) || -1;
+        const yb = parseInt(String(b.y), 10) || -1;
+        if (yb !== ya) return yb - ya;
+        return (a.n || '').localeCompare(b.n || '');
+      }
+
+      if (sortOption === 'year-asc') {
+        const ya = parseInt(String(a.y), 10) || 9999;
+        const yb = parseInt(String(b.y), 10) || 9999;
+        if (ya !== yb) return ya - yb;
+        return (a.n || '').localeCompare(b.n || '');
+      }
+
+      if (sortOption === 'name-asc') {
+        return (a.n || '').localeCompare(b.n || '');
+      }
+
+      if (sortOption === 'name-desc') {
+        return (b.n || '').localeCompare(a.n || '');
+      }
+
+      if (sortOption === 'category') {
+        const catOrder = { T: 1, A: 2, O: 3 };
+        const ca = catOrder[a.c] || 9;
+        const cb = catOrder[b.c] || 9;
+        if (ca !== cb) return ca - cb;
+        const yb = parseInt(String(b.y), 10) || -1;
+        const ya = parseInt(String(a.y), 10) || -1;
+        return yb - ya;
+      }
+
+      return 0;
+    });
+
+    return list;
+  }, [searchResults, sortOption, searchQuery]);
 
   const resetFilters = () => {
     setSelectedSubject(null);
-    setAgentQuery('');
+    setSearchQuery('');
   };
 
   const paginatedPaperRows = visiblePaperRows.slice(0, renderLimit);
@@ -791,17 +773,7 @@ export default function App() {
               <span className="pill subtle" style={{ padding: '8px 12px' }}>{shareNotice}</span>
             )}
 
-            <button
-              type="button"
-              onClick={() => setIsAgentOpen(true)}
-              className="btn-secondary"
-              id="agent-command-center-trigger"
-              style={{ padding: '10px 12px', color: 'var(--brand-experiment)' }}
-              title="Open AI Agent"
-            >
-              <BotMessageSquare size={16} />
-              <span>AI Agent</span>
-            </button>
+
             <button
               type="button"
               onClick={() => updateAppearance({ mode: theme === 'dark' ? 'light' : 'dark' })}
@@ -921,16 +893,112 @@ export default function App() {
                 </section>
 
                 <section className="content-band">
-                  {!viewBookmarks && (
-                    <AgenticPaperFinder
-                      value={agentQuery}
-                      onSearch={(query) => setAgentQuery(query.trim())}
-                      onClear={() => setAgentQuery('')}
-                      result={agentResult}
-                      disabled={loading || agentLoading}
-                      loading={agentLoading}
-                    />
-                  )}
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '12px',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '20px',
+                    padding: '14px 18px',
+                    backgroundColor: 'var(--bg-secondary)',
+                    borderRadius: '16px',
+                    border: '1px solid var(--border-subtle, rgba(255,255,255,0.08))'
+                  }}>
+                    {/* Algorithmic Search Input */}
+                    <div style={{
+                      position: 'relative',
+                      flex: '1 1 280px',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}>
+                      <Search size={18} style={{
+                        position: 'absolute',
+                        left: '14px',
+                        color: 'var(--text-muted)',
+                        pointerEvents: 'none'
+                      }} />
+                      <input
+                        type="text"
+                        placeholder="Search by school, year, subject, trial, solutions (e.g. 'James Ruse 2020 Biology w. sol')..."
+                        value={searchQuery}
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value);
+                          if (e.target.value.trim() && sortOption !== 'relevance') {
+                            setSortOption('relevance');
+                          } else if (!e.target.value.trim() && sortOption === 'relevance') {
+                            setSortOption('year-desc');
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 36px 10px 40px',
+                          borderRadius: '10px',
+                          backgroundColor: 'var(--bg-elevated)',
+                          border: '1px solid var(--border-subtle)',
+                          color: 'var(--text-normal)',
+                          fontSize: '14px',
+                          outline: 'none'
+                        }}
+                      />
+                      {searchQuery && (
+                        <button
+                          onClick={() => {
+                            setSearchQuery('');
+                            if (sortOption === 'relevance') setSortOption('year-desc');
+                          }}
+                          style={{
+                            position: 'absolute',
+                            right: '12px',
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                          title="Clear search"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Sorting Controls */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      flexShrink: 0
+                    }}>
+                      <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: '500' }}>
+                        Sort by:
+                      </span>
+                      <select
+                        value={sortOption}
+                        onChange={(e) => setSortOption(e.target.value)}
+                        style={{
+                          padding: '9px 14px',
+                          borderRadius: '10px',
+                          backgroundColor: 'var(--bg-elevated)',
+                          border: '1px solid var(--border-subtle)',
+                          color: 'var(--text-normal)',
+                          fontSize: '13px',
+                          fontWeight: '500',
+                          outline: 'none',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {searchQuery.trim() && <option value="relevance">⚡ Search Relevance</option>}
+                        <option value="year-desc">📅 Year (Newest first)</option>
+                        <option value="year-asc">⌛ Year (Oldest first)</option>
+                        <option value="name-asc">🔤 Name (A → Z)</option>
+                        <option value="name-desc">🔠 Name (Z → A)</option>
+                        <option value="category">🏆 Category (Trials / Assessments)</option>
+                      </select>
+                    </div>
+                  </div>
 
 
 
@@ -956,8 +1024,8 @@ export default function App() {
                       <div className="results-header">
                         <span>
                           {visiblePaperRows.length.toLocaleString()} matches
-                          {!agentSearchActive && selectedSubject !== null && ` in ${subjects[selectedSubject]}`}
-                          {agentSearchActive && ' ranked by agent finder'}
+                          {selectedSubject !== null && ` in ${subjects[selectedSubject]}`}
+                          {searchQuery.trim() && ' (algorithmic search)'}
                         </span>
                         <span>Showing {Math.min(renderLimit, visiblePaperRows.length).toLocaleString()}</span>
                       </div>
@@ -981,12 +1049,10 @@ export default function App() {
                       ) : (
                         <div className="empty-state">
                           <h3 style={{ color: 'var(--header-primary)', marginBottom: '8px' }}>
-                            {agentSearchActive ? 'Agent couldn\'t find matches' : 'No matches found'}
+                            No matches found
                           </h3>
                           <p style={{ marginBottom: '16px' }}>
-                            {agentSearchActive
-                              ? `No papers matched "${agentQuery}". Try rephrasing or use the normal filters.`
-                              : 'Try resetting your filters or searching for different terms.'}
+                            Try resetting your filters or searching for different terms.
                           </p>
                           <button onClick={resetFilters} className="btn-primary">
                             Reset filters
@@ -1016,20 +1082,7 @@ export default function App() {
       {/* Vercel Web Analytics */}
       <Analytics />
 
-      {/* AI Agent Command Center */}
-      <AgentCommandCenter
-        isOpen={isAgentOpen}
-        onClose={() => setIsAgentOpen(false)}
-        appContext={{
-          papers,
-          subjects,
-          schools,
-          bookmarks,
-          toggleBookmark,
-          addCalendarEvent,
-          selectedLevel,
-        }}
-      />
+
 
       {/* Sign In Prompt Overlay */}
       {showSignInPrompt && (
