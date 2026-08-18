@@ -39,4 +39,12 @@ export default [
       react: { version: 'detect' },
     },
   },
+  {
+    files: ['**/*.cjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'commonjs',
+      globals: globals.node,
+    },
+  },
 ];
