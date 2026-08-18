@@ -1,5 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { runAgent } from '../utils/agentHarness.js';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 
 // ─── Icons (inline SVG to avoid extra dependencies) ───────────────────────────
 
@@ -36,6 +41,24 @@ const STEP_CONFIG = {
   answer: { icon: '💬', className: 'agent-step-answer' },
   error: { icon: '⚠', className: 'agent-step-error' },
 };
+
+// ─── Formatted assistant answers ───────────────────────────────────────────────
+
+function normaliseMathDelimiters(content) {
+  return String(content || '')
+    .replace(/\\\[(.*?)\\\]/gs, (_, math) => '$$' + math + '$$')
+    .replace(/\\\((.*?)\\\)/gs, (_, math) => '$' + math + '$');
+}
+
+function FormattedAssistantAnswer({ content }) {
+  return (
+    <div className="agent-markdown">
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+        {normaliseMathDelimiters(content)}
+      </ReactMarkdown>
+    </div>
+  );
+}
 
 // ─── Step Component ────────────────────────────────────────────────────────────
 
@@ -364,7 +387,9 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
                       {message.role === 'user' ? 'You' : message.role === 'assistant' ? 'AI Agent' : 'Error'}
                     </div>
                     <div className="agent-message-bubble">
-                      {message.content}
+                      {message.role === 'assistant'
+                        ? <FormattedAssistantAnswer content={message.content} />
+                        : message.content}
                     </div>
                   </div>
                 ))}
