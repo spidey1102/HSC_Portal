@@ -20,18 +20,20 @@ export function SyncProvider({ children }) {
       if (docSnap.exists()) {
         setData(docSnap.data());
       } else {
-        // Initialize if doesn't exist
-                  setDoc(userRef, {
-            bookmarks: [],
-            assessments: [],
-            appearance: {},
-            selectedSubject: null,
-            selectedLevel: 12,
-            mySubjects: [],
-            viewedPapers: [],
-            completedPapers: [],
-            updatedAt: new Date(),
-          });
+        // Initialize if no account document exists yet.
+        setDoc(userRef, {
+          bookmarks: [],
+          assessments: [],
+          appearance: {},
+          selectedSubject: null,
+          selectedLevel: 12,
+          mySubjects: [],
+          viewedPapers: [],
+          completedPapers: [],
+          practiceReviews: [],
+          mistakeLog: [],
+          updatedAt: new Date(),
+        });
 
       }
     });

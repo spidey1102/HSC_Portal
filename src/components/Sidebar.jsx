@@ -30,6 +30,8 @@ export default function Sidebar({
   setViewTextbooks,
   viewCalendar,
   setViewCalendar,
+  viewNotebook = false,
+  setViewNotebook,
   bookmarksCount,
   totalPapersCount,
   subjectCounts,
@@ -88,13 +90,14 @@ export default function Sidebar({
         <div className="sidebar-section-label">View</div>
         <div className="sidebar-button-stack">
           <SidebarButton
-            active={!viewBookmarks && !viewTextbooks && !viewCalendar}
+            active={!viewBookmarks && !viewTextbooks && !viewCalendar && !viewNotebook}
             icon={Library}
             label="Past papers"
             onClick={() => {
               setViewBookmarks(false);
               setViewTextbooks(false);
               setViewCalendar(false);
+              setViewNotebook?.(false);
               setSelectedLevel(12);
             }}
           />
@@ -106,6 +109,7 @@ export default function Sidebar({
               setViewBookmarks(true);
               setViewTextbooks(false);
               setViewCalendar(false);
+              setViewNotebook?.(false);
             }}
             color="var(--status-positive)"
           />
@@ -117,6 +121,7 @@ export default function Sidebar({
               setViewTextbooks(true);
               setViewBookmarks(false);
               setViewCalendar(false);
+              setViewNotebook?.(false);
             }}
           />
           <SidebarButton
@@ -127,6 +132,7 @@ export default function Sidebar({
               setViewCalendar(true);
               setViewBookmarks(false);
               setViewTextbooks(false);
+              setViewNotebook?.(false);
             }}
             color="var(--status-warning)"
           />
@@ -144,6 +150,7 @@ export default function Sidebar({
               setViewBookmarks(false);
               setViewTextbooks(false);
               setViewCalendar(false);
+              setViewNotebook?.(false);
             }}
           >
             Year 12
@@ -156,6 +163,7 @@ export default function Sidebar({
               setViewBookmarks(false);
               setViewTextbooks(false);
               setViewCalendar(false);
+              setViewNotebook?.(false);
             }}
           >
             Year 11
@@ -172,6 +180,7 @@ export default function Sidebar({
             if (viewTextbooks) return;
             setSelectedSubject(null);
             setViewBookmarks(false);
+            setViewNotebook?.(false);
           }}
         >
           <span className="sidebar-subject-name">All papers</span>
@@ -193,6 +202,7 @@ export default function Sidebar({
                 setSelectedSubject(idx);
                 setViewBookmarks(false);
                 setViewTextbooks(false);
+                setViewNotebook?.(false);
               }}
             >
               <span className="sidebar-subject-name">{sub}</span>

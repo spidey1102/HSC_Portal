@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, X, BookOpen, Clock, ChevronDown, ChevronUp, Sparkles, Check } from 'lucide-react';
+import { Play, Pause, RotateCcw, X, BookOpen, Clock, ChevronDown, ChevronUp, Sparkles, Check, ClipboardCheck, ListChecks } from 'lucide-react';
 import { getPaperIdentity } from '../utils/paperIdentity';
+import { useAuth } from './AuthContext';
 import AgentCommandCenter from './AgentCommandCenter';
+import PracticeReviewModal from './PracticeReviewModal';
+import { analysePaperMetadata, createEmptyPaperMetadata, getPaperMetadata } from '../utils/paperMetadata';
 
 const TIMER_MAX_DURATION_MINUTES = 4 * 60;
 const TIMER_DURATION_OPTIONS = Array.from({ length: TIMER_MAX_DURATION_MINUTES / 5 }, (_, index) => (index + 1) * 5);
@@ -21,6 +24,7 @@ export default function PracticeRoom({
   agentContext = {}
 }) {
   const paperKey = getPaperIdentity(paper);
+  const { user } = useAuth();
 
   const loadSavedTimerSeconds = () => {
     try {
@@ -58,6 +62,9 @@ export default function PracticeRoom({
   const [actionMessage, setActionMessage] = useState('');
   const actionTimerRef = useRef(null);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [paperMetadata, setPaperMetadata] = useState(() => createEmptyPaperMetadata());
+  const [isRequestingMetadata, setIsRequestingMetadata] = useState(false);
 
   const getFormulaSheet = (sub) => {
     if (!sub) return null;
@@ -113,6 +120,62 @@ export default function PracticeRoom({
 
     return () => controller.abort();
   }, [paper.v, paper.n, paperKey]);
+
+  useEffect(() => {
+    let isActive = true;
+    setPaperMetadata(createEmptyPaperMetadata());
+
+    getPaperMetadata(paper)
+      .then((metadata) => {
+        if (isActive) setPaperMetadata(metadata);
+      })
+      .catch((error) => {
+        if (isActive) setPaperMetadata({ ...createEmptyPaperMetadata('missing'), error: error.message || 'Paper structure could not be loaded.' });
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [paperKey, paper]);
+
+  const handleAnalysePaperMetadata = async () => {
+    if (paperMetadata.status === 'analysing') {
+      setIsRequestingMetadata(true);
+      try {
+        const metadata = await getPaperMetadata(paper);
+        setPaperMetadata(metadata);
+        setActionMessage(metadata.status === 'ready' ? 'Question and mark structure is ready' : 'Analysis is still in progress. Try again shortly.');
+      } catch (error) {
+        setActionMessage('Could not refresh paper analysis');
+      } finally {
+        setIsRequestingMetadata(false);
+        if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+        actionTimerRef.current = setTimeout(() => setActionMessage(''), 2600);
+      }
+      return;
+    }
+
+    if (!user) {
+      setActionMessage('Sign in to analyse and save this paper structure');
+      return;
+    }
+
+    setIsRequestingMetadata(true);
+    setPaperMetadata((current) => ({ ...current, status: 'analysing', error: '' }));
+    try {
+      const token = await user.getIdToken();
+      const metadata = await analysePaperMetadata(paper, token);
+      setPaperMetadata(metadata);
+      setActionMessage(metadata.status === 'analysing' ? 'Analysis has started. Check again shortly.' : 'Question and mark structure is ready');
+    } catch (error) {
+      setPaperMetadata({ ...createEmptyPaperMetadata('missing'), error: error.message || 'Paper structure could not be analysed.' });
+      setActionMessage('Could not analyse this paper');
+    } finally {
+      setIsRequestingMetadata(false);
+      if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+      actionTimerRef.current = setTimeout(() => setActionMessage(''), 2600);
+    }
+  };
 
   // Record that this paper was viewed (recently opened)
   useEffect(() => {
@@ -211,8 +274,9 @@ export default function PracticeRoom({
       if (idx >= 0) arr[idx] = { ...arr[idx], ...entry };
       else arr.unshift(entry);
       localStorage.setItem(key, JSON.stringify((arr || []).slice(0, 500)));
-      setActionMessage('Marked as completed');
+      setActionMessage('Marked as completed — add your review');
       setIsCompleted(true);
+      setIsReviewOpen(true);
       try { window.dispatchEvent(new CustomEvent('hsc:history-updated')); } catch (e) { /* ignore */ }
       if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
       actionTimerRef.current = setTimeout(() => setActionMessage(''), 1800);
@@ -320,6 +384,12 @@ export default function PracticeRoom({
       pageEnd: paperContext.pageEnd,
       totalPages: paperContext.totalPages,
       text: paperContext.text,
+      structure: {
+        status: paperMetadata.status,
+        questionCount: paperMetadata.questionCount,
+        totalMarks: paperMetadata.totalMarks,
+        questions: paperMetadata.questions,
+      },
     },
   };
 
@@ -524,6 +594,36 @@ export default function PracticeRoom({
             <span>Ask AI</span>
           </button>
 
+          <button
+            type="button"
+            onClick={() => setIsReviewOpen(true)}
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            title="Review your practice and add mistakes"
+          >
+            <ClipboardCheck size={16} />
+            <span>Review</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleAnalysePaperMetadata}
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', color: paperMetadata.status === 'ready' ? 'var(--status-positive)' : 'var(--brand-experiment)' }}
+            title={paperMetadata.status === 'ready' ? 'Paper question and mark structure is saved for all students' : 'Use AI once to identify and save questions and marks'}
+            disabled={isRequestingMetadata}
+          >
+            <ListChecks size={16} />
+            <span>{paperMetadata.status === 'ready'
+              ? `${paperMetadata.questionCount} questions${paperMetadata.totalMarks !== null ? ` · ${paperMetadata.totalMarks} marks` : ''}`
+              : isRequestingMetadata
+                ? 'Analysing paper…'
+                : paperMetadata.status === 'analysing'
+                  ? 'Refresh analysis'
+                : 'Analyse questions'}
+            </span>
+          </button>
+
           {isCompleted ? (
             <button
               onClick={handleUnmarkCompleted}
@@ -680,6 +780,22 @@ export default function PracticeRoom({
         </div>
 
       </div>
+
+      {isReviewOpen && (
+        <PracticeReviewModal
+          paper={paper}
+          subjectName={subjectName}
+          schoolName={schoolName}
+          metadata={paperMetadata}
+          timeSpent={totalSeconds - secondsLeft}
+          onClose={() => setIsReviewOpen(false)}
+          onSaved={(_, mistakeCount) => {
+            setActionMessage(mistakeCount ? `Review saved with ${mistakeCount} mistake${mistakeCount === 1 ? '' : 's'}` : 'Review saved');
+            if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+            actionTimerRef.current = setTimeout(() => setActionMessage(''), 2200);
+          }}
+        />
+      )}
 
       <AgentCommandCenter
         isOpen={isPaperAgentOpen}

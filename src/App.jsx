@@ -9,8 +9,9 @@ import PaperSearch from './components/PaperSearch';
 import AdaptiveRecommendations from './components/AdaptiveRecommendations';
 import AgentCommandCenter from './components/AgentCommandCenter';
 import CustomizationMenu from './components/CustomizationMenu';
-import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock, BotMessageSquare, Palette } from 'lucide-react';
+import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock, BotMessageSquare, Palette, BookOpenCheck } from 'lucide-react';
 import PaperHistory from './components/PaperHistory';
+import StudyNotebook from './components/StudyNotebook';
 import { Analytics } from '@vercel/analytics/react';
 import { findPaperByIdentifier, getPaperRouteId } from './utils/paperIdentity';
 import { loadMySubjects } from './utils/mySubjects';
@@ -28,6 +29,15 @@ import {
   writeStoredArray,
 } from './utils/studySync';
 import { loadOpenRouterSettings, saveOpenRouterSettings } from './utils/openRouterKeySettings';
+import {
+  loadMistakeLog,
+  loadPracticeReviews,
+  mergeMistakeLog,
+  mergePracticeReviews,
+  MISTAKE_LOG_STORAGE_KEY,
+  notifyPracticeRecordsUpdated,
+  PRACTICE_REVIEWS_STORAGE_KEY,
+} from './utils/practiceRecords';
 import {
   ACCENT_OPTIONS,
   APPEARANCE_DEFAULTS,
@@ -129,6 +139,8 @@ export default function App() {
       const remoteSubjects = mergeMySubjects(data.mySubjects, []);
       const remoteViewed = mergeViewedPapers(data.viewedPapers, []);
       const remoteCompleted = mergeCompletedPapers(data.completedPapers, []);
+      const remoteReviews = mergePracticeReviews(data.practiceReviews, []);
+      const remoteMistakes = mergeMistakeLog(data.mistakeLog, []);
       let didRestoreLocalData = false;
 
       if (!sameSerializedValue(loadMySubjects(), remoteSubjects)) {
@@ -144,16 +156,31 @@ export default function App() {
         writeStoredArray(COMPLETED_PAPERS_STORAGE_KEY, remoteCompleted);
         didRestoreLocalData = true;
       }
-      if (didRestoreLocalData) notifyStudySyncUpdate();
+      if (!sameSerializedValue(loadPracticeReviews(), remoteReviews)) {
+        writeStoredArray(PRACTICE_REVIEWS_STORAGE_KEY, remoteReviews);
+        didRestoreLocalData = true;
+      }
+      if (!sameSerializedValue(loadMistakeLog(), remoteMistakes)) {
+        writeStoredArray(MISTAKE_LOG_STORAGE_KEY, remoteMistakes);
+        didRestoreLocalData = true;
+      }
+      if (didRestoreLocalData) {
+        notifyStudySyncUpdate();
+        notifyPracticeRecordsUpdated();
+      }
       return;
     }
 
     const localSubjects = loadMySubjects();
     const localViewed = readStoredArray(VIEWED_PAPERS_STORAGE_KEY);
     const localCompleted = readStoredArray(COMPLETED_PAPERS_STORAGE_KEY);
+    const localReviews = loadPracticeReviews();
+    const localMistakes = loadMistakeLog();
     const mergedSubjects = mergeMySubjects(data.mySubjects, localSubjects);
     const mergedViewed = mergeViewedPapers(data.viewedPapers, localViewed);
     const mergedCompleted = mergeCompletedPapers(data.completedPapers, localCompleted);
+    const mergedReviews = mergePracticeReviews(data.practiceReviews, localReviews);
+    const mergedMistakes = mergeMistakeLog(data.mistakeLog, localMistakes);
 
     hasRestoredStudySyncRef.current = true;
 
@@ -163,12 +190,17 @@ export default function App() {
     }
     if (!sameSerializedValue(localViewed, mergedViewed)) writeStoredArray(VIEWED_PAPERS_STORAGE_KEY, mergedViewed);
     if (!sameSerializedValue(localCompleted, mergedCompleted)) writeStoredArray(COMPLETED_PAPERS_STORAGE_KEY, mergedCompleted);
+    if (!sameSerializedValue(localReviews, mergedReviews)) writeStoredArray(PRACTICE_REVIEWS_STORAGE_KEY, mergedReviews);
+    if (!sameSerializedValue(localMistakes, mergedMistakes)) writeStoredArray(MISTAKE_LOG_STORAGE_KEY, mergedMistakes);
     notifyStudySyncUpdate();
+    notifyPracticeRecordsUpdated();
 
     const remotePatch = {};
     if (!sameSerializedValue(data.mySubjects || [], mergedSubjects)) remotePatch.mySubjects = mergedSubjects;
     if (!sameSerializedValue(data.viewedPapers || [], mergedViewed)) remotePatch.viewedPapers = mergedViewed;
     if (!sameSerializedValue(data.completedPapers || [], mergedCompleted)) remotePatch.completedPapers = mergedCompleted;
+    if (!sameSerializedValue(data.practiceReviews || [], mergedReviews)) remotePatch.practiceReviews = mergedReviews;
+    if (!sameSerializedValue(data.mistakeLog || [], mergedMistakes)) remotePatch.mistakeLog = mergedMistakes;
     updateRemoteFields(remotePatch);
   }, [data, updateRemoteFields, user]);
 
@@ -180,12 +212,18 @@ export default function App() {
       viewedPapers: readStoredArray(VIEWED_PAPERS_STORAGE_KEY),
       completedPapers: readStoredArray(COMPLETED_PAPERS_STORAGE_KEY),
     });
+    const syncPracticeRecords = () => updateRemoteFields({
+      practiceReviews: loadPracticeReviews(),
+      mistakeLog: loadMistakeLog(),
+    });
 
     window.addEventListener('hsc:my-subjects-updated', syncSubjects);
     window.addEventListener('hsc:history-updated', syncHistory);
+    window.addEventListener('hsc:study-records-updated', syncPracticeRecords);
     return () => {
       window.removeEventListener('hsc:my-subjects-updated', syncSubjects);
       window.removeEventListener('hsc:history-updated', syncHistory);
+      window.removeEventListener('hsc:study-records-updated', syncPracticeRecords);
     };
   }, [updateRemote, updateRemoteFields, user]);
 
@@ -247,6 +285,7 @@ export default function App() {
 
   // History State
   const [viewHistory, setViewHistory] = useState(false);
+  const [viewNotebook, setViewNotebook] = useState(false);
 
   // Calendar State
   const [viewCalendar, setViewCalendar] = useState(false);
@@ -804,7 +843,7 @@ export default function App() {
     const target = paperLoadSentinelRef.current;
     const scrollRoot = scrollableContentRef.current;
     const canObserve = typeof window !== 'undefined' && 'IntersectionObserver' in window;
-    const isHomePaperView = !loading && !error && !viewCalendar && !viewTextbooks && !viewHistory;
+    const isHomePaperView = !loading && !error && !viewCalendar && !viewTextbooks && !viewHistory && !viewNotebook;
 
     if (!target || !scrollRoot || !canObserve || !isHomePaperView || !hasMorePaperRows) return undefined;
 
@@ -817,7 +856,7 @@ export default function App() {
 
     observer.observe(target);
     return () => observer.disconnect();
-  }, [loading, error, viewCalendar, viewTextbooks, viewHistory, hasMorePaperRows, loadNextPaperPage]);
+  }, [loading, error, viewCalendar, viewTextbooks, viewHistory, viewNotebook, hasMorePaperRows, loadNextPaperPage]);
 
   useEffect(() => () => {
     if (loadMoreTimerRef.current) clearTimeout(loadMoreTimerRef.current);
@@ -831,7 +870,9 @@ export default function App() {
         ? 'Saved library'
         : viewHistory
           ? 'Paper History'
-          : 'HSC past papers';
+          : viewNotebook
+            ? 'Mistake Notebook'
+            : 'HSC past papers';
 
   const currentViewDescription = viewCalendar
     ? 'Track assessment dates and keep the term visible at a glance.'
@@ -841,7 +882,9 @@ export default function App() {
         ? 'Return to the papers you have saved for practice.'
         : viewHistory
           ? 'Papers you opened and those you marked complete.'
-          : 'Browse official papers, trial exams, and resources without the clutter.';
+          : viewNotebook
+            ? 'Review your practice, capture useful mistakes, and turn them into next steps.'
+            : 'Browse official papers, trial exams, and resources without the clutter.';
 
   if (paperRouteId) {
     if (loading) {
@@ -936,6 +979,8 @@ export default function App() {
           setViewTextbooks={setViewTextbooks}
           viewCalendar={viewCalendar}
           setViewCalendar={setViewCalendar}
+          viewNotebook={viewNotebook}
+          setViewNotebook={setViewNotebook}
           bookmarksCount={bookmarks.size}
           totalPapersCount={papers.length}
           subjectCounts={subjectCounts}
@@ -963,6 +1008,8 @@ export default function App() {
               <Calendar size={20} color="var(--brand-experiment)" />
             ) : viewTextbooks ? (
               <Book size={20} color="var(--brand-experiment)" />
+            ) : viewNotebook ? (
+              <BookOpenCheck size={20} color="var(--brand-experiment)" />
             ) : (
               <Library size={20} color="var(--brand-experiment)" />
             )}
@@ -1028,6 +1075,7 @@ export default function App() {
                   setViewTextbooks(false);
                   setViewCalendar(false);
                   setViewBookmarks(false);
+                  setViewNotebook(false);
                 }
               }}
               className="btn-secondary"
@@ -1036,6 +1084,24 @@ export default function App() {
             >
               <Clock size={16} />
               <span>History</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setViewNotebook((isOpen) => !isOpen);
+                if (!viewNotebook) {
+                  setViewHistory(false);
+                  setViewTextbooks(false);
+                  setViewCalendar(false);
+                  setViewBookmarks(false);
+                }
+              }}
+              className="btn-secondary"
+              style={{ padding: '10px 12px' }}
+              title="Open Mistake Notebook"
+            >
+              <BookOpenCheck size={16} />
+              <span>Notebook</span>
             </button>
           </div>
         </div>
@@ -1062,6 +1128,11 @@ export default function App() {
                 schools={schools}
                 onSelectPaper={openPaper}
               />
+            ) : viewNotebook ? (
+              <StudyNotebook onSelectPaper={(paperId) => {
+                const matchingPaper = findPaperByIdentifier(papers, paperId);
+                if (matchingPaper) openPaper(matchingPaper);
+              }} />
             ) : (
               <>
                 <section className="hero-band">

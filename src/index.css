@@ -3003,8 +3003,143 @@ textarea:focus,
   .adaptive-recommendations-heading {
     flex-direction: column;
   }
-
   .adaptive-recommendation-filters {
     justify-content: flex-start;
   }
+}
+
+/* Practice review and mistake notebook */
+.practice-review-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 180;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--bg-primary) 72%, transparent);
+  backdrop-filter: blur(8px);
+}
+.practice-review-modal {
+  width: min(760px, 100%);
+  max-height: min(860px, calc(100vh - 40px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--bg-modifier-accent);
+  border-radius: 18px;
+  background: var(--bg-secondary);
+  color: var(--text-normal);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  animation: practice-review-enter 180ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+@keyframes practice-review-enter {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.practice-review-header,.practice-review-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px;
+  background: var(--bg-tertiary);
+}
+.practice-review-header { border-bottom: 1px solid var(--bg-modifier-accent); }
+.practice-review-footer { border-top: 1px solid var(--bg-modifier-accent); }
+.practice-review-header h2 { margin: 3px 0 4px; color: var(--header-primary); font-size: 21px; }
+.practice-review-header p { margin: 0; color: var(--text-muted); font-size: 13px; }
+.practice-review-eyebrow { color: var(--brand-experiment); font-size: 11px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.practice-review-icon-button { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--bg-modifier-accent); border-radius: 9px; background: transparent; color: var(--text-muted); }
+.practice-review-scroll { overflow-y: auto; padding: 22px 24px 28px; }
+.practice-review-structure { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--brand-experiment) 30%, var(--bg-modifier-accent)); border-radius: 12px; background: color-mix(in srgb, var(--brand-experiment) 9%, var(--bg-primary)); }
+.practice-review-structure span { color: var(--text-muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.practice-review-structure strong { color: var(--header-primary); font-size: 14px; }
+.practice-review-structure p { width: 100%; margin: 0; color: var(--text-muted); font-size: 12px; }
+.practice-review-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+.practice-review-grid label,.practice-review-field { display: grid; gap: 7px; color: var(--text-muted); font-size: 12px; font-weight: 700; }
+.practice-review-grid input,.practice-review-field input,.practice-review-field textarea,.practice-review-select-wrap select,.study-notebook-filter select { width: 100%; box-sizing: border-box; border: 1px solid var(--bg-modifier-accent); border-radius: 9px; padding: 10px 11px; outline: none; background: var(--bg-primary); color: var(--text-normal); font: inherit; font-size: 14px; font-weight: 500; }
+.practice-review-grid input:focus,.practice-review-field input:focus,.practice-review-field textarea:focus,.practice-review-select-wrap select:focus,.study-notebook-filter select:focus { border-color: var(--brand-experiment); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-experiment) 22%, transparent); }
+.practice-review-field { margin-top: 18px; }
+.practice-review-field textarea { resize: vertical; min-height: 70px; line-height: 1.45; }
+.practice-review-confidence { margin: 20px 0 0; padding: 0; border: 0; }
+.practice-review-confidence legend { margin-bottom: 9px; color: var(--text-muted); font-size: 12px; font-weight: 700; }
+.practice-review-confidence > div { display: flex; gap: 7px; }
+.practice-review-confidence button { width: 38px; height: 34px; border: 1px solid var(--bg-modifier-accent); border-radius: 8px; background: var(--bg-primary); color: var(--text-muted); font-weight: 750; }
+.practice-review-confidence button.is-selected { border-color: var(--brand-experiment); background: var(--brand-experiment); color: white; }
+.practice-review-confidence small { display: block; margin-top: 7px; color: var(--text-muted); font-size: 11px; }
+.practice-review-mistakes { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--bg-modifier-accent); }
+.practice-review-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.practice-review-section-heading h3 { margin: 3px 0 0; color: var(--header-primary); font-size: 16px; }
+.practice-review-count { color: var(--text-muted); font-size: 12px; }
+.practice-review-select-wrap { position: relative; }
+.practice-review-select-wrap select { appearance: none; padding-right: 33px; }
+.practice-review-select-wrap svg { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+.practice-review-add { display: inline-flex; align-items: center; gap: 7px; margin-top: 13px; padding: 8px 11px; font-size: 13px; }
+.practice-review-draft-list { display: grid; gap: 8px; margin: 16px 0 0; padding: 0; list-style: none; }
+.practice-review-draft-list li { display: flex; justify-content: space-between; gap: 14px; padding: 11px 12px; border: 1px solid var(--bg-modifier-accent); border-radius: 10px; background: var(--bg-primary); }
+.practice-review-draft-list strong,.practice-review-draft-list span { display: block; }
+.practice-review-draft-list strong { color: var(--header-primary); font-size: 12px; }
+.practice-review-draft-list span { margin-top: 3px; color: var(--text-muted); font-size: 12px; line-height: 1.4; }
+.practice-review-draft-list button { align-self: flex-start; border: 0; background: transparent; color: var(--text-muted); }
+.practice-review-error { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding: 10px 12px; border-radius: 9px; background: color-mix(in srgb, var(--status-danger) 13%, var(--bg-primary)); color: var(--status-danger); font-size: 13px; }
+.practice-review-save { display: inline-flex; align-items: center; gap: 8px; }
+
+.study-notebook { display: grid; gap: 22px; }
+.study-notebook-hero { display: flex; justify-content: space-between; gap: 24px; padding: clamp(22px, 4vw, 38px); border: 1px solid var(--bg-modifier-accent); border-radius: 18px; background: linear-gradient(130deg, color-mix(in srgb, var(--brand-experiment) 15%, var(--bg-secondary)), var(--bg-secondary)); }
+.study-notebook-hero h2 { margin: 4px 0 7px; color: var(--header-primary); font-size: clamp(24px, 3vw, 34px); }
+.study-notebook-hero p { max-width: 540px; margin: 0; color: var(--text-muted); line-height: 1.55; }
+.study-notebook-metrics { display: grid; grid-template-columns: repeat(3, minmax(86px, 1fr)); align-content: start; min-width: 300px; overflow: hidden; border: 1px solid var(--bg-modifier-accent); border-radius: 12px; background: color-mix(in srgb, var(--bg-primary) 86%, transparent); }
+.study-notebook-metrics div { display: grid; gap: 5px; padding: 13px; border-left: 1px solid var(--bg-modifier-accent); }
+.study-notebook-metrics div:first-child { border-left: 0; }
+.study-notebook-metrics span { color: var(--text-muted); font-size: 11px; line-height: 1.25; }
+.study-notebook-metrics strong { color: var(--header-primary); font-size: 20px; }
+.study-notebook-focus { display: flex; align-items: center; gap: 12px; padding: 13px 16px; border: 1px solid color-mix(in srgb, var(--brand-experiment) 28%, var(--bg-modifier-accent)); border-radius: 12px; background: color-mix(in srgb, var(--brand-experiment) 8%, var(--bg-secondary)); color: var(--brand-experiment); }
+.study-notebook-focus div { display: grid; gap: 2px; }
+.study-notebook-focus span { color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.study-notebook-focus strong { color: var(--header-primary); font-size: 13px; }
+.study-notebook-tabs { display: flex; gap: 6px; width: fit-content; padding: 4px; border: 1px solid var(--bg-modifier-accent); border-radius: 11px; background: var(--bg-secondary); }
+.study-notebook-tabs button { display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 7px; padding: 8px 11px; background: transparent; color: var(--text-muted); font-size: 13px; font-weight: 700; }
+.study-notebook-tabs button.is-active { background: var(--brand-experiment); color: white; }
+.study-notebook-section { padding: 22px; border: 1px solid var(--bg-modifier-accent); border-radius: 16px; background: var(--bg-secondary); }
+.study-notebook-section-header { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.study-notebook-section-header h3 { margin: 0 0 5px; color: var(--header-primary); font-size: 18px; }
+.study-notebook-section-header p { margin: 0; color: var(--text-muted); font-size: 13px; }
+.study-notebook-filter { display: flex; align-items: center; gap: 7px; align-self: flex-start; color: var(--text-muted); }
+.study-notebook-filter select { min-width: 145px; padding: 8px 9px; font-size: 12px; }
+.study-notebook-empty { display: grid; justify-items: center; gap: 7px; padding: 42px 20px; color: var(--text-muted); text-align: center; }
+.study-notebook-empty h3 { margin: 5px 0 0; color: var(--header-primary); font-size: 16px; }
+.study-notebook-empty p { max-width: 430px; margin: 0; line-height: 1.5; font-size: 13px; }
+.study-notebook-list { display: grid; gap: 12px; }
+.study-notebook-mistake { padding: 16px; border: 1px solid var(--bg-modifier-accent); border-radius: 12px; background: var(--bg-primary); }
+.study-notebook-mistake-meta { display: flex; justify-content: space-between; gap: 12px; color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.study-notebook-mistake-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 9px; }
+.study-notebook-mistake-title h4 { margin: 0; color: var(--header-primary); font-size: 15px; }
+.study-notebook-mistake-title span,.study-notebook-topic { display: inline-flex; width: fit-content; border-radius: 999px; padding: 4px 8px; background: color-mix(in srgb, var(--brand-experiment) 12%, var(--bg-secondary)); color: var(--brand-experiment); font-size: 11px; font-weight: 700; }
+.study-notebook-topic { margin-top: 9px; }
+.study-notebook-mistake p { margin: 10px 0 0; color: var(--text-normal); line-height: 1.55; font-size: 13px; white-space: pre-wrap; }
+.study-notebook-card-actions { display: flex; gap: 14px; margin-top: 14px; }
+.study-notebook-card-actions button,.study-notebook-review-side button { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: transparent; color: var(--brand-experiment); font-size: 12px; font-weight: 700; }
+.study-notebook-card-actions button:last-child { color: var(--text-muted); }
+.study-notebook-review { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 17px; border: 1px solid var(--bg-modifier-accent); border-radius: 12px; background: var(--bg-primary); }
+.study-notebook-review-subject { color: var(--brand-experiment); font-size: 11px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.study-notebook-review h4 { margin: 5px 0; color: var(--header-primary); font-size: 16px; }
+.study-notebook-review p { margin: 0; color: var(--text-muted); font-size: 12px; }
+.study-notebook-review blockquote { margin: 12px 0 0; border-left: 3px solid var(--brand-experiment); padding-left: 10px; color: var(--text-normal); font-size: 13px; line-height: 1.5; }
+.study-notebook-review-side { display: grid; justify-items: end; gap: 9px; text-align: right; white-space: nowrap; }
+.study-notebook-review-side strong { color: var(--header-primary); font-size: 14px; }
+@media (max-width: 720px) {
+  .practice-review-backdrop { padding: 0; }
+  .practice-review-modal { max-height: 100vh; min-height: 100vh; border-radius: 0; border: 0; }
+  .practice-review-header,.practice-review-footer,.practice-review-scroll { padding-left: 17px; padding-right: 17px; }
+  .practice-review-grid,.study-notebook-metrics { grid-template-columns: 1fr; }
+  .study-notebook-hero,.study-notebook-review { flex-direction: column; }
+  .study-notebook-metrics { width: 100%; min-width: 0; }
+  .study-notebook-metrics div { border-top: 1px solid var(--bg-modifier-accent); border-left: 0; }
+  .study-notebook-metrics div:first-child { border-top: 0; }
+  .study-notebook-section { padding: 17px; }
+  .study-notebook-section-header { flex-direction: column; }
+  .study-notebook-review-side { justify-items: start; text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .practice-review-modal { animation: none; }
 }

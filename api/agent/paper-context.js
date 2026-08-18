@@ -19,7 +19,7 @@ const MAX_CACHED_PDFS = 4
 const contextCache = new Map()
 const pdfByteCache = new Map()
 
-function loadPaper(paperId, paperName) {
+export function loadPaperRecord(paperId, paperName) {
   const raw = fs.readFileSync(resolve(process.cwd(), 'public', 'papers.json'), 'utf-8')
   const papers = JSON.parse(raw).papers || []
   return papers.find((paper) => (
@@ -38,6 +38,14 @@ function paperUrl(filePath) {
 
 function paperCacheKey(paper) {
   return `${paper.v}::${paper.n}`
+}
+
+export function getPaperSourceFingerprint(paper) {
+  return JSON.stringify({
+    paperId: String(paper?.v || ''),
+    paperName: String(paper?.n || ''),
+    sourcePath: String(paper?.cf || ''),
+  })
 }
 
 function normaliseText(items) {
@@ -98,7 +106,7 @@ async function getPaperBytes(paper) {
   return { bytes, cached: false }
 }
 
-async function extractFullPaperText(paper) {
+export async function extractFullPaperText(paper) {
   const paperBytes = await getPaperBytes(paper)
   if (paperBytes.unavailable) {
     return {
@@ -162,7 +170,7 @@ export default async function handler(req, res) {
       return
     }
 
-    const paper = loadPaper(paperId, paperName)
+    const paper = loadPaperRecord(paperId, paperName)
     if (!paper) {
       res.statusCode = 404
       res.setHeader('Content-Type', 'application/json')
