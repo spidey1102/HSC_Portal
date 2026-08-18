@@ -76,9 +76,72 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
   const [steps, setSteps] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
   const [hasRun, setHasRun] = useState(false);
+  const [selectedPaper, setSelectedPaper] = useState(null);
+  const [paperPickerOpen, setPaperPickerOpen] = useState(false);
+  const [paperQuery, setPaperQuery] = useState('');
   const abortRef = useRef(null);
   const inputRef = useRef(null);
   const logRef = useRef(null);
+
+  const effectiveAppContext = selectedPaper
+    ? { ...appContext, currentPaper: selectedPaper }
+    : appContext;
+
+  const selectPaperForAI = async (paper) => {
+    if (!paper?.v || !paper?.n) return;
+
+    const paperMetadata = {
+      name: paper.n,
+      subject: appContext?.subjects?.[paper.s] || 'Unknown subject',
+      school: appContext?.schools?.[paper.h] || 'Unknown source',
+      level: `Year ${paper.l || 'Unknown'}`,
+      year: paper.y || 'Unknown',
+      category: paper.c === 'H' ? 'Official HSC' : paper.c === 'T' ? 'School trial' : paper.c === 'A' ? 'Assessment task' : 'Resource',
+      hasSolutions: paper.w === 1,
+      textStatus: 'loading',
+      textReason: '',
+      pagesExtracted: 0,
+      pageStart: 0,
+      pageEnd: 0,
+      totalPages: 0,
+      text: '',
+    };
+
+    setSelectedPaper(paperMetadata);
+    setPaperPickerOpen(false);
+    setPaperQuery('');
+    handleClear();
+
+    try {
+      const response = await fetch(`/api/agent/paper-context?paperId=${encodeURIComponent(paper.v)}&paperName=${encodeURIComponent(paper.n)}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || 'The selected paper could not be prepared.');
+
+      setSelectedPaper({
+        ...paperMetadata,
+        textStatus: payload.status || 'unavailable',
+        textReason: payload.reason || '',
+        pagesExtracted: payload.pagesExtracted || 0,
+        pageStart: payload.pageStart || 0,
+        pageEnd: payload.pageEnd || 0,
+        totalPages: payload.totalPages || 0,
+        text: payload.text || '',
+      });
+    } catch (error) {
+      setSelectedPaper({
+        ...paperMetadata,
+        textStatus: 'unavailable',
+        textReason: error.message || 'The selected paper could not be prepared.',
+      });
+    }
+  };
+
+  const useOpenPaperForAI = () => {
+    setSelectedPaper(null);
+    setPaperPickerOpen(false);
+    setPaperQuery('');
+    handleClear();
+  };
 
   // Auto-scroll to latest step
   useEffect(() => {
@@ -108,7 +171,7 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
     abortRef.current = controller;
 
     try {
-      const result = await runAgent(trimmed, appContext, {
+      const result = await runAgent(trimmed, effectiveAppContext, {
         signal: controller.signal,
         onStep: (step) => {
           setSteps((prev) => {
@@ -140,7 +203,7 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
       setIsRunning(false);
       abortRef.current = null;
     }
-  }, [input, isRunning, appContext]);
+  }, [input, isRunning, effectiveAppContext]);
 
   const handleStop = () => {
     abortRef.current?.abort();
@@ -174,6 +237,25 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
   const hasError = steps.some((s) => s.type === 'error');
   const lastStepIdx = steps.length - 1;
   const hasConversation = conversation.length > 0;
+  const activePaper = selectedPaper || appContext?.currentPaper;
+  const paperSearchQuery = paperQuery.trim().toLowerCase();
+  const paperChoices = (appContext?.papers || [])
+    .filter((paper) => {
+      if (!paperSearchQuery) return true;
+      const subject = appContext?.subjects?.[paper.s] || '';
+      const school = appContext?.schools?.[paper.h] || '';
+      return [paper.n, subject, school, String(paper.y || '')]
+        .join(' ')
+        .toLowerCase()
+        .includes(paperSearchQuery);
+    })
+    .slice(0, 16);
+  const suggestions = activePaper ? [
+    'Give me a short plan for this paper',
+    'What should I focus on while doing this paper?',
+    'How should I approach this paper under timed conditions?',
+    'How should I review this paper afterwards?',
+  ] : SUGGESTIONS;
 
   return (
     <>
@@ -194,7 +276,7 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
             <span className="agent-sparkle-icon"><IconSparkle /></span>
             <div>
               <div className="agent-title">AI Agent</div>
-              <div className="agent-subtitle">Ask me to search, bookmark, or schedule</div>
+              <div className="agent-subtitle">{activePaper ? 'Paper-aware study support' : 'Ask me to search, bookmark, or schedule'}</div>
             </div>
           </div>
           <div className="agent-header-actions">
@@ -212,6 +294,63 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
 
         {/* Body */}
         <div className="agent-body">
+          <div style={{ margin: '14px 18px 0', padding: '10px 12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--bg-modifier-accent)', fontSize: '12px', lineHeight: 1.45, color: 'var(--text-muted)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--brand-experiment)' }}>Paper shared with AI</div>
+              <button type="button" className="agent-action-btn" onClick={() => setPaperPickerOpen((open) => !open)} style={{ fontSize: '11px', padding: '4px 7px' }}>
+                {paperPickerOpen ? 'Close chooser' : 'Choose paper'}
+              </button>
+            </div>
+
+            {activePaper ? (
+              <>
+                <div style={{ color: 'var(--text-normal)', fontWeight: 650, marginTop: '5px' }}>{activePaper.name}</div>
+                <div>{activePaper.subject || 'Unknown subject'} · {activePaper.year || 'Unknown year'} · {activePaper.category || 'Resource'}</div>
+                <div style={{ marginTop: '4px' }}>
+                  {activePaper.textStatus === 'ready'
+                    ? `Full paper ready: pages 1–${activePaper.totalPages || activePaper.pageEnd || activePaper.pagesExtracted || 'available'} are available to the AI.`
+                    : activePaper.textStatus === 'loading'
+                      ? 'Reading the complete paper for the AI…'
+                      : `Paper details are available, but full text could not be prepared. ${activePaper.textReason || ''}`}
+                </div>
+                {selectedPaper && appContext?.currentPaper && (
+                  <button type="button" className="agent-action-btn" onClick={useOpenPaperForAI} style={{ marginTop: '8px', fontSize: '11px', padding: '4px 7px' }}>
+                    Use currently open paper instead
+                  </button>
+                )}
+              </>
+            ) : (
+              <div style={{ marginTop: '5px' }}>No paper is currently shared. Choose a paper to give the AI complete paper context.</div>
+            )}
+
+            {paperPickerOpen && (
+              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--bg-modifier-accent)' }}>
+                <input
+                  autoFocus
+                  type="search"
+                  value={paperQuery}
+                  onChange={(event) => setPaperQuery(event.target.value)}
+                  placeholder="Search by title, subject, school, or year"
+                  aria-label="Search papers to share with the AI"
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 9px', borderRadius: '7px', border: '1px solid var(--bg-modifier-accent)', background: 'var(--bg-primary)', color: 'var(--text-normal)', fontSize: '12px' }}
+                />
+                <div style={{ marginTop: '7px', maxHeight: '180px', overflowY: 'auto', display: 'grid', gap: '4px' }}>
+                  {paperChoices.map((paper) => (
+                    <button
+                      key={`${paper.v}-${paper.n}`}
+                      type="button"
+                      onClick={() => selectPaperForAI(paper)}
+                      style={{ textAlign: 'left', padding: '7px 8px', border: '1px solid var(--bg-modifier-accent)', borderRadius: '7px', background: 'var(--bg-primary)', color: 'var(--text-normal)', cursor: 'pointer', fontSize: '12px' }}
+                    >
+                      <strong style={{ display: 'block', fontWeight: 650 }}>{paper.n}</strong>
+                      <span style={{ color: 'var(--text-muted)' }}>{appContext?.subjects?.[paper.s] || 'Unknown subject'} · {paper.y || 'Unknown year'} · {appContext?.schools?.[paper.h] || 'Unknown source'}</span>
+                    </button>
+                  ))}
+                  {paperChoices.length === 0 && <div style={{ padding: '8px 0' }}>No papers match that search.</div>}
+                </div>
+              </div>
+            )}
+          </div>
           {/* Conversation History */}
           {hasConversation ? (
             <div className="agent-log" ref={logRef}>
@@ -255,9 +394,9 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
             <div className="agent-empty">
               <div className="agent-empty-icon"><IconSparkle /></div>
               <p className="agent-empty-title">What can I help with?</p>
-              <p className="agent-empty-sub">I can search papers, manage bookmarks, and add calendar events.</p>
+              <p className="agent-empty-sub">{activePaper ? 'I can use this open paper to help you plan, approach, and review your practice.' : 'I can search papers, manage bookmarks, and add calendar events.'}</p>
               <div className="agent-suggestions">
-                {SUGGESTIONS.map((s) => (
+                {suggestions.map((s) => (
                   <button
                     key={s}
                     className="agent-suggestion-pill"
@@ -280,7 +419,7 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask me anything…"
+            placeholder={activePaper ? 'Ask about this paper…' : 'Ask me anything…'}
             rows={1}
             disabled={isRunning}
             aria-label="Agent command input"

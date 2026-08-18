@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
-import { Check, X, Monitor, Moon, Palette, Sun } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Check, X, Monitor, Moon, Palette, Sun, KeyRound, Server, UserRound, Eye, EyeOff, Trash2 } from 'lucide-react';
 import {
   APPEARANCE_PRESETS,
   ACCENT_OPTIONS,
   DENSITY_OPTIONS,
+  LAYOUT_OPTIONS,
 } from '../utils/appearancePresets';
 
 const MODE_OPTIONS = [
@@ -46,7 +47,16 @@ function OptionButton({ active, label, description, icon: Icon, onClick }) {
   );
 }
 
-export default function CustomizationMenu({ isOpen, settings, onChange, onClose }) {
+export default function CustomizationMenu({
+  isOpen,
+  settings,
+  onChange,
+  aiSettings = { providerMode: 'portal', personalKey: '' },
+  onAiSettingsChange,
+  onClose,
+}) {
+  const [showPersonalKey, setShowPersonalKey] = useState(false);
+
   useEffect(() => {
     if (!isOpen) return undefined;
 
@@ -155,6 +165,25 @@ export default function CustomizationMenu({ isOpen, settings, onChange, onClose 
 
             <section className="appearance-section">
               <div className="appearance-section-header">
+                <div className="appearance-section-title">Page layout</div>
+                <div className="appearance-section-note">Focus hides dashboard extras to make browsing papers calmer and easier to scan.</div>
+              </div>
+              <div className="appearance-option-grid appearance-option-grid--compact">
+                {LAYOUT_OPTIONS.map((option) => (
+                  <OptionButton
+                    key={option.value}
+                    active={settings.layout === option.value}
+                    label={option.label}
+                    description={option.description}
+                    icon={Palette}
+                    onClick={() => onChange({ layout: option.value })}
+                  />
+                ))}
+              </div>
+            </section>
+
+            <section className="appearance-section">
+              <div className="appearance-section-header">
                 <div className="appearance-section-title">Spacing</div>
                 <div className="appearance-section-note">A small extra option for dense or relaxed layouts.</div>
               </div>
@@ -171,10 +200,83 @@ export default function CustomizationMenu({ isOpen, settings, onChange, onClose 
                 ))}
               </div>
             </section>
+
+            <section className="appearance-section">
+              <div className="appearance-section-header">
+                <div className="appearance-section-title">AI provider</div>
+                <div className="appearance-section-note">Choose the portal AI or use your own OpenRouter key for this browser session.</div>
+              </div>
+              <div className="appearance-option-grid appearance-option-grid--compact">
+                <OptionButton
+                  active={aiSettings.providerMode !== 'personal'}
+                  label="Use portal AI"
+                  description="Uses the server-side key configured by HSC Portal."
+                  icon={Server}
+                  onClick={() => onAiSettingsChange?.({ providerMode: 'portal' })}
+                />
+                <OptionButton
+                  active={aiSettings.providerMode === 'personal'}
+                  label="Use my OpenRouter key"
+                  description="Uses your own key for AI requests in this browser session."
+                  icon={UserRound}
+                  onClick={() => onAiSettingsChange?.({ providerMode: 'personal' })}
+                />
+              </div>
+
+              {aiSettings.providerMode === 'personal' && (
+                <div style={{ marginTop: '12px', padding: '12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--sidebar-border)' }}>
+                  <label htmlFor="personal-openrouter-key" style={{ display: 'block', marginBottom: '7px', fontSize: '12px', fontWeight: 700, color: 'var(--text-normal)' }}>
+                    OpenRouter API key
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      id="personal-openrouter-key"
+                      type={showPersonalKey ? 'text' : 'password'}
+                      value={aiSettings.personalKey || ''}
+                      onChange={(event) => onAiSettingsChange?.({ personalKey: event.target.value })}
+                      className="discord-input"
+                      placeholder="sk-or-v1-…"
+                      autoComplete="off"
+                      spellCheck="false"
+                      style={{ flex: 1, minWidth: 0 }}
+                    />
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => setShowPersonalKey((visible) => !visible)}
+                      aria-label={showPersonalKey ? 'Hide personal API key' : 'Show personal API key'}
+                      title={showPersonalKey ? 'Hide key' : 'Show key'}
+                      style={{ padding: '8px 10px' }}
+                    >
+                      {showPersonalKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                    {!!aiSettings.personalKey && (
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => onAiSettingsChange?.({ personalKey: '', providerMode: 'portal' })}
+                        title="Remove personal key"
+                        aria-label="Remove personal key"
+                        style={{ padding: '8px 10px', color: 'var(--status-danger)' }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '7px', marginTop: '9px', color: 'var(--text-muted)', fontSize: '12px', lineHeight: 1.45 }}>
+                    <KeyRound size={15} style={{ flexShrink: 0, marginTop: '1px' }} />
+                    <span>{aiSettings.personalKey
+                      ? 'Your key is stored only in this browser tab’s session storage. It is not synced, saved to your HSC Portal profile, or shown to other users. It is sent to the portal only for your AI requests and is discarded after each request.'
+                      : 'Add a personal key to enable this option. Until then, AI requests continue to use the portal server key when it is configured.'}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </section>
           </div>
 
           <div className="appearance-modal-footer">
-            Settings save automatically and stay in your browser.
+            Appearance settings save automatically. Personal OpenRouter keys remain only in the current browser session.
           </div>
         </div>
       </div>

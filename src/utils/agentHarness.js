@@ -8,6 +8,7 @@
 
 import { getPaperIdentity } from './paperIdentity.js';
 import { findAgenticPaperMatches } from './agenticPaperSearch.js';
+import { getOpenRouterRequestHeaders } from './openRouterKeySettings.js';
 
 // ─── Tool Definitions (OpenAI function-calling schema) ────────────────────────
 
@@ -297,6 +298,34 @@ export async function executeTool(toolName, args, appContext) {
 
 const MAX_TURNS = 6; // prevent infinite loops
 
+function buildActivePaperContext(appContext) {
+  const activePaper = appContext?.currentPaper;
+  if (!activePaper?.name) return '';
+
+  const details = [
+    'ACTIVE PAPER CONTEXT — this is the paper the student currently has open.',
+    `Title: ${activePaper.name}`,
+    `Subject: ${activePaper.subject || 'Unknown'}`,
+    `School or source: ${activePaper.school || 'Unknown'}`,
+    `Year level: ${activePaper.level || 'Unknown'}`,
+    `Paper year: ${activePaper.year || 'Unknown'}`,
+    `Paper type: ${activePaper.category || 'Unknown'}`,
+    `Solutions available: ${activePaper.hasSolutions ? 'Yes' : 'No'}`,
+  ];
+
+  if (activePaper.textStatus === 'ready' && activePaper.text) {
+    details.push(
+      `Complete PDF text is supplied from pages 1–${activePaper.totalPages || activePaper.pageEnd || activePaper.pagesExtracted || 'available'}. You may use any included page, but distinguish the paper text from your own advice.`,
+      `Complete paper text:\n${String(activePaper.text)}`,
+    );
+  } else {
+    details.push(`PDF text is not available for this paper. ${activePaper.textReason || 'Use the paper metadata only and ask the student to paste an excerpt for question-specific help.'}`);
+  }
+
+  details.push('Use this context when it helps. Never claim that you can see text that is not included above.');
+  return details.join('\n');
+}
+
 /**
  * Runs the full agentic execution loop.
  *
@@ -315,8 +344,13 @@ export async function runAgent(userMessage, appContext, { onStep, signal } = {})
     if (typeof onStep === 'function') onStep(step);
   };
 
+  const activePaperContext = buildActivePaperContext(appContext);
+  const requestContent = activePaperContext
+    ? `${activePaperContext}\n\nSTUDENT REQUEST:\n${userMessage}`
+    : userMessage;
+
   const messages = [
-    { role: 'user', content: userMessage },
+    { role: 'user', content: requestContent },
   ];
 
   emit({ type: 'thinking', label: 'Thinking…' });
@@ -330,7 +364,10 @@ export async function runAgent(userMessage, appContext, { onStep, signal } = {})
     try {
       response = await fetch('/api/agent-chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...getOpenRouterRequestHeaders(appContext?.openRouterSettings),
+        },
         signal,
         body: JSON.stringify({
           messages,

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, RotateCcw, X, ExternalLink, Edit3, BookOpen, Clock, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Share2, Sparkles, Send, Check } from 'lucide-react';
 import { getPaperIdentity, getPaperStorageKey, getLegacyPaperStorageKey } from '../utils/paperIdentity';
+import AgentCommandCenter from './AgentCommandCenter';
+import { getOpenRouterRequestHeaders } from '../utils/openRouterKeySettings';
 
 export default function PracticeRoom({
   paper,
@@ -11,7 +13,8 @@ export default function PracticeRoom({
   subjects,
   schools,
   onSharePaper,
-  onSelectPaper
+  onSelectPaper,
+  agentContext = {}
 }) {
   const paperKey = getPaperIdentity(paper);
 
@@ -79,6 +82,16 @@ export default function PracticeRoom({
   const [aiError, setAiError] = useState('');
   const [extractedQuestions, setExtractedQuestions] = useState([]);
   const [extractLoading, setExtractLoading] = useState(false);
+  const [isPaperAgentOpen, setIsPaperAgentOpen] = useState(false);
+  const [paperContext, setPaperContext] = useState({
+    status: 'loading',
+    text: '',
+    pagesExtracted: 0,
+    pageStart: 0,
+    pageEnd: 0,
+    totalPages: 0,
+    reason: '',
+  });
 
   const [actionMessage, setActionMessage] = useState('');
   const actionTimerRef = useRef(null);
@@ -137,6 +150,38 @@ export default function PracticeRoom({
     setAiResponse('');
     setAiError('');
   }, [paperKey]);
+
+  const requestPaperContext = async (signal) => {
+    const requestUrl = `/api/agent/paper-context?paperId=${encodeURIComponent(paper.v)}&paperName=${encodeURIComponent(paper.n)}`;
+    const response = await fetch(requestUrl, { signal });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload?.error || 'The complete paper could not be prepared.');
+    return payload;
+  };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setPaperContext({ status: 'loading', text: '', pagesExtracted: 0, pageStart: 0, pageEnd: 0, totalPages: 0, reason: '' });
+
+    requestPaperContext(controller.signal)
+      .then((payload) => {
+        setPaperContext({
+          status: payload.status || 'unavailable',
+          text: payload.text || '',
+          pagesExtracted: payload.pagesExtracted || 0,
+          pageStart: payload.pageStart || 0,
+          pageEnd: payload.pageEnd || 0,
+          totalPages: payload.totalPages || 0,
+          reason: payload.reason || '',
+        });
+      })
+      .catch((error) => {
+        if (error.name === 'AbortError') return;
+        setPaperContext({ status: 'unavailable', text: '', pagesExtracted: 0, pageStart: 0, pageEnd: 0, totalPages: 0, reason: error.message || 'The complete paper could not be prepared.' });
+      });
+
+    return () => controller.abort();
+  }, [paper.v, paper.n, paperKey]);
 
   // Record that this paper was viewed (recently opened)
   useEffect(() => {
@@ -351,6 +396,7 @@ export default function PracticeRoom({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getOpenRouterRequestHeaders(agentContext.openRouterSettings),
         },
         body: JSON.stringify({
           model: aiModel.trim() || 'openai/gpt-oss-120b:free',
@@ -421,7 +467,10 @@ export default function PracticeRoom({
 
       const resp = await fetch('/api/agent/ask', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...getOpenRouterRequestHeaders(agentContext.openRouterSettings),
+        },
         body: JSON.stringify(payload),
       });
 
@@ -497,6 +546,26 @@ export default function PracticeRoom({
     ? `https://hscportal.pages.dev/${encodeURI(paper.cf)}`
     : `https://thsconline.github.io/s/viewer.html?field=${encodeURIComponent(paper?.n ?? '')}&base=${paper?.v ?? ''}`;
   const viewUrl = pdfBlobUrl || directIframeUrl;
+  const paperCategory = paper.c === 'H' ? 'Official HSC' : paper.c === 'T' ? 'School trial' : paper.c === 'A' ? 'Assessment task' : 'Resource';
+  const paperAgentContext = {
+    ...agentContext,
+    currentPaper: {
+      name: paper.n,
+      subject: subjectName,
+      school: schoolName,
+      level: `Year ${paper.l}`,
+      year: paper.y,
+      category: paperCategory,
+      hasSolutions: paper.w === 1,
+      textStatus: paperContext.status,
+      textReason: paperContext.reason,
+      pagesExtracted: paperContext.pagesExtracted,
+      pageStart: paperContext.pageStart,
+      pageEnd: paperContext.pageEnd,
+      totalPages: paperContext.totalPages,
+      text: paperContext.text,
+    },
+  };
 
   return (
     <div style={{
@@ -564,6 +633,17 @@ export default function PracticeRoom({
               <span>{showFormula ? 'Hide Formula Sheet' : 'Formula Sheet'}</span>
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={() => setIsPaperAgentOpen(true)}
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--brand-experiment)' }}
+            title="Ask AI about this open paper"
+          >
+            <Sparkles size={16} />
+            <span>Ask AI</span>
+          </button>
 
           {isCompleted ? (
             <button
@@ -1382,6 +1462,12 @@ export default function PracticeRoom({
 
         </div>
       </div>
+
+      <AgentCommandCenter
+        isOpen={isPaperAgentOpen}
+        onClose={() => setIsPaperAgentOpen(false)}
+        appContext={paperAgentContext}
+      />
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import { resolveOpenRouterKey } from './openRouterKeyResolver.js';
+
 const DEFAULT_MODEL = 'openrouter/free';
 
 const SYSTEM_PROMPT = `You are a search query parser for an HSC (Higher School Certificate) exam portal.
@@ -25,12 +27,18 @@ export async function handleAgentSearchRequest(req, res, apiKey) {
     return;
   }
 
-  if (!apiKey) {
+  const keySelection = resolveOpenRouterKey(req, apiKey);
+  if (keySelection.error) {
+    res.statusCode = 400;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: keySelection.error }));
+    return;
+  }
+
+  if (!keySelection.key) {
     res.statusCode = 500;
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({
-      error: 'OpenRouter is not configured. Set OPENROUTER_API_KEY in your environment.',
-    }));
+    res.end(JSON.stringify({ error: 'AI is not configured. Set OPENROUTER_API_KEY on the server or add a personal key in Customise.' }));
     return;
   }
 
@@ -64,7 +72,7 @@ Extract intent matching the JSON schema.`;
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${keySelection.key}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://hsc-portal.local',
         'X-Title': 'HSC Portal Agentic Search',

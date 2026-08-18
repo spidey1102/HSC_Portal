@@ -1,3 +1,5 @@
+import { resolveOpenRouterKey } from './openRouterKeyResolver.js';
+
 const AGENT_MODEL = 'openrouter/free';
 
 const AGENT_SYSTEM_PROMPT = [
@@ -8,6 +10,7 @@ const AGENT_SYSTEM_PROMPT = [
   'Do not invent paper IDs or data. Only work with what the tools return.',
   'Keep your final responses concise — one or two sentences at most.',
   'Never use markdown headers or excessive formatting in your final response.',
+  'When selected-paper context is supplied, use it to give paper-aware guidance. The supplied PDF text contains every selectable-text page in the selected paper; you may discuss any included page or question, but never invent text that is not present in the supplied paper.',
 ].join(' ');
 
 /**
@@ -22,15 +25,6 @@ export async function handleAgentChatRequest(req, res, apiKey) {
     res.statusCode = 405;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ error: 'Method not allowed' }));
-    return;
-  }
-
-  if (!apiKey) {
-    res.statusCode = 500;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({
-      error: 'Agent chat is not configured. Set OPENROUTER_API_KEY in your environment.',
-    }));
     return;
   }
 
@@ -55,6 +49,21 @@ export async function handleAgentChatRequest(req, res, apiKey) {
   }
 
   const { messages, tools, tool_choice } = parsed;
+  const keySelection = resolveOpenRouterKey(req, apiKey);
+
+  if (keySelection.error) {
+    res.statusCode = 400;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: keySelection.error }));
+    return;
+  }
+
+  if (!keySelection.key) {
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'AI is not configured. Set OPENROUTER_API_KEY on the server or add a personal key in Customise.' }));
+    return;
+  }
 
   if (!Array.isArray(messages) || messages.length === 0) {
     res.statusCode = 400;
@@ -84,7 +93,7 @@ export async function handleAgentChatRequest(req, res, apiKey) {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${keySelection.key}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://hsc-portal.vercel.app',
         'X-Title': 'HSC Portal Agent',

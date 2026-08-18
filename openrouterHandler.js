@@ -1,3 +1,5 @@
+import { resolveOpenRouterKey } from './openRouterKeyResolver.js';
+
 const DEFAULT_MODEL = 'openrouter/free';
 
 const SYSTEM_PROMPT = [
@@ -27,10 +29,18 @@ export async function handleOpenRouterRequest(req, res, apiKey) {
     const cleanPrompt = String(parsed.prompt || '').trim();
     const cleanContext = String(parsed.context || '').trim();
     const cleanModel = String(parsed.model || DEFAULT_MODEL).trim() || DEFAULT_MODEL;
+    const keySelection = resolveOpenRouterKey(req, apiKey);
+    if (keySelection.error) {
+      res.statusCode = 400;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: keySelection.error }));
+      return;
+    }
+    const resolvedApiKey = keySelection.key;
     const maxTokens = Number.isFinite(Number(parsed.max_tokens)) ? Number(parsed.max_tokens) : 700;
     const temperature = Number.isFinite(Number(parsed.temperature)) ? Number(parsed.temperature) : 0.4;
 
-    if (!apiKey) {
+    if (!resolvedApiKey) {
       // Fallback to a local mock response when no API key is provided.
       // This enables a fast prototype experience without external API access.
       try {
@@ -57,7 +67,7 @@ export async function handleOpenRouterRequest(req, res, apiKey) {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${resolvedApiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://hsc-portal.local',
         'X-Title': 'HSC Portal',

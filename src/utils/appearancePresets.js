@@ -5,6 +5,7 @@ export const APPEARANCE_DEFAULTS = {
   preset: 'current',
   accent: 'forest',
   density: 'comfortable',
+  layout: 'standard',
 };
 
 export const APPEARANCE_PRESETS = {
@@ -213,6 +214,19 @@ export const DENSITY_OPTIONS = [
   },
 ];
 
+export const LAYOUT_OPTIONS = [
+  {
+    value: 'standard',
+    label: 'Standard',
+    description: 'Keeps the complete study workspace.',
+  },
+  {
+    value: 'focus',
+    label: 'Focus',
+    description: 'Hides visual extras so papers and search stay front and centre.',
+  },
+];
+
 export const APPEARANCE_VARIABLE_KEYS = [
   '--page-gradient-top',
   '--page-gradient-bottom',
@@ -249,8 +263,11 @@ export function loadAppearanceSettings() {
     const density = DENSITY_OPTIONS.some((option) => option.value === parsed?.density)
       ? parsed.density
       : APPEARANCE_DEFAULTS.density;
+    const layout = LAYOUT_OPTIONS.some((option) => option.value === parsed?.layout)
+      ? parsed.layout
+      : APPEARANCE_DEFAULTS.layout;
 
-    return { mode, preset, accent, density };
+    return { mode, preset, accent, density, layout };
   } catch (error) {
     return { ...APPEARANCE_DEFAULTS };
   }

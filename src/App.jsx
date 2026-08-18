@@ -5,15 +5,15 @@ import PracticeRoom from './components/PracticeRoom';
 import TextbooksView from './components/TextbooksView';
 import ExamCountdown from './components/ExamCountdown';
 import CustomCalendar from './components/CustomCalendar';
-import AgenticPaperFinder from './components/AgenticPaperFinder';
+import PaperSearch from './components/PaperSearch';
 import AgentCommandCenter from './components/AgentCommandCenter';
 import CustomizationMenu from './components/CustomizationMenu';
 import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock, BotMessageSquare, Palette } from 'lucide-react';
 import PaperHistory from './components/PaperHistory';
 import { Analytics } from '@vercel/analytics/react';
-import { findAgenticPaperMatchesAsync } from './utils/agenticPaperSearch';
 import { findPaperByIdentifier, getPaperRouteId } from './utils/paperIdentity';
 import { loadMySubjects } from './utils/mySubjects';
+import { loadOpenRouterSettings, saveOpenRouterSettings } from './utils/openRouterKeySettings';
 import {
   ACCENT_OPTIONS,
   APPEARANCE_DEFAULTS,
@@ -69,16 +69,7 @@ export default function App() {
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [selectedLevel, setSelectedLevel] = useState(12); // Year 12 (HSC) by default
   const [mySubjects, setMySubjects] = useState(() => loadMySubjects());
-  const [agentQuery, setAgentQuery] = useState('');
-  const [agentLoading, setAgentLoading] = useState(false);
-  const [agentResult, setAgentResult] = useState({
-    intent: {},
-    papers: [],
-    total: 0,
-    applied: false,
-    summary: '',
-    isAiAssisted: false,
-  });
+  const [paperSearchQuery, setPaperSearchQuery] = useState('');
 
   // Bookmarks State
   const [viewBookmarks, setViewBookmarks] = useState(false);
@@ -162,8 +153,15 @@ export default function App() {
     hash: window.location.hash || '',
   }));
 
-  // Mobile sidebar toggle
+  // Sidebar controls
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => (
+    localStorage.getItem('hsc_sidebar_collapsed') === 'true'
+  ));
+
+  useEffect(() => {
+    localStorage.setItem('hsc_sidebar_collapsed', String(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
 
   // Appearance state
   const [appearance, setAppearance] = useState(loadAppearanceSettings);
@@ -185,6 +183,8 @@ export default function App() {
 
   // Agent Command Center state
   const [isAgentOpen, setIsAgentOpen] = useState(false);
+  // Personal API keys are held in browser session storage only; they never enter Firestore.
+  const [openRouterSettings, setOpenRouterSettings] = useState(loadOpenRouterSettings);
 
   // Pagination Limit
   const [renderLimit, setRenderLimit] = useState(40);
@@ -219,6 +219,7 @@ export default function App() {
     root.setAttribute('data-theme', theme);
     root.setAttribute('data-palette', appearance.preset);
     root.setAttribute('data-density', appearance.density);
+    root.setAttribute('data-layout', appearance.layout);
 
     APPEARANCE_VARIABLE_KEYS.forEach((key) => root.style.removeProperty(key));
     Object.entries(presetVars || {}).forEach(([key, value]) => {
@@ -246,6 +247,14 @@ export default function App() {
       return next;
     });
   }, [updateRemote]);
+
+  const updateOpenRouterSettings = useCallback((patch) => {
+    setOpenRouterSettings((current) => {
+      const next = { ...current, ...patch };
+      saveOpenRouterSettings(next);
+      return next;
+    });
+  }, []);
 
   // Persist selectedSubject to Firestore whenever it changes (after initial restore)
   const prevSelectedSubjectRef = useRef(undefined);
@@ -318,42 +327,6 @@ export default function App() {
         setLoading(false);
       });
   }, []);
-
-  // Async Agentic Search Trigger
-  useEffect(() => {
-    let active = true;
-    const query = agentQuery.trim();
-
-    if (!query) {
-      setAgentResult({
-        intent: {},
-        papers: [],
-        total: 0,
-        applied: false,
-        summary: '',
-        isAiAssisted: false,
-      });
-      setAgentLoading(false);
-      return;
-    }
-
-    setAgentLoading(true);
-    findAgenticPaperMatchesAsync(query, papers, subjects, schools, { defaultLevel: selectedLevel })
-      .then((res) => {
-        if (!active) return;
-        setAgentResult(res);
-        setAgentLoading(false);
-      })
-      .catch((err) => {
-        if (!active) return;
-        console.error('Agentic search error:', err);
-        setAgentLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [agentQuery, papers, subjects, schools, selectedLevel]);
 
   // Save Bookmarks to localStorage
   const toggleBookmark = (viewno) => {
@@ -554,7 +527,7 @@ export default function App() {
   }, [
     selectedSubject,
     selectedLevel,
-    agentQuery,
+    paperSearchQuery,
     viewBookmarks,
     viewTextbooks,
     viewHistory,
@@ -593,16 +566,43 @@ export default function App() {
 
   // Filter papers array
   const filteredPapers = useMemo(() => {
-    return papers.filter(p => {
+    const searchTerms = paperSearchQuery
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    return papers.filter((p) => {
       // 1. Level filter (Prelim vs HSC) - ignore if viewing bookmarks
       if (!viewBookmarks && p.l !== selectedLevel) return false;
-      
+
       // 2. Bookmarked filter
       if (viewBookmarks && !bookmarks.has(p.v + '_' + p.n)) return false;
-      
+
       // 3. Subject filter
       if (!matchesSubjectFilter(p)) return false;
-      
+
+      // 4. Standard search: match every typed term against the paper metadata.
+      if (searchTerms.length > 0) {
+        const category = p.c === 'H'
+          ? 'official hsc'
+          : p.c === 'T'
+            ? 'trial exam'
+            : p.c === 'A'
+              ? 'assessment task'
+              : '';
+        const searchable = [
+          p.n,
+          subjects[p.s],
+          schools[p.h],
+          p.y,
+          category,
+          p.w === 1 ? 'solutions answers' : '',
+        ].join(' ').toLowerCase();
+
+        if (!searchTerms.every((term) => searchable.includes(term))) return false;
+      }
+
       return true;
     });
   }, [
@@ -611,6 +611,9 @@ export default function App() {
     selectedLevel,
     viewBookmarks,
     bookmarks,
+    paperSearchQuery,
+    subjects,
+    schools,
     matchesSubjectFilter
   ]);
 
@@ -624,27 +627,13 @@ export default function App() {
     return list;
   }, [filteredPapers]);
 
-  const agentSearchActive = agentResult.applied;
-
-  const visiblePaperRows = useMemo(() => {
-    if (agentSearchActive) {
-      return agentResult.papers
-        .filter((item) => matchesSubjectFilter(item.paper))
-        .map((item) => ({
-          paper: item.paper,
-          matchReasons: item.reasons,
-        }));
-    }
-
-    return sortedPapers.map((paper) => ({
-      paper,
-      matchReasons: [],
-    }));
-  }, [agentResult, agentSearchActive, matchesSubjectFilter, sortedPapers]);
+  const visiblePaperRows = useMemo(() => (
+    sortedPapers.map((paper) => ({ paper, matchReasons: [] }))
+  ), [sortedPapers]);
 
   const resetFilters = () => {
     setSelectedSubject(null);
-    setAgentQuery('');
+    setPaperSearchQuery('');
   };
 
   const paginatedPaperRows = visiblePaperRows.slice(0, renderLimit);
@@ -722,12 +711,22 @@ export default function App() {
           schools={schools}
           onSharePaper={() => sharePaper(activePaper)}
           onSelectPaper={openPaper}
+          agentContext={{
+            papers,
+            subjects,
+            schools,
+            bookmarks,
+            toggleBookmark,
+            addCalendarEvent,
+            selectedLevel,
+            openRouterSettings,
+          }}
         />
     );
   }
 
   return (
-    <div className={`app-container ${isSidebarOpen ? 'sidebar-visible' : ''}`}>
+    <div className={`app-container ${isSidebarOpen ? 'sidebar-visible' : ''} ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       {/* Mobile Sidebar Backdrop */}
       {isSidebarOpen && (
         <div
@@ -754,6 +753,8 @@ export default function App() {
           bookmarksCount={bookmarks.size}
           totalPapersCount={papers.length}
           subjectCounts={subjectCounts}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
           onCloseMobile={() => setIsSidebarOpen(false)}
         />
       </div>
@@ -857,6 +858,8 @@ export default function App() {
           isOpen={isCustomizationOpen}
           settings={appearance}
           onChange={updateAppearance}
+          aiSettings={openRouterSettings}
+          onAiSettingsChange={updateOpenRouterSettings}
           onClose={() => setIsCustomizationOpen(false)}
         />
 
@@ -921,18 +924,11 @@ export default function App() {
                 </section>
 
                 <section className="content-band">
-                  {!viewBookmarks && (
-                    <AgenticPaperFinder
-                      value={agentQuery}
-                      onSearch={(query) => setAgentQuery(query.trim())}
-                      onClear={() => setAgentQuery('')}
-                      result={agentResult}
-                      disabled={loading || agentLoading}
-                      loading={agentLoading}
-                    />
-                  )}
-
-
+                  <PaperSearch
+                    value={paperSearchQuery}
+                    onChange={setPaperSearchQuery}
+                    disabled={loading}
+                  />
 
                   {loading ? (
                     <div style={{
@@ -956,15 +952,15 @@ export default function App() {
                       <div className="results-header">
                         <span>
                           {visiblePaperRows.length.toLocaleString()} matches
-                          {!agentSearchActive && selectedSubject !== null && ` in ${subjects[selectedSubject]}`}
-                          {agentSearchActive && ' ranked by agent finder'}
+                          {selectedSubject !== null && ` in ${subjects[selectedSubject]}`}
+                          {paperSearchQuery.trim() && ` for “${paperSearchQuery.trim()}”`}
                         </span>
                         <span>Showing {Math.min(renderLimit, visiblePaperRows.length).toLocaleString()}</span>
                       </div>
 
                       {visiblePaperRows.length > 0 ? (
                         <div className="papers-grid">
-                          {paginatedPaperRows.map(({ paper, matchReasons }, idx) => (
+                          {paginatedPaperRows.map(({ paper }, idx) => (
                             <PaperCard
                               key={`${paper.v}-${idx}`}
                               paper={paper}
@@ -974,19 +970,18 @@ export default function App() {
                               toggleBookmark={() => toggleBookmark(paper.v + '_' + paper.n)}
                               sharePaper={() => sharePaper(paper)}
                               onSelectPaper={openPaper}
-                              matchReasons={matchReasons}
                             />
                           ))}
                         </div>
                       ) : (
                         <div className="empty-state">
                           <h3 style={{ color: 'var(--header-primary)', marginBottom: '8px' }}>
-                            {agentSearchActive ? 'Agent couldn\'t find matches' : 'No matches found'}
+                            No matching papers
                           </h3>
                           <p style={{ marginBottom: '16px' }}>
-                            {agentSearchActive
-                              ? `No papers matched "${agentQuery}". Try rephrasing or use the normal filters.`
-                              : 'Try resetting your filters or searching for different terms.'}
+                            {paperSearchQuery.trim()
+                              ? `No papers match “${paperSearchQuery.trim()}”. Try a shorter search or clear your filters.`
+                              : 'Try resetting your filters or choosing a different subject.'}
                           </p>
                           <button onClick={resetFilters} className="btn-primary">
                             Reset filters
@@ -1028,6 +1023,7 @@ export default function App() {
           toggleBookmark,
           addCalendarEvent,
           selectedLevel,
+          openRouterSettings,
         }}
       />
 

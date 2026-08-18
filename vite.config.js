@@ -5,6 +5,8 @@ import { handleAgentSearchRequest } from './agentSearchHandler.js'
 import findAgentHandler from './api/agent/find.js'
 import extractAgentHandler from './api/agent/extract.js'
 import askAgentHandler from './api/agent/ask.js'
+import paperContextHandler from './api/agent/paper-context.js'
+import { handleAgentChatRequest } from './agentChatHandler.js'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -14,7 +16,7 @@ export default defineConfig(({ mode }) => {
     server: {
       host: '0.0.0.0',
       port: 3000,
-      allowedHosts: 'all',
+      allowedHosts: ['.manus.computer'],
     },
     plugins: [
       react(),
@@ -73,6 +75,28 @@ export default defineConfig(({ mode }) => {
             }
 
             await askAgentHandler(req, res)
+          })
+
+          server.middlewares.use('/api/agent/paper-context', async (req, res, next) => {
+            if (req.method !== 'GET') {
+              next()
+              return
+            }
+
+            await paperContextHandler(req, res)
+          })
+
+          server.middlewares.use('/api/agent-chat', async (req, res, next) => {
+            if (req.method !== 'POST') {
+              next()
+              return
+            }
+
+            await handleAgentChatRequest(
+              req,
+              res,
+              env.OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY
+            )
           })
         },
       },

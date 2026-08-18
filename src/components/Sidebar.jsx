@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, GraduationCap, Calendar, Database, Library, Bookmark, X, Smartphone, Share2, PlusSquare } from 'lucide-react';
+import { BookOpen, GraduationCap, Calendar, Database, Library, Bookmark, X, Smartphone, Share2, PlusSquare, ChevronLeft, ChevronRight } from 'lucide-react';
 
 function SidebarButton({ active, icon: Icon, label, onClick, color = 'var(--text-normal)' }) {
   return (
@@ -8,6 +8,8 @@ function SidebarButton({ active, icon: Icon, label, onClick, color = 'var(--text
       onClick={onClick}
       className={`sidebar-button ${active ? 'is-active' : ''}`}
       style={{ color }}
+      title={label}
+      aria-label={label}
     >
       <Icon size={16} />
       <span>{label}</span>
@@ -31,6 +33,8 @@ export default function Sidebar({
   bookmarksCount,
   totalPapersCount,
   subjectCounts,
+  isCollapsed,
+  onToggleCollapse,
   onCloseMobile
 }) {
   const [showInstallModal, setShowInstallModal] = useState(false);
@@ -47,29 +51,40 @@ export default function Sidebar({
   return (
     <aside className="study-sidebar">
       <div className="study-sidebar-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+        <div className="study-sidebar-brand">
           <div className="study-brand-mark">
             <GraduationCap size={20} />
           </div>
-          <div style={{ minWidth: 0 }}>
+          <div className="study-sidebar-brand-copy">
             <div className="study-sidebar-kicker">HSC Portal</div>
             <div className="study-sidebar-title">Study map</div>
           </div>
         </div>
-        {onCloseMobile && (
+        <div className="study-sidebar-header-actions">
           <button
             type="button"
-            className="btn-secondary mobile-sidebar-close"
-            onClick={onCloseMobile}
-            style={{ padding: '6px' }}
-            aria-label="Close menu"
+            className="btn-secondary sidebar-collapse-btn"
+            onClick={onToggleCollapse}
+            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            <X size={18} />
+            {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
-        )}
+          {onCloseMobile && (
+            <button
+              type="button"
+              className="btn-secondary mobile-sidebar-close"
+              onClick={onCloseMobile}
+              style={{ padding: '6px' }}
+              aria-label="Close menu"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="sidebar-section">
+      <div className="sidebar-section sidebar-section--views">
         <div className="sidebar-section-label">View</div>
         <div className="sidebar-button-stack">
           <SidebarButton
@@ -118,7 +133,7 @@ export default function Sidebar({
         </div>
       </div>
 
-      <div className="sidebar-section">
+      <div className="sidebar-section sidebar-section--year">
         <div className="sidebar-section-label">Year level</div>
         <div className="sidebar-chip-row">
           <button
@@ -148,7 +163,7 @@ export default function Sidebar({
         </div>
       </div>
 
-      <div className="sidebar-section sidebar-scroll-section">
+      <div className="sidebar-section sidebar-section--subjects sidebar-scroll-section">
         <div className="sidebar-section-label">Subjects</div>
         <button
           type="button"

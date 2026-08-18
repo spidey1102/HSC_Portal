@@ -1,6 +1,7 @@
 import fs from 'fs'
 import { resolve } from 'path'
 import { generateMockAnswer } from '../../openrouterHandler.js'
+import { resolveOpenRouterKey } from '../../openRouterKeyResolver.js'
 
 async function readJsonBody(req) {
   let body = ''
@@ -31,9 +32,16 @@ export default async function handler(req, res) {
 
     const context = [`Paper title: ${paperTitle}`, `Question: ${questionText}`].join('\n')
 
-    // If an OpenRouter API key is configured in environment, call it.
-    const apiKey = process.env.OPENROUTER_API_KEY
-    if (!apiKey) {
+    const keySelection = resolveOpenRouterKey(req, process.env.OPENROUTER_API_KEY)
+    if (keySelection.error) {
+      res.statusCode = 400
+      res.setHeader('Content-Type', 'application/json')
+      res.end(JSON.stringify({ error: keySelection.error }))
+      return
+    }
+
+    // If neither key source is available, keep the local prototype fallback.
+    if (!keySelection.key) {
       const answer = generateMockAnswer(prompt || '', context)
       res.statusCode = 200
       res.setHeader('Content-Type', 'application/json')
@@ -45,7 +53,7 @@ export default async function handler(req, res) {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${keySelection.key}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://hsc-portal',
         'X-Title': 'HSC Portal',
