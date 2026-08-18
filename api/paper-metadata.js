@@ -186,6 +186,11 @@ async function readMetadata({ paper, sourceFingerprint }) {
 }
 
 export default async function handler(req, res) {
+  // Only a request that successfully claimed a fresh analysis may mark its document
+  // as failed. This prevents auth, lookup, or response errors from corrupting an
+  // already-ready shared cache entry.
+  let claimedAnalysisRef = null;
+
   if (!['GET', 'POST'].includes(req.method)) {
     sendJson(res, 405, { error: 'Method not allowed.' });
     return;
@@ -262,6 +267,7 @@ export default async function handler(req, res) {
       return;
     }
 
+    claimedAnalysisRef = ref;
     const extracted = await extractFullPaperText(paper);
     if (extracted.status !== 'ready' || !extracted.text) {
       throw new Error(extracted.reason || 'The PDF does not expose readable text for question extraction.');
@@ -281,21 +287,19 @@ export default async function handler(req, res) {
       updatedAt: FieldValue.serverTimestamp(),
     };
     await ref.set(stored, { merge: true });
+    claimedAnalysisRef = null;
     sendJson(res, 200, publicMetadata({ ...analysis, paperKey: paperIdentity(paper) }, { cached: false }));
   } catch (error) {
-    try {
-      const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-      const paper = loadPaperRecord(requestUrl.searchParams.get('paperId'), requestUrl.searchParams.get('paperName'));
-      if (paper) {
-        const db = getAdminFirestore();
-        await db.collection(METADATA_COLLECTION).doc(metadataDocumentId(paper)).set({
+    if (claimedAnalysisRef) {
+      try {
+        await claimedAnalysisRef.set({
           status: 'error',
           analysisStartedAtMillis: FieldValue.delete(),
           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
+      } catch (recordError) {
+        // Preserve the original failure for the client even if error recording is unavailable.
       }
-    } catch (recordError) {
-      // Preserve the original failure for the client even if error recording is unavailable.
     }
 
     const status = /Sign in is required|sign-in session/i.test(String(error?.message || '')) ? 401 : 500;
