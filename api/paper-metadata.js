@@ -211,6 +211,10 @@ export default async function handler(req, res) {
     }
 
     const sourceFingerprint = getPaperSourceFingerprint(paper);
+    // GET is deliberately public for reusable paper structure. Every POST is an
+    // analysis request and must authenticate before even returning a cache hit.
+    if (req.method === 'POST') await requireAuthenticatedUser(req);
+
     const initial = await readMetadata({ paper, sourceFingerprint });
     if (initial.data) {
       sendJson(res, 200, publicMetadata(initial.data));
@@ -222,7 +226,6 @@ export default async function handler(req, res) {
       return;
     }
 
-    await requireAuthenticatedUser(req);
     const db = getAdminFirestore();
     const ref = initial.ref;
     const now = Date.now();
