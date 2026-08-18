@@ -15,6 +15,18 @@ import { Analytics } from '@vercel/analytics/react';
 import { findPaperByIdentifier, getPaperRouteId } from './utils/paperIdentity';
 import { loadMySubjects } from './utils/mySubjects';
 import { getAdaptiveRecommendations, loadRecommendationHistory } from './utils/adaptiveRecommendations';
+import {
+  COMPLETED_PAPERS_STORAGE_KEY,
+  mergeCompletedPapers,
+  mergeMySubjects,
+  mergeViewedPapers,
+  MY_SUBJECTS_STORAGE_KEY,
+  notifyStudySyncUpdate,
+  readStoredArray,
+  sameSerializedValue,
+  VIEWED_PAPERS_STORAGE_KEY,
+  writeStoredArray,
+} from './utils/studySync';
 import { loadOpenRouterSettings, saveOpenRouterSettings } from './utils/openRouterKeySettings';
 import {
   ACCENT_OPTIONS,
@@ -33,7 +45,7 @@ import UserButton from './components/UserButton';
 const PAPER_PAGE_SIZE = 40;
 
 export default function App() {
-  const { data, updateRemote } = useSync();
+  const { data, updateRemote, updateRemoteFields } = useSync();
   const { user, loading: authLoading, signInWithGoogle } = useAuth();
   
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
@@ -91,6 +103,8 @@ export default function App() {
     }
   }, [data?.bookmarks]);
 
+  const hasRestoredStudySyncRef = useRef(false);
+
   useEffect(() => {
     const syncMySubjects = () => setMySubjects(loadMySubjects());
     const handleStorage = (event) => {
@@ -107,6 +121,77 @@ export default function App() {
       window.removeEventListener('storage', handleStorage);
     };
   }, []);
+
+  useEffect(() => {
+    if (!user || !data) return;
+
+    if (hasRestoredStudySyncRef.current) {
+      const remoteSubjects = mergeMySubjects(data.mySubjects, []);
+      const remoteViewed = mergeViewedPapers(data.viewedPapers, []);
+      const remoteCompleted = mergeCompletedPapers(data.completedPapers, []);
+      let didRestoreLocalData = false;
+
+      if (!sameSerializedValue(loadMySubjects(), remoteSubjects)) {
+        localStorage.setItem(MY_SUBJECTS_STORAGE_KEY, JSON.stringify(remoteSubjects));
+        setMySubjects(remoteSubjects);
+        didRestoreLocalData = true;
+      }
+      if (!sameSerializedValue(readStoredArray(VIEWED_PAPERS_STORAGE_KEY), remoteViewed)) {
+        writeStoredArray(VIEWED_PAPERS_STORAGE_KEY, remoteViewed);
+        didRestoreLocalData = true;
+      }
+      if (!sameSerializedValue(readStoredArray(COMPLETED_PAPERS_STORAGE_KEY), remoteCompleted)) {
+        writeStoredArray(COMPLETED_PAPERS_STORAGE_KEY, remoteCompleted);
+        didRestoreLocalData = true;
+      }
+      if (didRestoreLocalData) notifyStudySyncUpdate();
+      return;
+    }
+
+    const localSubjects = loadMySubjects();
+    const localViewed = readStoredArray(VIEWED_PAPERS_STORAGE_KEY);
+    const localCompleted = readStoredArray(COMPLETED_PAPERS_STORAGE_KEY);
+    const mergedSubjects = mergeMySubjects(data.mySubjects, localSubjects);
+    const mergedViewed = mergeViewedPapers(data.viewedPapers, localViewed);
+    const mergedCompleted = mergeCompletedPapers(data.completedPapers, localCompleted);
+
+    hasRestoredStudySyncRef.current = true;
+
+    if (!sameSerializedValue(localSubjects, mergedSubjects)) {
+      localStorage.setItem(MY_SUBJECTS_STORAGE_KEY, JSON.stringify(mergedSubjects));
+      setMySubjects(mergedSubjects);
+    }
+    if (!sameSerializedValue(localViewed, mergedViewed)) writeStoredArray(VIEWED_PAPERS_STORAGE_KEY, mergedViewed);
+    if (!sameSerializedValue(localCompleted, mergedCompleted)) writeStoredArray(COMPLETED_PAPERS_STORAGE_KEY, mergedCompleted);
+    notifyStudySyncUpdate();
+
+    const remotePatch = {};
+    if (!sameSerializedValue(data.mySubjects || [], mergedSubjects)) remotePatch.mySubjects = mergedSubjects;
+    if (!sameSerializedValue(data.viewedPapers || [], mergedViewed)) remotePatch.viewedPapers = mergedViewed;
+    if (!sameSerializedValue(data.completedPapers || [], mergedCompleted)) remotePatch.completedPapers = mergedCompleted;
+    updateRemoteFields(remotePatch);
+  }, [data, updateRemoteFields, user]);
+
+  useEffect(() => {
+    if (!user) return undefined;
+
+    const syncSubjects = () => updateRemote('mySubjects', loadMySubjects());
+    const syncHistory = () => updateRemoteFields({
+      viewedPapers: readStoredArray(VIEWED_PAPERS_STORAGE_KEY),
+      completedPapers: readStoredArray(COMPLETED_PAPERS_STORAGE_KEY),
+    });
+
+    window.addEventListener('hsc:my-subjects-updated', syncSubjects);
+    window.addEventListener('hsc:history-updated', syncHistory);
+    return () => {
+      window.removeEventListener('hsc:my-subjects-updated', syncSubjects);
+      window.removeEventListener('hsc:history-updated', syncHistory);
+    };
+  }, [updateRemote, updateRemoteFields, user]);
+
+  useEffect(() => {
+    if (!user) hasRestoredStudySyncRef.current = false;
+  }, [user]);
 
   useEffect(() => {
     localStorage.setItem('hsc_recommendation_paper_type', recommendationPaperType);

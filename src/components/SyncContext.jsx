@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 
 const SyncContext = createContext();
 
@@ -21,21 +21,38 @@ export function SyncProvider({ children }) {
         setData(docSnap.data());
       } else {
         // Initialize if doesn't exist
-        setDoc(userRef, { bookmarks: [], assessments: [], appearance: {}, selectedSubject: null, selectedLevel: 12, updatedAt: new Date() });
+                  setDoc(userRef, {
+            bookmarks: [],
+            assessments: [],
+            appearance: {},
+            selectedSubject: null,
+            selectedLevel: 12,
+            mySubjects: [],
+            viewedPapers: [],
+            completedPapers: [],
+            updatedAt: new Date(),
+          });
+
       }
     });
 
     return unsubscribe;
   }, [user]);
 
-  const updateRemote = async (key, value) => {
+  const updateRemote = useCallback(async (key, value) => {
     if (!user) return;
     const userRef = doc(db, 'users', user.uid);
     await setDoc(userRef, { [key]: value, updatedAt: new Date() }, { merge: true });
-  };
+  }, [user]);
+
+  const updateRemoteFields = useCallback(async (patch) => {
+    if (!user || !patch || Object.keys(patch).length === 0) return;
+    const userRef = doc(db, 'users', user.uid);
+    await setDoc(userRef, { ...patch, updatedAt: new Date() }, { merge: true });
+  }, [user]);
 
   return (
-    <SyncContext.Provider value={{ data, updateRemote }}>
+    <SyncContext.Provider value={{ data, updateRemote, updateRemoteFields }}>
       {children}
     </SyncContext.Provider>
   );
