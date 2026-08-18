@@ -6,6 +6,7 @@ export const APPEARANCE_DEFAULTS = {
   accent: 'forest',
   density: 'comfortable',
   layout: 'standard',
+  showRecommendations: true,
 };
 
 export const APPEARANCE_PRESETS = {
@@ -266,8 +267,9 @@ export function loadAppearanceSettings() {
     const layout = LAYOUT_OPTIONS.some((option) => option.value === parsed?.layout)
       ? parsed.layout
       : APPEARANCE_DEFAULTS.layout;
+    const showRecommendations = parsed?.showRecommendations !== false;
 
-    return { mode, preset, accent, density, layout };
+    return { mode, preset, accent, density, layout, showRecommendations };
   } catch (error) {
     return { ...APPEARANCE_DEFAULTS };
   }

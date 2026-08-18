@@ -1,6 +1,13 @@
-import { Search, X } from 'lucide-react';
+import { ArrowDownUp, Search, X } from 'lucide-react';
 
-export default function PaperSearch({ value, onChange, disabled = false }) {
+export default function PaperSearch({
+  value,
+  onChange,
+  sortBy,
+  onSortChange,
+  sortOptions = [],
+  disabled = false,
+}) {
   const hasSearch = Boolean(value?.trim());
 
   return (
@@ -14,29 +21,45 @@ export default function PaperSearch({ value, onChange, disabled = false }) {
         <Search size={18} aria-hidden="true" />
       </div>
 
-      <label className="paper-search-input" htmlFor="paper-search-input">
-        <Search size={16} aria-hidden="true" />
-        <input
-          id="paper-search-input"
-          type="search"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder="Search papers, subjects, schools, or years"
-          disabled={disabled}
-          autoComplete="off"
-        />
-        {hasSearch && (
-          <button
-            type="button"
-            className="paper-search-clear"
-            onClick={() => onChange('')}
-            aria-label="Clear paper search"
-            title="Clear search"
+      <div className="paper-search-controls">
+        <label className="paper-search-input" htmlFor="paper-search-input">
+          <Search size={16} aria-hidden="true" />
+          <input
+            id="paper-search-input"
+            type="search"
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder="Search papers, subjects, schools, or years"
+            disabled={disabled}
+            autoComplete="off"
+          />
+          {hasSearch && (
+            <button
+              type="button"
+              className="paper-search-clear"
+              onClick={() => onChange('')}
+              aria-label="Clear paper search"
+              title="Clear search"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </label>
+
+        <label className="paper-sort-control" htmlFor="paper-sort-select">
+          <span className="paper-sort-label"><ArrowDownUp size={15} aria-hidden="true" /> Sort by</span>
+          <select
+            id="paper-sort-select"
+            value={sortBy}
+            onChange={(event) => onSortChange(event.target.value)}
+            disabled={disabled}
           >
-            <X size={16} />
-          </button>
-        )}
-      </label>
+            {sortOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </label>
+      </div>
     </section>
   );
 }

@@ -114,6 +114,24 @@ export default function CustomizationMenu({
 
             <section className="appearance-section">
               <div className="appearance-section-header">
+                <div className="appearance-section-title">Suggested Next</div>
+                <div className="appearance-section-note">Show or hide the recommendation box above paper search.</div>
+              </div>
+              <div className="appearance-option-grid appearance-option-grid--compact">
+                <OptionButton
+                  active={settings.showRecommendations !== false}
+                  label={settings.showRecommendations !== false ? 'Show Suggested Next' : 'Hide Suggested Next'}
+                  description={settings.showRecommendations !== false
+                    ? 'Recommendations are visible on the paper library.'
+                    : 'The paper library opens directly to search and results.'}
+                  icon={settings.showRecommendations !== false ? Eye : EyeOff}
+                  onClick={() => onChange({ showRecommendations: settings.showRecommendations === false })}
+                />
+              </div>
+            </section>
+
+            <section className="appearance-section">
+              <div className="appearance-section-header">
                 <div className="appearance-section-title">Presets</div>
                 <div className="appearance-section-note">Use one of the existing looks or switch to a new study palette.</div>
               </div>

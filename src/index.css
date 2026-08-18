@@ -552,6 +552,64 @@ textarea:focus,
   color: var(--header-primary);
 }
 
+.paper-search-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.paper-search-controls .paper-search-input {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.paper-sort-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.paper-sort-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.paper-sort-control select {
+  min-height: 42px;
+  padding: 0 32px 0 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 11px;
+  background: var(--bg-tertiary);
+  color: var(--text-normal);
+  font: inherit;
+}
+
+.paper-sort-control select:focus-visible {
+  outline: 2px solid var(--brand-experiment);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .paper-search-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .paper-sort-control {
+    justify-content: space-between;
+  }
+
+  .paper-sort-control select {
+    flex: 1;
+  }
+}
+
 .papers-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

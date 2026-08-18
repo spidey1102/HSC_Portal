@@ -53,6 +53,12 @@ import { useAuth } from './components/AuthContext';
 import UserButton from './components/UserButton';
 
 const PAPER_PAGE_SIZE = 40;
+const PAPER_SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'title', label: 'Title A–Z' },
+  { value: 'school', label: 'School A–Z' },
+];
 
 export default function App() {
   const { data, updateRemote, updateRemoteFields } = useSync();
@@ -96,6 +102,10 @@ export default function App() {
   const [selectedLevel, setSelectedLevel] = useState(12); // Year 12 (HSC) by default
   const [mySubjects, setMySubjects] = useState(() => loadMySubjects());
   const [paperSearchQuery, setPaperSearchQuery] = useState('');
+  const [paperSort, setPaperSort] = useState(() => {
+    const storedSort = localStorage.getItem('hsc_paper_sort');
+    return PAPER_SORT_OPTIONS.some((option) => option.value === storedSort) ? storedSort : 'newest';
+  });
   const [recommendationHistory, setRecommendationHistory] = useState(() => loadRecommendationHistory());
   const [recommendationPaperType, setRecommendationPaperType] = useState(() => localStorage.getItem('hsc_recommendation_paper_type') || 'all');
 
@@ -234,6 +244,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('hsc_recommendation_paper_type', recommendationPaperType);
   }, [recommendationPaperType]);
+
+  useEffect(() => {
+    localStorage.setItem('hsc_paper_sort', paperSort);
+  }, [paperSort]);
 
   useEffect(() => {
     const refreshRecommendationHistory = () => setRecommendationHistory(loadRecommendationHistory());
@@ -684,6 +698,7 @@ export default function App() {
     selectedSubject,
     selectedLevel,
     paperSearchQuery,
+    paperSort,
     viewBookmarks,
     viewTextbooks,
     viewHistory,
@@ -775,13 +790,23 @@ export default function App() {
 
   const sortedPapers = useMemo(() => {
     const list = [...filteredPapers];
+    const compareText = (left, right) => String(left || '').localeCompare(String(right || ''), undefined, {
+      numeric: true,
+      sensitivity: 'base',
+    });
+    const compareNewest = (a, b) => {
+      const yearDelta = (parseInt(String(b.y), 10) || -1) - (parseInt(String(a.y), 10) || -1);
+      return yearDelta || compareText(a.n, b.n) || compareText(a.v, b.v);
+    };
+
     list.sort((a, b) => {
-      const ya = parseInt(String(a.y), 10) || -1;
-      const yb = parseInt(String(b.y), 10) || -1;
-      return yb - ya;
+      if (paperSort === 'oldest') return -compareNewest(a, b);
+      if (paperSort === 'title') return compareText(a.n, b.n) || compareNewest(a, b);
+      if (paperSort === 'school') return compareText(schools[a.h], schools[b.h]) || compareText(a.n, b.n) || compareNewest(a, b);
+      return compareNewest(a, b);
     });
     return list;
-  }, [filteredPapers]);
+  }, [filteredPapers, paperSort, schools]);
 
   const visiblePaperRows = useMemo(() => (
     sortedPapers.map((paper) => ({ paper, matchReasons: [] }))
@@ -1181,7 +1206,7 @@ export default function App() {
                 </section>
 
                 <section className="content-band">
-                  {!viewBookmarks && !paperSearchQuery.trim() && !loading && !error && (
+                  {!viewBookmarks && appearance.showRecommendations && !paperSearchQuery.trim() && !loading && !error && (
                     <AdaptiveRecommendations
                       recommendations={adaptiveRecommendations}
                       subjects={subjects}
@@ -1199,6 +1224,9 @@ export default function App() {
                   <PaperSearch
                     value={paperSearchQuery}
                     onChange={setPaperSearchQuery}
+                    sortBy={paperSort}
+                    onSortChange={setPaperSort}
+                    sortOptions={PAPER_SORT_OPTIONS}
                     disabled={loading}
                   />
 
