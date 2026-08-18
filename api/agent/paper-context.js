@@ -1,6 +1,14 @@
 import fs from 'fs'
 import { resolve } from 'path'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import { WorkerMessageHandler } from 'pdfjs-dist/legacy/build/pdf.worker.mjs'
+
+// The serverless runtime does not retain pdf.js's dynamically imported worker file.
+// Register a directly imported worker handler instead, which lets pdf.js use its
+// Node-compatible in-process worker without resolving a separate runtime module.
+if (!globalThis.pdfjsWorker) {
+  globalThis.pdfjsWorker = { WorkerMessageHandler }
+}
 
 export const maxDuration = 60;
 
