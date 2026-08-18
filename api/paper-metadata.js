@@ -11,8 +11,10 @@ export const maxDuration = 60;
 const PAPER_ID_FIELDS = ['v', 's', 'l', 'c', 'y', 'h', 'w', 'n'];
 const METADATA_COLLECTION = 'paperMetadata';
 const EXTRACTION_VERSION = 'question-marks-v1';
-const ANALYSIS_LOCK_MS = 6 * 60 * 1000;
+const ANALYSIS_LOCK_MS = 2 * 60 * 1000;
 const MAX_ANALYSIS_TEXT_CHARS = 150000;
+const ANALYSIS_PROVIDER_TIMEOUT_MS = 55 * 1000;
+const MAX_ANALYSIS_OUTPUT_TOKENS = 3000;
 const DEFAULT_MODEL = 'openrouter/free';
 
 function sendJson(res, status, payload) {
@@ -117,44 +119,58 @@ function buildAnalysisPrompt(paper, paperText) {
   ].join('\n');
 }
 
-async function callPaperAnalysis(prompt) {
+export async function callPaperAnalysis(prompt, { timeoutMs = ANALYSIS_PROVIDER_TIMEOUT_MS } = {}) {
   const apiKey = String(process.env.OPENROUTER_API_KEY || '').trim();
   if (!apiKey) throw new Error('The portal AI key is not configured for paper analysis.');
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://hscportal.pages.dev',
-      'X-Title': 'HSC Portal paper metadata cache',
-    },
-    body: JSON.stringify({
-      model: String(process.env.PAPER_METADATA_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL,
-      messages: [
-        { role: 'system', content: 'Return only strictly valid JSON. Never include markdown fences.' },
-        { role: 'user', content: prompt },
-      ],
-      max_tokens: 7000,
-      temperature: 0,
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-  const raw = await response.text();
-  let payload = null;
   try {
-    payload = JSON.parse(raw);
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://hscportal.pages.dev',
+        'X-Title': 'HSC Portal paper metadata cache',
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: String(process.env.PAPER_METADATA_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL,
+        messages: [
+          { role: 'system', content: 'Return only strictly valid JSON. Never include markdown fences.' },
+          { role: 'user', content: prompt },
+        ],
+        max_tokens: MAX_ANALYSIS_OUTPUT_TOKENS,
+        temperature: 0,
+        provider: { sort: 'throughput' },
+      }),
+    });
+
+    const raw = await response.text();
+    let payload = null;
+    try {
+      payload = JSON.parse(raw);
+    } catch (error) {
+      // The error message below deliberately avoids exposing the raw provider response.
+    }
+
+    if (!response.ok) {
+      throw new Error(payload?.error?.message || `The paper analysis provider returned status ${response.status}.`);
+    }
+
+    const answer = String(payload?.choices?.[0]?.message?.content || '').trim();
+    if (!answer) throw new Error('The paper analysis provider returned no result.');
+    return answer;
   } catch (error) {
-    // The error message below deliberately avoids exposing the raw provider response.
+    if (controller.signal.aborted || error?.name === 'AbortError') {
+      throw new Error('The paper analysis provider took too long to respond. Please retry this paper.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  if (!response.ok) {
-    throw new Error(payload?.error?.message || `The paper analysis provider returned status ${response.status}.`);
-  }
-
-  const answer = String(payload?.choices?.[0]?.message?.content || '').trim();
-  if (!answer) throw new Error('The paper analysis provider returned no result.');
-  return answer;
 }
 
 function publicMetadata(data, { cached = true } = {}) {
