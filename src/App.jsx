@@ -6,6 +6,7 @@ import TextbooksView from './components/TextbooksView';
 import ExamCountdown from './components/ExamCountdown';
 import CustomCalendar from './components/CustomCalendar';
 import PaperSearch from './components/PaperSearch';
+import AdaptiveRecommendations from './components/AdaptiveRecommendations';
 import AgentCommandCenter from './components/AgentCommandCenter';
 import CustomizationMenu from './components/CustomizationMenu';
 import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock, BotMessageSquare, Palette } from 'lucide-react';
@@ -13,6 +14,7 @@ import PaperHistory from './components/PaperHistory';
 import { Analytics } from '@vercel/analytics/react';
 import { findPaperByIdentifier, getPaperRouteId } from './utils/paperIdentity';
 import { loadMySubjects } from './utils/mySubjects';
+import { getAdaptiveRecommendations, loadRecommendationHistory } from './utils/adaptiveRecommendations';
 import { loadOpenRouterSettings, saveOpenRouterSettings } from './utils/openRouterKeySettings';
 import {
   ACCENT_OPTIONS,
@@ -72,6 +74,8 @@ export default function App() {
   const [selectedLevel, setSelectedLevel] = useState(12); // Year 12 (HSC) by default
   const [mySubjects, setMySubjects] = useState(() => loadMySubjects());
   const [paperSearchQuery, setPaperSearchQuery] = useState('');
+  const [recommendationHistory, setRecommendationHistory] = useState(() => loadRecommendationHistory());
+  const [recommendationPaperType, setRecommendationPaperType] = useState(() => localStorage.getItem('hsc_recommendation_paper_type') || 'all');
 
   // Bookmarks State
   const [viewBookmarks, setViewBookmarks] = useState(false);
@@ -101,6 +105,24 @@ export default function App() {
     return () => {
       window.removeEventListener('hsc:my-subjects-updated', syncMySubjects);
       window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('hsc_recommendation_paper_type', recommendationPaperType);
+  }, [recommendationPaperType]);
+
+  useEffect(() => {
+    const refreshRecommendationHistory = () => setRecommendationHistory(loadRecommendationHistory());
+    const handleHistoryStorage = (event) => {
+      if (event.key === 'hsc_viewed_papers' || event.key === 'hsc_completed_papers') refreshRecommendationHistory();
+    };
+
+    window.addEventListener('hsc:history-updated', refreshRecommendationHistory);
+    window.addEventListener('storage', handleHistoryStorage);
+    return () => {
+      window.removeEventListener('hsc:history-updated', refreshRecommendationHistory);
+      window.removeEventListener('storage', handleHistoryStorage);
     };
   }, []);
 
@@ -641,6 +663,36 @@ export default function App() {
     sortedPapers.map((paper) => ({ paper, matchReasons: [] }))
   ), [sortedPapers]);
 
+  const hasRecommendationSubjectScope = selectedSubject !== null || mySubjects.length > 0;
+  const recommendationSubjectScopeLabel = selectedSubject !== null
+    ? subjects[selectedSubject] || 'your selected subject'
+    : mySubjects.length === 1
+      ? mySubjects[0]
+      : `${mySubjects.length} selected subjects`;
+
+  const adaptiveRecommendations = useMemo(() => getAdaptiveRecommendations({
+    papers,
+    subjects,
+    selectedLevel,
+    selectedSubject,
+    mySubjects,
+    bookmarks,
+    viewed: recommendationHistory.viewed,
+    completed: recommendationHistory.completed,
+    paperType: recommendationPaperType,
+    requireSubjectScope: true,
+    limit: 3,
+  }), [
+    papers,
+    subjects,
+    selectedLevel,
+    selectedSubject,
+    mySubjects,
+    bookmarks,
+    recommendationHistory,
+    recommendationPaperType,
+  ]);
+
   const resetFilters = () => {
     setSelectedSubject(null);
     setPaperSearchQuery('');
@@ -973,6 +1025,21 @@ export default function App() {
                 </section>
 
                 <section className="content-band">
+                  {!viewBookmarks && !paperSearchQuery.trim() && !loading && !error && (
+                    <AdaptiveRecommendations
+                      recommendations={adaptiveRecommendations}
+                      subjects={subjects}
+                      schools={schools}
+                      bookmarks={bookmarks}
+                      paperType={recommendationPaperType}
+                      subjectScopeLabel={recommendationSubjectScopeLabel}
+                      hasSubjectScope={hasRecommendationSubjectScope}
+                      onPaperTypeChange={setRecommendationPaperType}
+                      onToggleBookmark={(paper) => toggleBookmark(paper.v + '_' + paper.n)}
+                      onOpenPaper={openPaper}
+                    />
+                  )}
+
                   <PaperSearch
                     value={paperSearchQuery}
                     onChange={setPaperSearchQuery}

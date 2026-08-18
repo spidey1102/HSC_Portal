@@ -124,6 +124,7 @@ export default function PracticeRoom({
       const filtered = (arr || []).filter(a => String(a.key || a.v) !== paperKey);
       filtered.unshift(entry);
       localStorage.setItem(key, JSON.stringify(filtered.slice(0, 200)));
+      try { window.dispatchEvent(new CustomEvent('hsc:history-updated')); } catch (e) { /* ignore */ }
     } catch (e) {
       // ignore
     }
