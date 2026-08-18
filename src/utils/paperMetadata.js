@@ -1,7 +1,3 @@
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import { getPaperRouteId } from './paperIdentity';
-
 export function createEmptyPaperMetadata(status = 'loading') {
   return {
     status,
@@ -16,26 +12,14 @@ export function createEmptyPaperMetadata(status = 'loading') {
   };
 }
 
-function metadataDocumentId(paper) {
-  return getPaperRouteId(paper);
-}
-
-function paperSourceFingerprint(paper) {
-  return JSON.stringify({
-    paperId: String(paper?.v || ''),
-    paperName: String(paper?.n || ''),
-    sourcePath: String(paper?.cf || ''),
-  });
-}
-
 function isKnownMark(value) {
   return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
 }
 
-function normaliseCachedMetadata(data) {
+function normaliseMetadata(data, { cached = true } = {}) {
   return {
     ...createEmptyPaperMetadata(data?.status || 'ready'),
-    cached: true,
+    cached,
     paperKey: data?.paperKey || '',
     questionCount: Number(data?.questionCount) || 0,
     totalMarks: isKnownMark(data?.totalMarks) ? Number(data.totalMarks) : null,
@@ -47,22 +31,35 @@ function normaliseCachedMetadata(data) {
   };
 }
 
-export async function getPaperMetadata(paper) {
-  const snapshot = await getDoc(doc(db, 'paperMetadata', metadataDocumentId(paper)));
-  if (!snapshot.exists()) return createEmptyPaperMetadata('missing');
-  const data = snapshot.data();
-  if (data?.status !== 'ready' || data?.sourceFingerprint !== paperSourceFingerprint(paper)) {
-    return createEmptyPaperMetadata(data?.status === 'analysing' ? 'analysing' : 'missing');
-  }
-  return normaliseCachedMetadata(data);
-}
-
-export async function analysePaperMetadata(paper, idToken) {
+function metadataRequestUrl(paper) {
   const params = new URLSearchParams({
     paperId: String(paper?.v || ''),
     paperName: String(paper?.n || ''),
   });
-  const response = await fetch(`/api/paper-metadata?${params.toString()}`, {
+  return `/api/paper-metadata?${params.toString()}`;
+}
+
+async function readMetadataResponse(paper) {
+  const response = await fetch(metadataRequestUrl(paper));
+  const payload = await response.json().catch(() => ({}));
+
+  if (response.status === 404) return createEmptyPaperMetadata('missing');
+  if (!response.ok) {
+    throw new Error(payload?.error || 'Paper structure could not be loaded.');
+  }
+
+  return normaliseMetadata(payload, { cached: true });
+}
+
+// Cache reads use the validated server endpoint rather than a direct Firestore read.
+// This guarantees the browser reads the same named database, document identity, and
+// source fingerprint as the privileged cache writer, while exposing only reusable paper structure.
+export async function getPaperMetadata(paper) {
+  return readMetadataResponse(paper);
+}
+
+export async function analysePaperMetadata(paper, idToken) {
+  const response = await fetch(metadataRequestUrl(paper), {
     method: 'POST',
     headers: { Authorization: `Bearer ${idToken}` },
   });
@@ -74,5 +71,5 @@ export async function analysePaperMetadata(paper, idToken) {
   if (!response.ok) {
     throw new Error(payload?.error || 'The paper structure could not be analysed.');
   }
-  return normaliseCachedMetadata({ ...payload, cached: false });
+  return normaliseMetadata(payload, { cached: false });
 }
