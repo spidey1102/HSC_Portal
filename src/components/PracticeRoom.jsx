@@ -1,8 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, X, ExternalLink, Edit3, BookOpen, Clock, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Share2, Sparkles, Send, Check } from 'lucide-react';
+import { Play, Pause, RotateCcw, X, ExternalLink, Edit3, BookOpen, Clock, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Share2, Sparkles, Send, Check } from 'lucide-react';
 import { getPaperIdentity, getPaperStorageKey, getLegacyPaperStorageKey } from '../utils/paperIdentity';
 import AgentCommandCenter from './AgentCommandCenter';
 import { getOpenRouterRequestHeaders } from '../utils/openRouterKeySettings';
+
+const TIMER_MAX_DURATION_MINUTES = 4 * 60;
+const TIMER_DURATION_OPTIONS = Array.from({ length: TIMER_MAX_DURATION_MINUTES / 5 }, (_, index) => (index + 1) * 5);
+
+function formatTimerDuration(minutes) {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h${remainingMinutes ? ` ${remainingMinutes}m` : ''}`;
+}
 
 export default function PracticeRoom({
   paper,
@@ -22,7 +32,7 @@ export default function PracticeRoom({
     try {
       const raw = localStorage.getItem('hsc_timer_duration_secs');
       const secs = parseInt(raw, 10);
-      if (secs >= 60 && secs <= 10 * 3600) return secs;
+      if (secs >= 60 && secs <= TIMER_MAX_DURATION_MINUTES * 60) return secs;
     } catch (e) {
       // ignore
     }
@@ -34,9 +44,8 @@ export default function PracticeRoom({
   // Timer States
   const [secondsLeft, setSecondsLeft] = useState(initialTimerSecs);
   const [totalSeconds, setTotalSeconds] = useState(initialTimerSecs);
-  const [customHours, setCustomHours] = useState(Math.floor(initialTimerSecs / 3600));
-  const [customMinutes, setCustomMinutes] = useState(Math.floor((initialTimerSecs % 3600) / 60));
   const [timerRunning, setTimerRunning] = useState(false);
+  const [timerPopoverOpen, setTimerPopoverOpen] = useState(false);
   const timerInterval = useRef(null);
   // Tools panel collapsed state (persisted)
   const [toolsCollapsed, setToolsCollapsed] = useState(() => {
@@ -45,15 +54,6 @@ export default function PracticeRoom({
       return raw ? JSON.parse(raw) : true;
     } catch (e) {
       return true;
-    }
-  });
-  // Collapsed timer state (persisted)
-  const [timerCollapsed, setTimerCollapsed] = useState(() => {
-    try {
-      const raw = localStorage.getItem('hsc_timer_collapsed');
-      return raw ? JSON.parse(raw) : false;
-    } catch (e) {
-      return false;
     }
   });
 
@@ -260,14 +260,6 @@ export default function PracticeRoom({
 
   useEffect(() => {
     try {
-      localStorage.setItem('hsc_timer_collapsed', JSON.stringify(timerCollapsed));
-    } catch (e) {
-      // ignore
-    }
-  }, [timerCollapsed]);
-
-  useEffect(() => {
-    try {
       localStorage.setItem('hsc_tools_collapsed', JSON.stringify(toolsCollapsed));
     } catch (e) {
       // ignore
@@ -281,17 +273,13 @@ export default function PracticeRoom({
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const applyCustomTimer = () => {
-    const hrs = Math.min(10, Math.max(0, parseInt(String(customHours), 10) || 0));
-    const mins = Math.min(59, Math.max(0, parseInt(String(customMinutes), 10) || 0));
-    let total = hrs * 3600 + mins * 60;
-    if (total < 60) total = 60;
+  const setTimerDuration = (minutes) => {
+    const safeMinutes = Math.min(TIMER_MAX_DURATION_MINUTES, Math.max(5, Number(minutes) || 5));
+    const total = safeMinutes * 60;
 
     setSecondsLeft(total);
     setTotalSeconds(total);
     setTimerRunning(false);
-    setCustomHours(Math.floor(total / 3600));
-    setCustomMinutes(Math.floor((total % 3600) / 60));
 
     try {
       localStorage.setItem('hsc_timer_duration_secs', String(total));
@@ -351,8 +339,35 @@ export default function PracticeRoom({
     }
   };
 
-  const progressPercentage = totalSeconds > 0 ? (secondsLeft / totalSeconds) * 100 : 0;
+  const timerDurationMinutes = Math.min(TIMER_MAX_DURATION_MINUTES, Math.max(5, Math.round(totalSeconds / 60 / 5) * 5));
+  const timerDurationIndex = TIMER_DURATION_OPTIONS.indexOf(timerDurationMinutes);
+  const timerWheelAngle = 360 / TIMER_DURATION_OPTIONS.length;
+  const timerWheelRotation = -(timerDurationIndex * timerWheelAngle);
   const isTimeCritical = secondsLeft < 15 * 60;
+
+  const changeTimerDuration = (direction) => {
+    const nextIndex = (timerDurationIndex + direction + TIMER_DURATION_OPTIONS.length) % TIMER_DURATION_OPTIONS.length;
+    setTimerDuration(TIMER_DURATION_OPTIONS[nextIndex]);
+  };
+
+  const handleTimerWheelKeyDown = (event) => {
+    if (['ArrowUp', 'ArrowRight', 'PageUp'].includes(event.key)) {
+      event.preventDefault();
+      changeTimerDuration(1);
+    }
+    if (['ArrowDown', 'ArrowLeft', 'PageDown'].includes(event.key)) {
+      event.preventDefault();
+      changeTimerDuration(-1);
+    }
+    if (event.key === 'Home') {
+      event.preventDefault();
+      setTimerDuration(TIMER_DURATION_OPTIONS[0]);
+    }
+    if (event.key === 'End') {
+      event.preventDefault();
+      setTimerDuration(TIMER_DURATION_OPTIONS[TIMER_DURATION_OPTIONS.length - 1]);
+    }
+  };
 
   const compactText = (value, limit = 2400) => {
     if (!value) return '';
@@ -609,6 +624,129 @@ export default function PracticeRoom({
         </div>
 
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div className="practice-timer-anchor">
+            <button
+              type="button"
+              onClick={() => setTimerPopoverOpen((open) => !open)}
+              className={`practice-timer-trigger ${timerPopoverOpen ? 'is-open' : ''}`}
+              aria-expanded={timerPopoverOpen}
+              aria-controls="practice-exam-timer"
+              title="Open exam timer"
+            >
+              <Clock size={16} />
+              <span>Timer</span>
+              <span className="practice-timer-trigger-time">{formatTime(secondsLeft)}</span>
+            </button>
+
+            <div
+              id="practice-exam-timer"
+              className={`practice-timer-popover ${timerPopoverOpen ? 'is-open' : ''}`}
+              role="dialog"
+              aria-label="Exam timer"
+              aria-hidden={!timerPopoverOpen}
+            >
+              <div className="practice-timer-popover-header">
+                <div>
+                  <span className="practice-timer-eyebrow">Exam timer</span>
+                  <span className={`practice-timer-status ${timerRunning ? 'is-running' : ''}`}>
+                    <span aria-hidden="true" />
+                    {timerRunning ? 'Running' : secondsLeft === 0 ? 'Finished' : 'Ready'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTimerPopoverOpen(false)}
+                  className="practice-timer-close"
+                  aria-label="Close exam timer"
+                  title="Close timer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="practice-timer-duration-picker">
+                <div className="practice-timer-wheel-controls">
+                  <button
+                    type="button"
+                    onClick={() => changeTimerDuration(1)}
+                    className="practice-timer-wheel-step"
+                    aria-label="Increase timer duration by five minutes"
+                    title="Increase duration"
+                  >
+                    <ChevronUp size={15} />
+                  </button>
+                  <div
+                    className="practice-timer-wheel-viewport"
+                    role="spinbutton"
+                    tabIndex={0}
+                    aria-label="Timer duration"
+                    aria-valuemin={5}
+                    aria-valuemax={TIMER_MAX_DURATION_MINUTES}
+                    aria-valuenow={timerDurationMinutes}
+                    aria-valuetext={formatTimerDuration(timerDurationMinutes)}
+                    onKeyDown={handleTimerWheelKeyDown}
+                    onWheel={(event) => {
+                      event.preventDefault();
+                      changeTimerDuration(event.deltaY > 0 ? -1 : 1);
+                    }}
+                  >
+                    <div
+                      className="practice-timer-wheel"
+                      style={{ '--timer-wheel-rotation': `${timerWheelRotation}deg`, '--timer-wheel-angle': `${timerWheelAngle}deg` }}
+                      aria-hidden="true"
+                    >
+                      {TIMER_DURATION_OPTIONS.map((duration, index) => (
+                        <span
+                          key={duration}
+                          className={`practice-timer-wheel-item ${index === timerDurationIndex ? 'is-selected' : ''}`}
+                          style={{ '--timer-wheel-item-angle': `${index * timerWheelAngle}deg` }}
+                        >
+                          {formatTimerDuration(duration)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => changeTimerDuration(-1)}
+                    className="practice-timer-wheel-step"
+                    aria-label="Decrease timer duration by five minutes"
+                    title="Decrease duration"
+                  >
+                    <ChevronDown size={15} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="practice-timer-controls">
+                <button
+                  type="button"
+                  onClick={() => setTimerRunning((running) => !running)}
+                  className="practice-timer-primary"
+                >
+                  {timerRunning ? <Pause size={17} /> : <Play size={17} />}
+                  <span>{timerRunning ? 'Pause timer' : 'Start timer'}</span>
+                </button>
+                <div className="practice-timer-readout" aria-live="polite">
+                  {formatTime(secondsLeft)}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setTimerRunning(false); setSecondsLeft(totalSeconds); }}
+                  className="practice-timer-reset"
+                  title="Reset timer"
+                  aria-label="Reset timer"
+                >
+                  <RotateCcw size={17} />
+                </button>
+              </div>
+
+              {isTimeCritical && secondsLeft > 0 && (
+                <div className="practice-timer-warning">Less than 15 minutes remaining</div>
+              )}
+            </div>
+          </div>
+
           {sheetUrl && (
             <button
               onClick={() => setShowFormula(prev => !prev)}
@@ -1186,208 +1324,6 @@ export default function PracticeRoom({
                   <X size={14} />
                   <span>Close Doubt Clarifier</span>
                 </button>
-              </div>
-            )}
-          </div>
-
-          {/* Timer Widget */}
-          <div style={{ padding: '16px', borderBottom: '1px solid var(--bg-modifier-accent)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--header-secondary)', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>
-                <Clock size={16} />
-                <span>Exam Timer</span>
-              </div>
-
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <button
-                  onClick={() => setTimerCollapsed(prev => !prev)}
-                  className="btn-secondary"
-                  aria-expanded={!timerCollapsed}
-                  title={timerCollapsed ? 'Show timer' : 'Collapse timer'}
-                  style={{ padding: '6px 8px' }}
-                >
-                  {timerCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                </button>
-              </div>
-            </div>
-
-            {timerCollapsed ? (
-              <div style={{
-                backgroundColor: 'var(--bg-tertiary)',
-                padding: '8px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '8px'
-              }}>
-                <div style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '18px', color: isTimeCritical ? 'var(--status-danger)' : 'var(--header-primary)' }}>
-                  {formatTime(secondsLeft)}
-                </div>
-
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => setTimerRunning(!timerRunning)}
-                    className="btn-primary"
-                    style={{ padding: '6px 8px', minWidth: '44px' }}
-                  >
-                    {timerRunning ? <Pause size={14} /> : <Play size={14} />}
-                  </button>
-
-                  <button
-                    onClick={() => { setTimerRunning(false); setSecondsLeft(totalSeconds); }}
-                    className="btn-secondary"
-                    style={{ padding: '6px 8px' }}
-                  >
-                    <RotateCcw size={14} />
-                  </button>
-
-                  <button
-                    onClick={() => setTimerCollapsed(false)}
-                    className="btn-secondary"
-                    title="Expand timer"
-                    style={{ padding: '6px 8px' }}
-                  >
-                    <ChevronUp size={14} />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div style={{
-                backgroundColor: 'var(--bg-tertiary)',
-                padding: '16px',
-                borderRadius: '8px',
-                position: 'relative',
-                overflow: 'hidden'
-              }}>
-                {/* Progress bar boundary background */}
-                <div style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  height: '4px',
-                  width: `${progressPercentage}%`,
-                  backgroundColor: isTimeCritical ? 'var(--status-danger)' : 'var(--brand-experiment)',
-                  transition: 'width 1s linear'
-                }} />
-
-                {/* Display Clock */}
-                <h3 style={{
-                  fontSize: '32px',
-                  fontFamily: 'monospace',
-                  fontWeight: 700,
-                  color: isTimeCritical ? 'var(--status-danger)' : 'var(--header-primary)',
-                  textAlign: 'center',
-                  marginBottom: '12px'
-                }}>
-                  {formatTime(secondsLeft)}
-                </h3>
-
-                {/* Time Critical Warning */}
-                {isTimeCritical && secondsLeft > 0 && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    color: 'var(--status-danger)',
-                    fontSize: '12px',
-                    marginBottom: '12px',
-                    fontWeight: 600
-                  }}>
-                    <AlertTriangle size={14} />
-                    <span>Time is almost up!</span>
-                  </div>
-                )}
-
-                {/* Controls */}
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                  <button
-                    onClick={() => setTimerRunning(!timerRunning)}
-                    className="btn-primary"
-                    style={{
-                      backgroundColor: timerRunning ? 'var(--status-warning)' : 'var(--status-positive)',
-                      color: timerRunning ? 'black' : 'white',
-                      flex: 1,
-                      justifyContent: 'center'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
-                    onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}
-                  >
-                    {timerRunning ? <Pause size={16} /> : <Play size={16} />}
-                    <span>{timerRunning ? 'Pause' : 'Start'}</span>
-                  </button>
-                  <button
-                    onClick={() => { setTimerRunning(false); setSecondsLeft(totalSeconds); }}
-                    className="btn-secondary"
-                  >
-                    <RotateCcw size={16} />
-                  </button>
-                </div>
-
-                {/* Custom duration */}
-                <div style={{ marginTop: '16px' }}>
-                  <div style={{
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    color: 'var(--header-secondary)',
-                    textTransform: 'uppercase',
-                    marginBottom: '8px',
-                  }}>
-                    Set duration
-                  </div>
-                  <div style={{
-                    display: 'flex',
-                    gap: '8px',
-                    alignItems: 'center',
-                    backgroundColor: 'var(--bg-primary)',
-                    padding: '8px',
-                    borderRadius: '4px',
-                  }}>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>Hours</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={10}
-                        value={customHours}
-                        onChange={(e) => setCustomHours(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && applyCustomTimer()}
-                        className="timer-duration-input"
-                        aria-label="Timer hours"
-                      />
-                    </label>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>Minutes</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={59}
-                        value={customMinutes}
-                        onChange={(e) => setCustomMinutes(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && applyCustomTimer()}
-                        className="timer-duration-input"
-                        aria-label="Timer minutes"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={applyCustomTimer}
-                      className="btn-primary"
-                      style={{
-                        alignSelf: 'flex-end',
-                        padding: '8px 12px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                      }}
-                    >
-                      Apply
-                    </button>
-                  </div>
-                  <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px', marginBottom: 0 }}>
-                    Your last duration is remembered for next time (min 1 minute).
-                  </p>
-                </div>
               </div>
             )}
           </div>

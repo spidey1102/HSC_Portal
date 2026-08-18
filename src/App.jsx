@@ -28,6 +28,8 @@ import { useSync } from './components/SyncContext';
 import { useAuth } from './components/AuthContext';
 import UserButton from './components/UserButton';
 
+const PAPER_PAGE_SIZE = 40;
+
 export default function App() {
   const { data, updateRemote } = useSync();
   const { user, loading: authLoading, signInWithGoogle } = useAuth();
@@ -186,8 +188,13 @@ export default function App() {
   // Personal API keys are held in browser session storage only; they never enter Firestore.
   const [openRouterSettings, setOpenRouterSettings] = useState(loadOpenRouterSettings);
 
-  // Pagination Limit
-  const [renderLimit, setRenderLimit] = useState(40);
+  // Pagination / continuous loading state
+  const [renderLimit, setRenderLimit] = useState(PAPER_PAGE_SIZE);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const paperLoadSentinelRef = useRef(null);
+  const scrollableContentRef = useRef(null);
+  const loadMoreLockRef = useRef(false);
+  const loadMoreTimerRef = useRef(null);
   const [shareNotice, setShareNotice] = useState('');
   const shareNoticeTimer = useRef(null);
   const paperReturnToRef = useRef(null);
@@ -521,9 +528,12 @@ export default function App() {
     }
   }, [selectedSubject, subjects, paperRouteId]);
 
-  // Reset pagination limit when filters change
+  // Reset the visible result window whenever the home-screen view changes.
   useEffect(() => {
-    setRenderLimit(40);
+    setRenderLimit(PAPER_PAGE_SIZE);
+    setIsLoadingMore(false);
+    loadMoreLockRef.current = false;
+    if (loadMoreTimerRef.current) clearTimeout(loadMoreTimerRef.current);
   }, [
     selectedSubject,
     selectedLevel,
@@ -637,6 +647,45 @@ export default function App() {
   };
 
   const paginatedPaperRows = visiblePaperRows.slice(0, renderLimit);
+  const hasMorePaperRows = renderLimit < visiblePaperRows.length;
+
+  const loadNextPaperPage = useCallback(() => {
+    if (!hasMorePaperRows || loadMoreLockRef.current) return;
+
+    loadMoreLockRef.current = true;
+    setIsLoadingMore(true);
+    setRenderLimit((current) => Math.min(current + PAPER_PAGE_SIZE, visiblePaperRows.length));
+
+    if (loadMoreTimerRef.current) clearTimeout(loadMoreTimerRef.current);
+    loadMoreTimerRef.current = setTimeout(() => {
+      setIsLoadingMore(false);
+      loadMoreLockRef.current = false;
+    }, 180);
+  }, [hasMorePaperRows, visiblePaperRows.length]);
+
+  useEffect(() => {
+    const target = paperLoadSentinelRef.current;
+    const scrollRoot = scrollableContentRef.current;
+    const canObserve = typeof window !== 'undefined' && 'IntersectionObserver' in window;
+    const isHomePaperView = !loading && !error && !viewCalendar && !viewTextbooks && !viewHistory;
+
+    if (!target || !scrollRoot || !canObserve || !isHomePaperView || !hasMorePaperRows) return undefined;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) loadNextPaperPage();
+      },
+      { root: scrollRoot, rootMargin: '360px 0px', threshold: 0.01 },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [loading, error, viewCalendar, viewTextbooks, viewHistory, hasMorePaperRows, loadNextPaperPage]);
+
+  useEffect(() => () => {
+    if (loadMoreTimerRef.current) clearTimeout(loadMoreTimerRef.current);
+  }, []);
+
   const currentViewLabel = viewCalendar
     ? 'Assessment calendar'
     : viewTextbooks
@@ -863,7 +912,7 @@ export default function App() {
           onClose={() => setIsCustomizationOpen(false)}
         />
 
-        <div className="scrollable-content">
+        <div className="scrollable-content" ref={scrollableContentRef}>
           <div className="content-stack">
             {viewCalendar ? (
               <CustomCalendar />
@@ -989,14 +1038,35 @@ export default function App() {
                         </div>
                       )}
 
-                      {visiblePaperRows.length > renderLimit && (
-                        <div style={{ display: 'flex', justifyContent: 'center', margin: '28px 0 48px' }}>
-                          <button
-                            onClick={() => setRenderLimit((prev) => prev + 40)}
-                            className="btn-secondary"
-                          >
-                            Load more papers
-                          </button>
+                      {visiblePaperRows.length > 0 && (
+                        <div
+                          ref={paperLoadSentinelRef}
+                          aria-live="polite"
+                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', margin: '28px 0 48px', minHeight: '44px', color: 'var(--text-muted)', fontSize: '13px' }}
+                        >
+                          {hasMorePaperRows ? (
+                            <>
+                              {isLoadingMore ? (
+                                <>
+                                  <RefreshCw size={16} className="spin" aria-hidden="true" />
+                                  <span>Loading more papers…</span>
+                                </>
+                              ) : (
+                                <span>Keep scrolling to load more papers</span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={loadNextPaperPage}
+                                className="btn-secondary"
+                                disabled={isLoadingMore}
+                                style={{ padding: '8px 12px', fontSize: '12px' }}
+                              >
+                                Load next {Math.min(PAPER_PAGE_SIZE, visiblePaperRows.length - renderLimit).toLocaleString()} papers
+                              </button>
+                            </>
+                          ) : (
+                            <span>All {visiblePaperRows.length.toLocaleString()} matching papers are loaded.</span>
+                          )}
                         </div>
                       )}
                     </>
