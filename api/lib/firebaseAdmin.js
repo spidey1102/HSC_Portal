@@ -2,7 +2,7 @@ import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 
-const DEFAULT_DATABASE_ID = 'ai-studio-hscportal-23b93b2f-3189-46a0-a6c8-b0b79ad59bc8';
+const DEFAULT_DATABASE_ID = '(default)';
 const APP_NAME = 'hsc-portal-server';
 
 function readServiceAccount() {

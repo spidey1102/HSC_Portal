@@ -1,12 +1,9 @@
 {
-  "projectId": "gen-lang-client-0605565509",
-  "appId": "1:484079697402:web:64765c85d8b6d3b9eb3843",
-  "apiKey": "AIzaSyB5HaBwHsrnwOHA_XNXrdpfUGkFogscWvg",
-  "authDomain": "gen-lang-client-0605565509.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-hscportal-23b93b2f-3189-46a0-a6c8-b0b79ad59bc8",
-  "storageBucket": "gen-lang-client-0605565509.firebasestorage.app",
-  "messagingSenderId": "484079697402",
-  "measurementId": "",
-  "oAuthClientId": "484079697402-4ki898s3due7o8io3ck6fd277b3vsmgm.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "projectId": "hsc-portal-firebase",
+  "appId": "1:459158950978:web:4d232657f1999e763d09db",
+  "apiKey": "AIzaSyC6vpRYcE9ZsjNmsJaB2D3Plp9p5ntG6eM",
+  "authDomain": "hsc-portal-firebase.firebaseapp.com",
+  "storageBucket": "hsc-portal-firebase.firebasestorage.app",
+  "messagingSenderId": "459158950978",
+  "measurementId": ""
 }

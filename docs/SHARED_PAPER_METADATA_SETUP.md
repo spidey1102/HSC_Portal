@@ -6,7 +6,7 @@ The paper-structure cache stores reusable **question counts, question labels, su
 
 Before deploying the application, publish the repository’s updated [`firestore.rules`](../firestore.rules) to the Firebase project. The rules allow anyone to read the non-personal `paperMetadata` collection, while client-side writes are denied. The server route uses the Firebase Admin SDK and is therefore the only writer. The existing `users/{uid}` rule continues to restrict private review and mistake data to the authenticated owner.
 
-Because this portal uses a named Firestore database, confirm that the rules are published to the database configured by `FIREBASE_FIRESTORE_DATABASE_ID` rather than to a different default database.
+The dedicated `hsc-portal-firebase` project uses Firestore’s default database, `(default)`, in the Sydney region. Confirm that these rules are published to that database.
 
 ## Configure protected Vercel environment variables
 
@@ -15,11 +15,11 @@ Set these **server-only** variables for the Production, Preview, and Development
 | Variable | Purpose |
 |---|---|
 | `OPENROUTER_API_KEY` | Existing portal AI key used to analyse a paper when no shared metadata exists. |
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | Full JSON for a Firebase service account with access to the portal’s Firestore database. This is used only by the Vercel serverless route. |
-| `FIREBASE_FIRESTORE_DATABASE_ID` | `ai-studio-hscportal-23b93b2f-3189-46a0-a6c8-b0b79ad59bc8`; optional because the server route includes this as its fallback. |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Full JSON for the dedicated `HSC Portal Paper Metadata API` service account. This is used only by the Vercel serverless route and must never be committed. |
+| `FIREBASE_FIRESTORE_DATABASE_ID` | `(default)`; optional because the server route includes the dedicated default database as its fallback. |
 | `PAPER_METADATA_MODEL` | Optional OpenRouter model override. If omitted, the route uses `openrouter/free`. |
 
-The service-account principal needs permission to read and write Firestore documents in the portal database. Do not use a browser API key in place of the service-account JSON.
+The service-account principal needs permission to read and write Firestore documents in the portal database. The dedicated service account uses the **Cloud Datastore User** role for that purpose. Do not use a browser API key in place of the service-account JSON.
 
 ## Verify the flow after deployment
 

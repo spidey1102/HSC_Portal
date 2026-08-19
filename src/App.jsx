@@ -9,6 +9,7 @@ import PaperSearch from './components/PaperSearch';
 import AdaptiveRecommendations from './components/AdaptiveRecommendations';
 import AgentCommandCenter from './components/AgentCommandCenter';
 import CustomizationMenu from './components/CustomizationMenu';
+import FirebaseResetNotice from './components/FirebaseResetNotice';
 import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock, BotMessageSquare, Palette, BookOpenCheck } from 'lucide-react';
 import PaperHistory from './components/PaperHistory';
 import StudyNotebook from './components/StudyNotebook';
@@ -53,6 +54,7 @@ import { useAuth } from './components/AuthContext';
 import UserButton from './components/UserButton';
 
 const PAPER_PAGE_SIZE = 40;
+const FIREBASE_RESET_NOTICE_STORAGE_KEY = 'hsc_new_firebase_2026';
 const PAPER_SORT_OPTIONS = [
   { value: 'newest', label: 'Newest first' },
   { value: 'oldest', label: 'Oldest first' },
@@ -65,6 +67,16 @@ export default function App() {
   const { user, loading: authLoading, signInWithGoogle } = useAuth();
   
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
+  const [showFirebaseResetNotice, setShowFirebaseResetNotice] = useState(false);
+
+  useEffect(() => {
+    try {
+      setShowFirebaseResetNotice(!localStorage.getItem(FIREBASE_RESET_NOTICE_STORAGE_KEY));
+    } catch (error) {
+      // If storage is unavailable, continue to make the migration notice visible for this visit.
+      setShowFirebaseResetNotice(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (!authLoading) {
@@ -88,6 +100,15 @@ export default function App() {
   const handleSkipSignIn = () => {
     localStorage.setItem('hsc_has_seen_signin_prompt', 'true');
     setShowSignInPrompt(false);
+  };
+
+  const dismissFirebaseResetNotice = () => {
+    try {
+      localStorage.setItem(FIREBASE_RESET_NOTICE_STORAGE_KEY, 'acknowledged');
+    } catch (error) {
+      // The state update still lets a user continue when browser storage is unavailable.
+    }
+    setShowFirebaseResetNotice(false);
   };
 
   // DB States
@@ -911,6 +932,13 @@ export default function App() {
             ? 'Review your practice, capture useful mistakes, and turn them into next steps.'
             : 'Browse official papers, trial exams, and resources without the clutter.';
 
+  const firebaseResetNotice = (
+    <FirebaseResetNotice
+      isOpen={showFirebaseResetNotice}
+      onDismiss={dismissFirebaseResetNotice}
+    />
+  );
+
   if (paperRouteId) {
     if (loading) {
         return (
@@ -919,6 +947,7 @@ export default function App() {
               <RefreshCw size={28} color="var(--text-muted)" className="spin" />
               <h3 style={{ marginTop: '12px', color: 'var(--header-primary)' }}>Loading paper</h3>
             </div>
+            {firebaseResetNotice}
             <Analytics />
           </div>
         );
@@ -934,6 +963,7 @@ export default function App() {
                 Back to home
               </button>
             </div>
+            {firebaseResetNotice}
             <Analytics />
           </div>
         );
@@ -949,12 +979,14 @@ export default function App() {
                 Back to home
               </button>
             </div>
+            {firebaseResetNotice}
             <Analytics />
           </div>
         );
     }
 
     return (
+      <>
         <PracticeRoom
           paper={activePaper}
           subjectName={subjects[activePaper.s]}
@@ -976,6 +1008,8 @@ export default function App() {
             openRouterSettings,
           }}
         />
+        {firebaseResetNotice}
+      </>
     );
   }
 
@@ -1329,6 +1363,8 @@ export default function App() {
         </div>
       </main>
 
+      {firebaseResetNotice}
+
       {/* Vercel Web Analytics */}
       <Analytics />
 
@@ -1349,7 +1385,7 @@ export default function App() {
       />
 
       {/* Sign In Prompt Overlay */}
-      {showSignInPrompt && (
+      {showSignInPrompt && !showFirebaseResetNotice && (
         <div className="modal-overlay" style={{ zIndex: 9999 }}>
           <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center', padding: '32px' }}>
             <h2 style={{ marginTop: 0, marginBottom: '8px' }}>Sign In to Sync</h2>
