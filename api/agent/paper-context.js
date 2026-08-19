@@ -13,6 +13,9 @@ if (!globalThis.pdfjsWorker) {
 export const maxDuration = 60;
 
 const PAPER_HOST = 'https://hscportal.pages.dev/'
+// Some PDFs reference unembedded standard fonts. In Node/Vercel, pdf.js passes
+// this base directly to fs.readFile, so it must be a filesystem directory path.
+const STANDARD_FONT_DATA_URL = `${resolve(process.cwd(), 'node_modules', 'pdfjs-dist', 'standard_fonts')}/`
 const CACHE_TTL_MS = 60 * 60 * 1000
 const MAX_PDF_BYTES = 12 * 1024 * 1024
 const MAX_CACHED_PDFS = 4
@@ -120,7 +123,11 @@ export async function extractFullPaperText(paper) {
 
   // pdf.js may transfer and detach the buffer it receives, so retain cached bytes
   // by giving the parser its own copy for each full-paper extraction.
-  const loadingTask = getDocument({ data: paperBytes.bytes.slice(), disableWorker: true })
+  const loadingTask = getDocument({
+    data: paperBytes.bytes.slice(),
+    disableWorker: true,
+    standardFontDataUrl: STANDARD_FONT_DATA_URL,
+  })
   const pdf = await loadingTask.promise
   const pageText = []
 
