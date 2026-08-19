@@ -39,6 +39,25 @@ export default function ExamCountdown({ subjectName = null, portalSubjects = [] 
   const isHome = subjectName == null;
 
   useEffect(() => {
+    const restoreSubjects = () => {
+      const restoredSubjects = loadMySubjects();
+      setMySubjects(restoredSubjects);
+      setDraftSubjects(restoredSubjects);
+      setEditingSubjects(restoredSubjects.length === 0);
+    };
+    const handleStorage = (event) => {
+      if (event.key === 'hsc_my_subjects') restoreSubjects();
+    };
+
+    window.addEventListener('hsc:my-subjects-updated', restoreSubjects);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('hsc:my-subjects-updated', restoreSubjects);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  useEffect(() => {
     fetch('/hsc-exam-dates.json')
       .then((res) => {
         if (!res.ok) throw new Error('Could not load exam dates.');
