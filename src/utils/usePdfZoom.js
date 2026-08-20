@@ -40,7 +40,7 @@ export function clampScale(value) {
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.round(value * 1000) / 1000));
 }
 
-export function usePdfZoom(viewportRef, contentRef, initialScale = 1.2) {
+export function usePdfZoom(viewportRef, contentRef, initialScale = 1) {
   const [rasterScale, setRasterScale] = useState(initialScale);
   const [displayScale, setDisplayScale] = useState(initialScale);
 

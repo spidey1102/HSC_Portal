@@ -1,6 +1,5 @@
 import { resolveOpenRouterKey } from './openRouterKeyResolver.js';
-
-const DEFAULT_MODEL = 'openrouter/free';
+import { SHARED_OPENROUTER_MODEL, getCompletionRoute, userSafeProviderError } from './openRouterRouting.js';
 
 const SYSTEM_PROMPT = [
   'You are a calm HSC study coach for a student revision app.',
@@ -28,7 +27,7 @@ export async function handleOpenRouterRequest(req, res, apiKey) {
     const parsed = body ? JSON.parse(body) : {};
     const cleanPrompt = String(parsed.prompt || '').trim();
     const cleanContext = String(parsed.context || '').trim();
-    const cleanModel = String(parsed.model || DEFAULT_MODEL).trim() || DEFAULT_MODEL;
+    const requestedModel = String(parsed.model || SHARED_OPENROUTER_MODEL).trim() || SHARED_OPENROUTER_MODEL;
     const keySelection = resolveOpenRouterKey(req, apiKey);
     if (keySelection.error) {
       res.statusCode = 400;
@@ -37,6 +36,11 @@ export async function handleOpenRouterRequest(req, res, apiKey) {
       return;
     }
     const resolvedApiKey = keySelection.key;
+    const completionRoute = getCompletionRoute({
+      route: 'chat',
+      keySelection,
+      requestedModel,
+    });
     const maxTokens = Number.isFinite(Number(parsed.max_tokens)) ? Number(parsed.max_tokens) : 700;
     const temperature = Number.isFinite(Number(parsed.temperature)) ? Number(parsed.temperature) : 0.4;
 
@@ -73,7 +77,7 @@ export async function handleOpenRouterRequest(req, res, apiKey) {
         'X-Title': 'HSC Portal',
       },
       body: JSON.stringify({
-        model: cleanModel,
+        ...completionRoute,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           {
@@ -100,7 +104,10 @@ export async function handleOpenRouterRequest(req, res, apiKey) {
     }
 
     if (!response.ok) {
-      const message = payload?.error?.message || raw || `OpenRouter request failed with status ${response.status}.`;
+      const providerMessage = payload?.error?.message || raw || `OpenRouter request failed with status ${response.status}.`;
+      const message = keySelection.source === 'server'
+        ? userSafeProviderError(response.status, providerMessage)
+        : providerMessage;
       res.statusCode = response.status;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ error: message }));

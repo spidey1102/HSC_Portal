@@ -8,6 +8,7 @@ import {
   ListChecks,
   PanelBottomOpen,
   Share2,
+  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
@@ -39,6 +40,7 @@ import { usePdfZoom } from '../utils/usePdfZoom';
 import { usePresence } from '../utils/usePresence';
 import { parsePaperTiming, describeTiming } from '../utils/paperTiming';
 import { isPrimaryModifier } from '../utils/platformShortcuts';
+import { challengeLevelLabel, challengeReasonLabel, getChallengeRecommendations } from '../utils/challengeRecommendations';
 
 const TIMER_STORAGE_KEY = 'hsc_timer_duration_secs';
 const SCALE_STEP = 1.2;
@@ -107,7 +109,7 @@ export default function PracticeRoom({
 
   const viewportRef = useRef(null);
   const contentRef = useRef(null);
-  const zoom = usePdfZoom(viewportRef, contentRef, 1.1);
+  const zoom = usePdfZoom(viewportRef, contentRef, 1);
   const toolbar = usePresence(!toolsHidden, 220);
   const reveal = usePresence(toolsHidden, 180);
 
@@ -185,6 +187,9 @@ export default function PracticeRoom({
   });
   const [paperMetadata, setPaperMetadata] = useState(() => createEmptyPaperMetadata());
   const [isRequestingMetadata, setIsRequestingMetadata] = useState(false);
+  const [isChallengeOpen, setIsChallengeOpen] = useState(false);
+  const [openChallengeWhenReady, setOpenChallengeWhenReady] = useState(false);
+  const [challengePage, setChallengePage] = useState(null);
   const [actionMessage, setActionMessage] = useState('');
   const [isCompleted, setIsCompleted] = useState(false);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
@@ -204,7 +209,7 @@ export default function PracticeRoom({
    */
   const handleDocumentLoaded = useCallback(({ widestPage: widest, firstPageText }) => {
     setWidestPage(widest);
-    zoom.fitToWidth(widest);
+    zoom.setScale(1);
 
     const timing = parsePaperTiming(firstPageText);
     if (timing.source !== 'document') return;
@@ -218,7 +223,7 @@ export default function PracticeRoom({
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zoom.fitToWidth]);
+  }, [zoom.setScale]);
 
   const flash = useCallback((message, duration = 2200) => {
     setActionMessage(message);
@@ -308,6 +313,20 @@ export default function PracticeRoom({
     return () => { isActive = false; clearInterval(timer); };
   }, [paperMetadata.status, paperMetadata.retryAfterSeconds, paper, flash]);
 
+  const challengeRecommendations = useMemo(
+    () => getChallengeRecommendations(paperMetadata.questions),
+    [paperMetadata.questions],
+  );
+
+  useEffect(() => {
+    if (!openChallengeWhenReady || paperMetadata.status !== 'ready') return;
+    setOpenChallengeWhenReady(false);
+    setIsChallengeOpen(true);
+    flash(challengeRecommendations.length
+      ? 'Recommended challenges are ready'
+      : 'This paper has no unusually challenging questions tagged yet');
+  }, [challengeRecommendations.length, flash, openChallengeWhenReady, paperMetadata.status]);
+
   const handleAnalysePaperMetadata = async () => {
     if (paperMetadata.status === 'analysing') {
       setIsRequestingMetadata(true);
@@ -341,6 +360,37 @@ export default function PracticeRoom({
     } finally {
       setIsRequestingMetadata(false);
     }
+  };
+
+  const handleRecommendChallenge = () => {
+    if (paperMetadata.status === 'ready') {
+      setIsChallengeOpen(true);
+      if (!challengeRecommendations.length) flash('No unusually challenging questions were tagged in this paper');
+      return;
+    }
+
+    if (!user) {
+      flash('Sign in to analyse and save this paper structure');
+      return;
+    }
+
+    setOpenChallengeWhenReady(true);
+    if (paperMetadata.status === 'analysing') {
+      flash('Question analysis is still running — recommendations will open when it finishes');
+      return;
+    }
+    handleAnalysePaperMetadata();
+  };
+
+  const handleOpenChallenge = (question) => {
+    const page = Number(question?.page);
+    if (!Number.isInteger(page) || page < 1) {
+      flash('This recommendation does not have a page number yet');
+      return;
+    }
+    setChallengePage(page);
+    setIsChallengeOpen(false);
+    flash(`Question ${question.id} — page ${page}`);
   };
 
   // Record that this paper was opened.
@@ -496,6 +546,19 @@ export default function PracticeRoom({
 
           <button
             type="button"
+            className={`btn ${isChallengeOpen ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={handleRecommendChallenge}
+            disabled={isRequestingMetadata}
+            title={paperMetadata.status === 'ready'
+              ? 'Find an unusual or challenging question in this paper'
+              : paperMetadata.error || 'Analyse this paper once, then find a recommended challenge'}
+          >
+            <Sparkles size={14} />
+            {paperMetadata.status === 'ready' ? 'Recommended challenge' : 'Find a challenge'}
+          </button>
+
+          <button
+            type="button"
             className="btn btn-secondary"
             onClick={handleAnalysePaperMetadata}
             disabled={isRequestingMetadata}
@@ -539,6 +602,45 @@ export default function PracticeRoom({
 
       {actionMessage && <div className="reader-notice">{actionMessage}</div>}
 
+      {isChallengeOpen && (
+        <section className="reader-challenge" aria-label="Recommended challenges" aria-live="polite">
+          <div className="reader-challenge-head">
+            <div>
+              <div className="kick"><Sparkles size={12} /> Recommended challenge</div>
+              <p className="dim" style={{ margin: '3px 0 0', fontSize: '12.5px' }}>
+                {challengeRecommendations.length
+                  ? 'These questions are tagged for unusual context, careful reasoning, or non-routine exam skills.'
+                  : 'The paper structure is ready, but no questions were tagged as unusually challenging.'}
+              </p>
+            </div>
+            <button type="button" className="btn btn-secondary btn-icon" onClick={() => setIsChallengeOpen(false)} aria-label="Close recommended challenges" title="Close">
+              <X size={14} />
+            </button>
+          </div>
+
+          {challengeRecommendations.length > 0 ? (
+            <div className="reader-challenge-list">
+              {challengeRecommendations.map((question) => (
+                <button
+                  key={question.id}
+                  type="button"
+                  className="reader-challenge-card"
+                  onClick={() => handleOpenChallenge(question)}
+                >
+                  <span className={`challenge-level is-${question.challenge.level}`}>{challengeLevelLabel(question.challenge.level)}</span>
+                  <strong>Question {question.id}</strong>
+                  <span className="num dim">{question.marks !== null && question.marks !== undefined ? `${question.marks} marks` : 'Marks not stated'} · Page {question.page}</span>
+                  <span className="challenge-reason">{challengeReasonLabel(question)}</span>
+                  <span className="challenge-go">Take me there →</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="reader-challenge-empty">Try the paper’s later multi-part questions, or use Margin to ask about a section you find difficult.</div>
+          )}
+        </section>
+      )}
+
       <div className="reader-body">
         <div className={`reader-panes ${showFormula && sheetUrl ? 'is-split' : ''}`}>
           <div className={`reader-pane ${mobileTab === 'paper' ? 'is-active' : ''}`}>
@@ -558,6 +660,7 @@ export default function PracticeRoom({
                 onSelectionChange={setSelectionText}
                 viewportRef={viewportRef}
                 contentRef={contentRef}
+                targetPage={challengePage}
               />
             ) : (
               <iframe className="reader-frame" src={legacyUrl} title="Exam paper" />

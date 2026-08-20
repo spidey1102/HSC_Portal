@@ -5,16 +5,16 @@ import {
   getPaperSourceFingerprint,
   loadPaperRecord,
 } from './agent/paper-context.js';
+import { getCompletionRoute, isRetryableProviderStatus, userSafeProviderError } from '../openRouterRouting.js';
 
 export const maxDuration = 60;
 
 const PAPER_ID_FIELDS = ['v', 's', 'l', 'c', 'y', 'h', 'w', 'n'];
 const METADATA_COLLECTION = 'paperMetadata';
-const EXTRACTION_VERSION = 'question-marks-v1';
+const EXTRACTION_VERSION = 'question-marks-v2-challenge';
 const ANALYSIS_LOCK_MS = 2 * 60 * 1000;
 const MAX_ANALYSIS_TEXT_CHARS = 150000;
 const MAX_ANALYSIS_OUTPUT_TOKENS = 8000;
-const DEFAULT_MODEL = 'openrouter/free';
 
 // The whole request has to finish inside maxDuration. Reserve a margin so a slow
 // provider is reported as a timeout instead of the runtime killing the function
@@ -55,6 +55,28 @@ function normaliseQuestionId(value, fallbackIndex) {
   return id || String(fallbackIndex + 1);
 }
 
+const CHALLENGE_LEVELS = new Set(['routine', 'challenging', 'stretch']);
+const CHALLENGE_REASON_CODES = new Set([
+  'unfamiliar-context',
+  'multi-step-reasoning',
+  'cross-topic-synthesis',
+  'data-interpretation',
+  'common-misconception',
+  'non-routine-method',
+  'extended-response',
+]);
+
+function normaliseChallenge(rawChallenge) {
+  const level = CHALLENGE_LEVELS.has(rawChallenge?.level) ? rawChallenge.level : 'routine';
+  const reasons = (Array.isArray(rawChallenge?.reasons) ? rawChallenge.reasons : [])
+    .map((reason) => String(reason || '').trim())
+    .filter((reason, index, all) => CHALLENGE_REASON_CODES.has(reason) && all.indexOf(reason) === index)
+    .slice(0, 2);
+  const note = String(rawChallenge?.note || '').trim().replace(/\s+/g, ' ').slice(0, 220);
+
+  return { level, reasons, note };
+}
+
 function normaliseQuestion(rawQuestion, index) {
   const subparts = (Array.isArray(rawQuestion?.subparts) ? rawQuestion.subparts : [])
     .map((subpart, subpartIndex) => {
@@ -77,6 +99,7 @@ function normaliseQuestion(rawQuestion, index) {
     marks: marks ?? (subpartMarks > 0 ? subpartMarks : null),
     page: normaliseNumber(rawQuestion?.page),
     subparts,
+    challenge: normaliseChallenge(rawQuestion?.challenge),
   };
 }
 
@@ -186,10 +209,12 @@ const PAPER_CATEGORY_LABELS = { H: 'official HSC paper', T: 'school trial paper'
 function buildAnalysisPrompt(paper, paperText) {
   return [
     'You extract the structure of NSW HSC past papers. Return JSON only, with no markdown or commentary.',
-    'Identify each top-level numbered question exactly once. For each, extract its printed marks where reliably stated, its PDF page number, and direct subparts only where their labels and marks are explicit.',
+    'Identify each top-level numbered question exactly once. For each, extract its printed marks where reliably stated, its PDF page number, direct subparts only where their labels and marks are explicit, and a compact challenge classification.',
+    'Classify the question itself, not the student. Use challenge.level "routine" for ordinary single-step practice, "challenging" when careful application or more than one step is required, and "stretch" only when the question is unusually difficult, non-routine, or deliberately unfamiliar for this course.',
+    'For challenge.reasons, select zero to two exact codes only from: unfamiliar-context, multi-step-reasoning, cross-topic-synthesis, data-interpretation, common-misconception, non-routine-method, extended-response. challenge.note must be one plain, factual sentence of no more than 24 words explaining the selection, or an empty string for routine questions.',
     'Do not invent marks. Use null when a mark cannot be established. Do not treat instructions, multiple-choice option labels, tables, source labels, or section headings as questions.',
     'For a question with subparts, preserve the top-level question as one item; only use subparts for a, b, i, ii style labels. totalMarks should be the printed paper total if stated, otherwise the sum of reliable top-level marks, otherwise null.',
-    'Use this exact shape: {"totalMarks":number|null,"confidence":"high"|"medium"|"low","notes":"short caveat or empty string","questions":[{"id":"1","marks":number|null,"page":number|null,"subparts":[{"id":"a","marks":number|null,"page":number|null}]}]}.',
+    'Use this exact shape: {"totalMarks":number|null,"confidence":"high"|"medium"|"low","notes":"short caveat or empty string","questions":[{"id":"1","marks":number|null,"page":number|null,"subparts":[{"id":"a","marks":number|null,"page":number|null}],"challenge":{"level":"routine"|"challenging"|"stretch","reasons":["unfamiliar-context"],"note":"short explanation or empty string"}}]}.',
     '',
     `Paper: ${paper.n}`,
     `Source category: ${PAPER_CATEGORY_LABELS[paper.c] || 'unknown'}`,
@@ -201,14 +226,23 @@ function buildAnalysisPrompt(paper, paperText) {
   ].join('\n');
 }
 
-export async function callPaperAnalysis(prompt, { timeoutMs = ANALYSIS_PROVIDER_TIMEOUT_MS } = {}) {
-  const apiKey = String(process.env.OPENROUTER_API_KEY || '').trim();
-  if (!apiKey) throw new Error('The portal AI key is not configured for paper analysis.');
+class PaperAnalysisProviderError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.name = 'PaperAnalysisProviderError';
+    this.status = Number(status) || 500;
+  }
+}
 
+async function requestPaperAnalysis({ prompt, apiKey, route, timeoutMs }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    const completionRoute = getCompletionRoute({
+      route,
+      keySelection: { source: 'server' },
+    });
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -219,7 +253,7 @@ export async function callPaperAnalysis(prompt, { timeoutMs = ANALYSIS_PROVIDER_
       },
       signal: controller.signal,
       body: JSON.stringify({
-        model: String(process.env.PAPER_METADATA_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL,
+        ...completionRoute,
         messages: [
           { role: 'system', content: 'Return only strictly valid JSON. Never include markdown fences.' },
           { role: 'user', content: prompt },
@@ -227,7 +261,6 @@ export async function callPaperAnalysis(prompt, { timeoutMs = ANALYSIS_PROVIDER_
         max_tokens: MAX_ANALYSIS_OUTPUT_TOKENS,
         temperature: 0,
         response_format: { type: 'json_object' },
-        provider: { sort: 'throughput' },
       }),
     });
 
@@ -236,11 +269,15 @@ export async function callPaperAnalysis(prompt, { timeoutMs = ANALYSIS_PROVIDER_
     try {
       payload = JSON.parse(raw);
     } catch (error) {
-      // The error message below deliberately avoids exposing the raw provider response.
+      // Never expose raw provider payloads through this shared public route.
     }
 
     if (!response.ok) {
-      throw new Error(payload?.error?.message || `The paper analysis provider returned status ${response.status}.`);
+      const providerMessage = payload?.error?.message || `The paper analysis provider returned status ${response.status}.`;
+      throw new PaperAnalysisProviderError(
+        response.status,
+        userSafeProviderError(response.status, providerMessage),
+      );
     }
 
     const answer = String(payload?.choices?.[0]?.message?.content || '').trim();
@@ -253,6 +290,34 @@ export async function callPaperAnalysis(prompt, { timeoutMs = ANALYSIS_PROVIDER_
     throw error;
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+export async function callPaperAnalysis(prompt, { timeoutMs = ANALYSIS_PROVIDER_TIMEOUT_MS } = {}) {
+  const apiKey = String(process.env.OPENROUTER_API_KEY || '').trim();
+  if (!apiKey) throw new Error('The portal AI key is not configured for paper analysis.');
+
+  const deadline = Date.now() + timeoutMs;
+  try {
+    return await requestPaperAnalysis({
+      prompt,
+      apiKey,
+      route: 'paperMetadataPrimary',
+      timeoutMs,
+    });
+  } catch (error) {
+    // The alternate Flash Lite model has a separate model quota. Retrying is only
+    // appropriate when OpenRouter reports an immediate quota or provider failure;
+    // a timeout or malformed answer should be reported as-is.
+    const remainingMs = deadline - Date.now();
+    if (!isRetryableProviderStatus(error?.status) || remainingMs < MIN_PROVIDER_TIMEOUT_MS) throw error;
+
+    return requestPaperAnalysis({
+      prompt,
+      apiKey,
+      route: 'paperMetadataFallback',
+      timeoutMs: remainingMs,
+    });
   }
 }
 
@@ -409,18 +474,30 @@ export default async function handler(req, res) {
   } catch (error) {
     if (claimedAnalysisRef) {
       try {
-        await claimedAnalysisRef.set({
-          status: 'error',
-          errorMessage: String(error?.message || 'The shared paper analysis could not be completed.').slice(0, 500),
-          analysisStartedAtMillis: FieldValue.delete(),
-          updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
+        if (Number(error?.status) === 429) {
+          // Quota exhaustion is transient. Clear the claim rather than turning it
+          // into a shared cached failure that would block a later student retry.
+          await claimedAnalysisRef.set({
+            status: 'missing',
+            analysisStartedAtMillis: FieldValue.delete(),
+            updatedAt: FieldValue.serverTimestamp(),
+          }, { merge: true });
+        } else {
+          await claimedAnalysisRef.set({
+            status: 'error',
+            errorMessage: String(error?.message || 'The shared paper analysis could not be completed.').slice(0, 500),
+            analysisStartedAtMillis: FieldValue.delete(),
+            updatedAt: FieldValue.serverTimestamp(),
+          }, { merge: true });
+        }
       } catch (recordError) {
         // Preserve the original failure for the client even if error recording is unavailable.
       }
     }
 
-    const status = /Sign in is required|sign-in session/i.test(String(error?.message || '')) ? 401 : 500;
+    const status = /Sign in is required|sign-in session/i.test(String(error?.message || ''))
+      ? 401
+      : Number(error?.status) === 429 ? 429 : 500;
     sendJson(res, status, { error: error?.message || 'The shared paper analysis could not be completed.' });
   }
 }

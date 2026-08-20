@@ -14,12 +14,11 @@ Set these **server-only** variables for the Production, Preview, and Development
 
 | Variable | Purpose |
 |---|---|
-| `OPENROUTER_API_KEY` | Existing portal AI key used to analyse a paper when no shared metadata exists. |
+| `OPENROUTER_API_KEY` | Portal-owned OpenRouter key. Chat uses Gemma 4 31B and paper analysis uses Gemini Flash Lite through the linked Google AI Studio provider only. |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | Full JSON for the dedicated `HSC Portal Paper Metadata API` service account. This is used only by the Vercel serverless route and must never be committed. |
 | `FIREBASE_FIRESTORE_DATABASE_ID` | `(default)`; optional because the server route includes the dedicated default database as its fallback. |
-| `PAPER_METADATA_MODEL` | Optional OpenRouter model override. If omitted, the route uses `openrouter/free`. |
 
-The service-account principal needs permission to read and write Firestore documents in the portal database. The dedicated service account uses the **Cloud Datastore User** role for that purpose. Do not use a browser API key in place of the service-account JSON.
+The server route pins the provider to `google-ai-studio` and disables OpenRouter fallbacks. It uses Gemini 3.1 Flash Lite first, then retries once with Gemini 3.5 Flash Lite only when the first model returns a provider quota or transient server error. This avoids consuming shared OpenRouter capacity. The service-account principal needs permission to read and write Firestore documents in the portal database. The dedicated service account uses the **Cloud Datastore User** role for that purpose. Do not use a browser API key in place of the service-account JSON.
 
 ## Verify the flow after deployment
 

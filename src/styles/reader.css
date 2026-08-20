@@ -46,6 +46,60 @@
   border-bottom: 1px solid var(--color-divider);
 }
 
+/* ── Recommended challenge ───────────────────────────────────────────── */
+
+.reader-challenge {
+  flex: none;
+  padding: 10px var(--gutter) 12px;
+  background: color-mix(in srgb, var(--color-accent-100) 58%, var(--color-bg));
+  border-bottom: 1px solid var(--color-divider);
+}
+.reader-challenge-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  max-width: 1180px; margin: 0 auto 9px;
+}
+.reader-challenge-head .kick { display: flex; align-items: center; gap: 5px; color: var(--color-accent-800); }
+.reader-challenge-list {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px;
+  max-width: 1180px; margin: 0 auto;
+}
+.reader-challenge-card {
+  min-width: 0;
+  display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 3px 8px;
+  padding: 10px 11px; text-align: left;
+  color: var(--color-text); background: var(--color-bg);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 42%, var(--color-divider));
+  border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
+  transition: transform 0.16s cubic-bezier(0.23, 1, 0.32, 1), border-color 0.16s ease, background-color 0.16s ease;
+}
+.reader-challenge-card:hover {
+  transform: translateY(-1px); border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent-100) 38%, var(--color-bg));
+}
+.reader-challenge-card:active { transform: scale(0.985); }
+.challenge-level {
+  grid-row: 1; display: inline-flex; align-items: center; width: fit-content;
+  padding: 2px 5px; border-radius: var(--radius-sm);
+  font: 10px var(--font-num); letter-spacing: 0.06em; text-transform: uppercase;
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  color: color-mix(in srgb, var(--color-text) 72%, transparent);
+}
+.challenge-level.is-challenging { background: color-mix(in srgb, var(--color-accent) 18%, transparent); color: var(--color-accent-800); }
+.challenge-level.is-stretch { background: color-mix(in srgb, var(--status-danger) 15%, transparent); color: var(--status-danger); }
+.reader-challenge-card strong { min-width: 0; font-family: var(--font-heading); font-size: 15px; line-height: 1.1; }
+.reader-challenge-card .num { grid-column: 1 / -1; font-size: 11px; }
+.challenge-reason { grid-column: 1 / -1; font-size: 12px; line-height: 1.32; color: color-mix(in srgb, var(--color-text) 72%, transparent); }
+.challenge-go { grid-column: 1 / -1; margin-top: 2px; font: 11px var(--font-num); color: var(--color-accent-800); }
+.reader-challenge-empty {
+  max-width: 1180px; margin: 0 auto; padding: 8px 10px;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+  background: var(--color-bg); border: 1px dashed var(--color-divider); border-radius: var(--radius-md); font-size: 12.5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-challenge-card { transition: none; }
+}
+
 /* ── Panes ────────────────────────────────────────────────────────────── */
 
 .reader-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }

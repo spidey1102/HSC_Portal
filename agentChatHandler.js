@@ -1,6 +1,5 @@
 import { resolveOpenRouterKey } from './openRouterKeyResolver.js';
-
-const AGENT_MODEL = 'openrouter/free';
+import { SHARED_OPENROUTER_MODEL, getCompletionRoute, userSafeProviderError } from './openRouterRouting.js';
 
 const AGENT_SYSTEM_PROMPT = [
   'You are a smart, efficient HSC study assistant operating inside the HSC Portal.',
@@ -77,8 +76,14 @@ export async function handleAgentChatRequest(req, res, apiKey) {
     ? messages
     : [{ role: 'system', content: AGENT_SYSTEM_PROMPT }, ...messages];
 
+  const completionRoute = getCompletionRoute({
+    route: 'chat',
+    keySelection,
+    requestedModel: String(parsed.model || SHARED_OPENROUTER_MODEL).trim() || SHARED_OPENROUTER_MODEL,
+  });
+
   const requestBody = {
-    model: AGENT_MODEL,
+    ...completionRoute,
     messages: fullMessages,
     max_tokens: 1024,
     temperature: 0.2,
@@ -110,7 +115,10 @@ export async function handleAgentChatRequest(req, res, apiKey) {
     }
 
     if (!response.ok) {
-      const message = payload?.error?.message || raw || `OpenRouter error: ${response.status}`;
+      const providerMessage = payload?.error?.message || raw || `OpenRouter error: ${response.status}`;
+      const message = keySelection.source === 'server'
+        ? userSafeProviderError(response.status, providerMessage)
+        : providerMessage;
       res.statusCode = response.status;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ error: message }));

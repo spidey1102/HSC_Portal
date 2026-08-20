@@ -16,6 +16,31 @@ function isKnownMark(value) {
   return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
 }
 
+const CHALLENGE_LEVELS = new Set(['routine', 'challenging', 'stretch']);
+const CHALLENGE_REASONS = new Set([
+  'unfamiliar-context',
+  'multi-step-reasoning',
+  'cross-topic-synthesis',
+  'data-interpretation',
+  'common-misconception',
+  'non-routine-method',
+  'extended-response',
+]);
+
+function normaliseQuestion(question) {
+  const rawChallenge = question?.challenge || {};
+  return {
+    ...question,
+    challenge: {
+      level: CHALLENGE_LEVELS.has(rawChallenge.level) ? rawChallenge.level : 'routine',
+      reasons: (Array.isArray(rawChallenge.reasons) ? rawChallenge.reasons : [])
+        .filter((reason, index, all) => CHALLENGE_REASONS.has(reason) && all.indexOf(reason) === index)
+        .slice(0, 2),
+      note: String(rawChallenge.note || '').trim().slice(0, 220),
+    },
+  };
+}
+
 function normaliseMetadata(data, { cached = true } = {}) {
   return {
     ...createEmptyPaperMetadata(data?.status || 'ready'),
@@ -23,7 +48,7 @@ function normaliseMetadata(data, { cached = true } = {}) {
     paperKey: data?.paperKey || '',
     questionCount: Number(data?.questionCount) || 0,
     totalMarks: isKnownMark(data?.totalMarks) ? Number(data.totalMarks) : null,
-    questions: Array.isArray(data?.questions) ? data.questions : [],
+    questions: Array.isArray(data?.questions) ? data.questions.map(normaliseQuestion) : [],
     confidence: data?.confidence || null,
     notes: data?.notes || '',
     sourceFingerprint: data?.sourceFingerprint || '',

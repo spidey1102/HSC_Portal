@@ -218,7 +218,7 @@ function PdfPage({
   const canSelectText = textSelectable && (tool === 'select' || tool === 'hand');
 
   return (
-    <div className="pdf-page">
+    <div className="pdf-page" data-pdf-page={pageNumber}>
       <div
         ref={surfaceRef}
         className="pdf-page-sheet"
@@ -325,6 +325,7 @@ export default function PdfDocument({
   onSelectionChange,
   viewportRef,
   contentRef,
+  targetPage = null,
   textSelectable = true,
 }) {
   const [pdfDocument, setPdfDocument] = useState(null);
@@ -560,6 +561,13 @@ export default function PdfDocument({
       setDraft(null);
     }
   }, [annotations, draft, onCommit]);
+
+  useEffect(() => {
+    const page = Number(targetPage);
+    if (status !== 'ready' || !Number.isInteger(page) || page < 1) return;
+    const target = contentRef.current?.querySelector(`[data-pdf-page="${page}"]`);
+    target?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }, [contentRef, status, targetPage]);
 
   const body = useMemo(() => (pdfDocument ? baseSizes.map((baseSize, index) => (
     <PdfPage

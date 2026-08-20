@@ -1,6 +1,5 @@
 import { resolveOpenRouterKey } from './openRouterKeyResolver.js';
-
-const DEFAULT_MODEL = 'openrouter/free';
+import { SHARED_OPENROUTER_MODEL, getCompletionRoute, userSafeProviderError } from './openRouterRouting.js';
 
 const SYSTEM_PROMPT = `You are a search query parser for an HSC (Higher School Certificate) exam portal.
 Analyze the user's natural language request and extract the search intent as a JSON object matching this schema:
@@ -50,7 +49,12 @@ export async function handleAgentSearchRequest(req, res, apiKey) {
     const query = String(parsed.query || '').trim();
     const subjects = Array.isArray(parsed.subjects) ? parsed.subjects : [];
     const schools = Array.isArray(parsed.schools) ? parsed.schools : [];
-    const model = String(parsed.model || DEFAULT_MODEL).trim() || DEFAULT_MODEL;
+    const requestedModel = String(parsed.model || SHARED_OPENROUTER_MODEL).trim() || SHARED_OPENROUTER_MODEL;
+    const completionRoute = getCompletionRoute({
+      route: 'chat',
+      keySelection,
+      requestedModel,
+    });
 
     if (!query) {
       res.statusCode = 400;
@@ -78,7 +82,7 @@ Extract intent matching the JSON schema.`;
         'X-Title': 'HSC Portal Agentic Search',
       },
       body: JSON.stringify({
-        model,
+        ...completionRoute,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: prompt },
@@ -97,7 +101,10 @@ Extract intent matching the JSON schema.`;
     }
 
     if (!response.ok) {
-      const message = payload?.error?.message || raw || `OpenRouter request failed with status ${response.status}.`;
+      const providerMessage = payload?.error?.message || raw || `OpenRouter request failed with status ${response.status}.`;
+      const message = keySelection.source === 'server'
+        ? userSafeProviderError(response.status, providerMessage)
+        : providerMessage;
       res.statusCode = response.status;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ error: message }));

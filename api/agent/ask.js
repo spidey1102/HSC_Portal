@@ -2,6 +2,7 @@ import fs from 'fs'
 import { resolve } from 'path'
 import { generateMockAnswer } from '../../openrouterHandler.js'
 import { resolveOpenRouterKey } from '../../openRouterKeyResolver.js'
+import { SHARED_OPENROUTER_MODEL, getCompletionRoute, userSafeProviderError } from '../../openRouterRouting.js'
 
 async function readJsonBody(req) {
   let body = ''
@@ -49,6 +50,12 @@ export default async function handler(req, res) {
       return
     }
 
+    const completionRoute = getCompletionRoute({
+      route: 'chat',
+      keySelection,
+      requestedModel: String(parsed.model || SHARED_OPENROUTER_MODEL).trim() || SHARED_OPENROUTER_MODEL,
+    })
+
     // Proxy request to OpenRouter
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -59,7 +66,7 @@ export default async function handler(req, res) {
         'X-Title': 'HSC Portal',
       },
       body: JSON.stringify({
-        model: parsed.model || 'openrouter/free',
+        ...completionRoute,
         messages: [
           { role: 'system', content: 'You are a calm HSC study coach for a student revision app.' },
           { role: 'user', content: [`Context from the app:`, context || 'No extra app context provided.', '', `Request: ${prompt}`].join('\n') },
@@ -74,7 +81,10 @@ export default async function handler(req, res) {
     try { payload = JSON.parse(rawText) } catch (err) { /* ignore */ }
 
     if (!response.ok) {
-      const message = payload?.error?.message || rawText || `OpenRouter request failed with status ${response.status}.`
+      const providerMessage = payload?.error?.message || rawText || `OpenRouter request failed with status ${response.status}.`
+      const message = keySelection.source === 'server'
+        ? userSafeProviderError(response.status, providerMessage)
+        : providerMessage
       res.statusCode = response.status
       res.setHeader('Content-Type', 'application/json')
       res.end(JSON.stringify({ error: message }))
