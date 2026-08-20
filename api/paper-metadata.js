@@ -458,6 +458,13 @@ export async function runPaperAnalysisWorker({ ref, paper, sourceFingerprint, re
 
 export default async function handler(req, res) {
   const requestStartedAt = Date.now();
+  const logPhase = (phase, details = {}) => {
+    console.info('[paper-metadata] claim route phase', {
+      phase,
+      elapsedMs: Date.now() - requestStartedAt,
+      ...details,
+    });
+  };
 
   if (!['GET', 'POST'].includes(req.method)) {
     sendJson(res, 405, { error: 'Method not allowed.' });
@@ -468,6 +475,7 @@ export default async function handler(req, res) {
     const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const paperId = requestUrl.searchParams.get('paperId');
     const paperName = requestUrl.searchParams.get('paperName');
+    logPhase('request received', { method: req.method, paperId: String(paperId || '') });
     if (!paperId) {
       sendJson(res, 400, { error: 'paperId is required.' });
       return;
@@ -486,9 +494,15 @@ export default async function handler(req, res) {
     const sourceFingerprint = getPaperSourceFingerprint(paper);
     // GET is deliberately public for reusable paper structure. Every POST is an
     // analysis request and must authenticate before even returning a cache hit.
-    if (req.method === 'POST') await requireAuthenticatedUser(req);
+    if (req.method === 'POST') {
+      logPhase('verifying token');
+      await requireAuthenticatedUser(req);
+      logPhase('token verified');
+    }
 
+    logPhase('reading metadata cache');
     const initial = await readMetadata({ paper, sourceFingerprint });
+    logPhase('metadata cache read', { status: initial.data?.status || initial.failure?.status || 'missing' });
     if (initial.data) {
       sendJson(res, initial.data.status === 'analysing' ? 202 : 200, publicMetadata(initial.data));
       return;
@@ -506,6 +520,7 @@ export default async function handler(req, res) {
     const db = getAdminFirestore();
     const ref = initial.ref;
     const now = Date.now();
+    logPhase('claiming analysis job');
     const claim = await db.runTransaction(async (transaction) => {
       const current = await transaction.get(ref);
       const data = current.exists ? current.data() : null;
@@ -530,6 +545,8 @@ export default async function handler(req, res) {
       }, { merge: true });
       return { state: 'claimed' };
     });
+
+    logPhase('analysis job claim completed', { state: claim.state });
 
     if (claim.state === 'ready') {
       sendJson(res, 200, publicMetadata(claim.data));
