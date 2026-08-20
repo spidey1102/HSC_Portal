@@ -5,7 +5,7 @@ import {
   completePaperAnalysis,
   getPaperMetadata,
   recordPaperAnalysisFailure,
-} from './lib/portalStorage.js';
+} from '../server/portalStorage.js';
 import {
   getPaperSourceFingerprint,
   loadPaperRecord,
