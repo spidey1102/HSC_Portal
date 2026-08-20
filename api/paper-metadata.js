@@ -517,34 +517,48 @@ export default async function handler(req, res) {
       return;
     }
 
-    const db = getAdminFirestore();
     const ref = initial.ref;
     const now = Date.now();
-    logPhase('claiming analysis job');
-    const claim = await db.runTransaction(async (transaction) => {
-      const current = await transaction.get(ref);
-      const data = current.exists ? current.data() : null;
-      if (data?.status === 'ready' && isCurrentCacheEntry(data, sourceFingerprint)) {
-        return { state: 'ready', data };
-      }
-      const startedAtMillis = Number(data?.analysisStartedAtMillis) || 0;
-      if (data?.status === 'analysing' && now - startedAtMillis < ANALYSIS_LOCK_MS) {
-        return { state: 'analysing', data };
-      }
+    const claimPayload = {
+      paperKey: paperIdentity(paper),
+      paperId: String(paper.v),
+      paperName: paper.n,
+      sourceFingerprint,
+      extractionVersion: EXTRACTION_VERSION,
+      status: 'analysing',
+      analysisStartedAtMillis: now,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
 
-      transaction.set(ref, {
-        paperKey: paperIdentity(paper),
-        paperId: String(paper.v),
-        paperName: paper.n,
-        sourceFingerprint,
-        extractionVersion: EXTRACTION_VERSION,
-        status: 'analysing',
-        analysisStartedAtMillis: now,
-        errorMessage: FieldValue.delete(),
-        updatedAt: FieldValue.serverTimestamp(),
-      }, { merge: true });
-      return { state: 'claimed' };
-    });
+    // Firestore transactions can retry their read-write cycle and were hanging in
+    // Vercel for the full route duration. A document create is atomic: exactly one
+    // concurrent request wins the missing-document claim; every other request reads
+    // the winner's state and simply reports that analysis is already underway.
+    logPhase('claiming analysis job');
+    let claim = { state: 'claimed' };
+    if (initial.failure) {
+      await ref.set({ ...claimPayload, errorMessage: FieldValue.delete() }, { merge: true });
+    } else {
+      try {
+        await ref.create(claimPayload);
+      } catch (error) {
+        const isAlreadyClaimed = error?.code === 6
+          || error?.code === 'already-exists'
+          || Number(error?.status) === 409;
+        if (!isAlreadyClaimed) throw error;
+
+        const current = await ref.get();
+        const data = current.exists ? current.data() : null;
+        const startedAtMillis = Number(data?.analysisStartedAtMillis) || 0;
+        if (data?.status === 'ready' && isCurrentCacheEntry(data, sourceFingerprint)) {
+          claim = { state: 'ready', data };
+        } else if (data?.status === 'analysing' && now - startedAtMillis < ANALYSIS_LOCK_MS) {
+          claim = { state: 'analysing', data };
+        } else {
+          await ref.set({ ...claimPayload, errorMessage: FieldValue.delete() }, { merge: true });
+        }
+      }
+    }
 
     logPhase('analysis job claim completed', { state: claim.state });
 
