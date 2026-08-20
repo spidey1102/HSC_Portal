@@ -19,6 +19,10 @@ const STANDARD_FONT_DATA_URL = `${resolve(process.cwd(), 'node_modules', 'pdfjs-
 const CACHE_TTL_MS = 60 * 60 * 1000
 const MAX_PDF_BYTES = 12 * 1024 * 1024
 const MAX_CACHED_PDFS = 4
+// Callers share a 60s function ceiling with whatever they do next, so the source
+// fetch must leave room rather than consume the whole request on its own.
+const PDF_FETCH_TIMEOUT_MS = 45 * 1000
+const MIN_PDF_FETCH_TIMEOUT_MS = 5 * 1000
 const contextCache = new Map()
 const pdfByteCache = new Map()
 
@@ -75,7 +79,7 @@ function storePdfBytes(cacheKey, bytes) {
   pdfByteCache.set(cacheKey, { createdAt: Date.now(), bytes })
 }
 
-async function getPaperBytes(paper) {
+async function getPaperBytes(paper, { timeoutMs = PDF_FETCH_TIMEOUT_MS } = {}) {
   if (!paper?.cf) {
     return { unavailable: 'This paper does not have a direct PDF source in the library.' }
   }
@@ -87,7 +91,7 @@ async function getPaperBytes(paper) {
   }
 
   const response = await fetch(paperUrl(paper.cf), {
-    signal: AbortSignal.timeout(59000),
+    signal: AbortSignal.timeout(Math.max(Number(timeoutMs) || 0, MIN_PDF_FETCH_TIMEOUT_MS)),
     headers: { Accept: 'application/pdf' },
   })
 
@@ -109,8 +113,8 @@ async function getPaperBytes(paper) {
   return { bytes, cached: false }
 }
 
-export async function extractFullPaperText(paper) {
-  const paperBytes = await getPaperBytes(paper)
+export async function extractFullPaperText(paper, { timeoutMs } = {}) {
+  const paperBytes = await getPaperBytes(paper, { timeoutMs })
   if (paperBytes.unavailable) {
     return {
       status: 'unavailable',

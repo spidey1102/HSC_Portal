@@ -13,9 +13,21 @@ const METADATA_COLLECTION = 'paperMetadata';
 const EXTRACTION_VERSION = 'question-marks-v1';
 const ANALYSIS_LOCK_MS = 2 * 60 * 1000;
 const MAX_ANALYSIS_TEXT_CHARS = 150000;
-const ANALYSIS_PROVIDER_TIMEOUT_MS = 55 * 1000;
-const MAX_ANALYSIS_OUTPUT_TOKENS = 3000;
+const MAX_ANALYSIS_OUTPUT_TOKENS = 8000;
 const DEFAULT_MODEL = 'openrouter/free';
+
+// The whole request has to finish inside maxDuration. Reserve a margin so a slow
+// provider is reported as a timeout instead of the runtime killing the function
+// mid-write and leaving the shared document locked as 'analysing'.
+const FUNCTION_BUDGET_MS = 54 * 1000;
+const RESPONSE_RESERVE_MS = 3 * 1000;
+const MIN_PROVIDER_TIMEOUT_MS = 8 * 1000;
+const ANALYSIS_PROVIDER_TIMEOUT_MS = 45 * 1000;
+const MAX_JSON_REPAIR_STEPS = 400;
+
+function remainingBudgetMs(startedAt) {
+  return FUNCTION_BUDGET_MS - RESPONSE_RESERVE_MS - (Date.now() - startedAt);
+}
 
 function sendJson(res, status, payload) {
   res.statusCode = status;
@@ -56,12 +68,52 @@ function normaliseQuestion(rawQuestion, index) {
     })
     .filter(Boolean);
 
+  const marks = normaliseNumber(rawQuestion?.marks);
+  const subpartMarks = subparts.reduce((sum, subpart) => sum + (subpart.marks ?? 0), 0);
+
   return {
     id: normaliseQuestionId(rawQuestion?.id || rawQuestion?.number || rawQuestion?.label, index),
-    marks: normaliseNumber(rawQuestion?.marks),
+    // A paper that prints marks only against its parts still has a known question total.
+    marks: marks ?? (subpartMarks > 0 ? subpartMarks : null),
     page: normaliseNumber(rawQuestion?.page),
     subparts,
   };
+}
+
+// Questions read out of a PDF arrive in whatever order the model emitted them.
+// Sort on the leading number so "10" follows "9" rather than "1".
+function questionOrder(id) {
+  const match = String(id).match(/\d+/);
+  return match ? Number(match[0]) : Number.MAX_SAFE_INTEGER;
+}
+
+function trimJsonTail(text) {
+  return text.replace(/[\s,]+$/, '');
+}
+
+// Returns the closing brackets needed to balance a JSON fragment, ignoring
+// braces that appear inside string literals.
+function closeOpenStructures(text) {
+  const stack = [];
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') inString = true;
+    else if (char === '{') stack.push('}');
+    else if (char === '[') stack.push(']');
+    else if (char === '}' || char === ']') stack.pop();
+  }
+
+  if (inString) stack.push('"');
+  return stack.reverse().join('');
 }
 
 function parseJsonAnswer(answer) {
@@ -70,11 +122,34 @@ function parseJsonAnswer(answer) {
     .replace(/\s*```$/i, '')
     .trim();
   const first = clean.indexOf('{');
-  const last = clean.lastIndexOf('}');
-  if (first === -1 || last === -1 || last < first) {
+  if (first === -1) {
     throw new Error('The analysis response was not valid JSON.');
   }
-  return JSON.parse(clean.slice(first, last + 1));
+
+  const last = clean.lastIndexOf('}');
+  if (last > first) {
+    try {
+      return JSON.parse(clean.slice(first, last + 1));
+    } catch (error) {
+      // A response cut off by the output ceiling is repaired below rather than lost.
+    }
+  }
+
+  // Every question emitted before the cut is still usable, so step back to the
+  // last complete value and close the structures that were left open.
+  let body = trimJsonTail(clean.slice(first));
+  for (let attempt = 0; attempt < MAX_JSON_REPAIR_STEPS && body.length > 1; attempt += 1) {
+    try {
+      return JSON.parse(`${body}${closeOpenStructures(body)}`);
+    } catch (error) {
+      // Fall through and drop the incomplete trailing value.
+    }
+    const cut = Math.max(body.lastIndexOf('}'), body.lastIndexOf(']'));
+    if (cut <= 0) break;
+    body = trimJsonTail(body.slice(0, cut));
+  }
+
+  throw new Error('The analysis response was not valid JSON.');
 }
 
 function normaliseAnalysis(answer, sourceFingerprint) {
@@ -82,6 +157,8 @@ function normaliseAnalysis(answer, sourceFingerprint) {
   const questions = (Array.isArray(parsed?.questions) ? parsed.questions : [])
     .map(normaliseQuestion)
     .filter((question, index, all) => question.id && all.findIndex((candidate) => candidate.id === question.id) === index)
+    .sort((left, right) => questionOrder(left.id) - questionOrder(right.id)
+      || String(left.id).localeCompare(String(right.id)))
     .slice(0, 250);
 
   if (questions.length === 0) {
@@ -104,6 +181,8 @@ function normaliseAnalysis(answer, sourceFingerprint) {
   };
 }
 
+const PAPER_CATEGORY_LABELS = { H: 'official HSC paper', T: 'school trial paper', A: 'assessment task', O: 'resource' };
+
 function buildAnalysisPrompt(paper, paperText) {
   return [
     'You extract the structure of NSW HSC past papers. Return JSON only, with no markdown or commentary.',
@@ -113,7 +192,10 @@ function buildAnalysisPrompt(paper, paperText) {
     'Use this exact shape: {"totalMarks":number|null,"confidence":"high"|"medium"|"low","notes":"short caveat or empty string","questions":[{"id":"1","marks":number|null,"page":number|null,"subparts":[{"id":"a","marks":number|null,"page":number|null}]}]}.',
     '',
     `Paper: ${paper.n}`,
-    `Source category: ${paper.c || 'unknown'}`,
+    `Source category: ${PAPER_CATEGORY_LABELS[paper.c] || 'unknown'}`,
+    paper.w === 1
+      ? 'This file also contains marking guidelines or worked solutions. Extract the question paper only, and never treat a solution heading as a separate question.'
+      : '',
     'PDF text follows, grouped by page:',
     paperText.slice(0, MAX_ANALYSIS_TEXT_CHARS),
   ].join('\n');
@@ -144,6 +226,7 @@ export async function callPaperAnalysis(prompt, { timeoutMs = ANALYSIS_PROVIDER_
         ],
         max_tokens: MAX_ANALYSIS_OUTPUT_TOKENS,
         temperature: 0,
+        response_format: { type: 'json_object' },
         provider: { sort: 'throughput' },
       }),
     });
@@ -185,20 +268,28 @@ function publicMetadata(data, { cached = true } = {}) {
     notes: data?.notes || '',
     sourceFingerprint: data?.sourceFingerprint || '',
     extractedAt: data?.extractedAt?.toDate?.().toISOString?.() || null,
+    error: data?.status === 'error' ? String(data?.errorMessage || 'The last analysis of this paper failed.') : '',
   };
+}
+
+function isCurrentCacheEntry(data, sourceFingerprint) {
+  return data?.sourceFingerprint === sourceFingerprint
+    && data?.extractionVersion === EXTRACTION_VERSION;
 }
 
 async function readMetadata({ paper, sourceFingerprint }) {
   const db = getAdminFirestore();
   const ref = db.collection(METADATA_COLLECTION).doc(metadataDocumentId(paper));
   const snapshot = await ref.get();
-  if (!snapshot.exists) return { ref, data: null };
+  if (!snapshot.exists) return { ref, data: null, failure: null };
 
   const data = snapshot.data();
-  if (data?.status === 'ready' && data?.sourceFingerprint === sourceFingerprint) {
-    return { ref, data };
-  }
-  return { ref, data: null };
+  if (!isCurrentCacheEntry(data, sourceFingerprint)) return { ref, data: null, failure: null };
+  if (data?.status === 'ready') return { ref, data, failure: null };
+  // A recorded failure is reported so the reader can show why, rather than looking
+  // like a paper that has simply never been analysed.
+  if (data?.status === 'error') return { ref, data: null, failure: data };
+  return { ref, data: null, failure: null };
 }
 
 export default async function handler(req, res) {
@@ -206,6 +297,7 @@ export default async function handler(req, res) {
   // as failed. This prevents auth, lookup, or response errors from corrupting an
   // already-ready shared cache entry.
   let claimedAnalysisRef = null;
+  const requestStartedAt = Date.now();
 
   if (!['GET', 'POST'].includes(req.method)) {
     sendJson(res, 405, { error: 'Method not allowed.' });
@@ -243,6 +335,10 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'GET') {
+      if (initial.failure) {
+        sendJson(res, 200, publicMetadata(initial.failure));
+        return;
+      }
       sendJson(res, 404, { status: 'missing', cached: false, error: 'No shared question-and-mark analysis exists for this paper yet.' });
       return;
     }
@@ -253,7 +349,7 @@ export default async function handler(req, res) {
     const claim = await db.runTransaction(async (transaction) => {
       const current = await transaction.get(ref);
       const data = current.exists ? current.data() : null;
-      if (data?.status === 'ready' && data?.sourceFingerprint === sourceFingerprint) {
+      if (data?.status === 'ready' && isCurrentCacheEntry(data, sourceFingerprint)) {
         return { state: 'ready', data };
       }
       const startedAtMillis = Number(data?.analysisStartedAtMillis) || 0;
@@ -269,6 +365,7 @@ export default async function handler(req, res) {
         extractionVersion: EXTRACTION_VERSION,
         status: 'analysing',
         analysisStartedAtMillis: now,
+        errorMessage: FieldValue.delete(),
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
       return { state: 'claimed' };
@@ -284,12 +381,16 @@ export default async function handler(req, res) {
     }
 
     claimedAnalysisRef = ref;
-    const extracted = await extractFullPaperText(paper);
+    const extracted = await extractFullPaperText(paper, { timeoutMs: remainingBudgetMs(requestStartedAt) });
     if (extracted.status !== 'ready' || !extracted.text) {
       throw new Error(extracted.reason || 'The PDF does not expose readable text for question extraction.');
     }
 
-    const answer = await callPaperAnalysis(buildAnalysisPrompt(paper, extracted.text));
+    const providerTimeoutMs = Math.max(remainingBudgetMs(requestStartedAt), MIN_PROVIDER_TIMEOUT_MS);
+    const answer = await callPaperAnalysis(
+      buildAnalysisPrompt(paper, extracted.text),
+      { timeoutMs: providerTimeoutMs },
+    );
     const analysis = normaliseAnalysis(answer, sourceFingerprint);
     const stored = {
       ...analysis,
@@ -310,6 +411,7 @@ export default async function handler(req, res) {
       try {
         await claimedAnalysisRef.set({
           status: 'error',
+          errorMessage: String(error?.message || 'The shared paper analysis could not be completed.').slice(0, 500),
           analysisStartedAtMillis: FieldValue.delete(),
           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });

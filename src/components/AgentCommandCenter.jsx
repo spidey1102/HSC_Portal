@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { runAgent } from '../utils/agentHarness.js';
+import { resolveLocally } from '../utils/localAgent.js';
+import { usePresence } from '../utils/usePresence.js';
+import { useEscapeKey } from '../utils/useEscapeKey.js';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -95,6 +98,10 @@ const SUGGESTIONS = [
  */
 export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
   const [input, setInput] = useState('');
+  const presence = usePresence(isOpen, 260);
+
+  // Every other overlay in the portal closes on Escape; this one did not.
+  useEscapeKey(isOpen, onClose);
   const [conversation, setConversation] = useState([]);
   const [steps, setSteps] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -186,9 +193,21 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
 
     setConversation((prev) => [...prev, { role: 'user', content: trimmed }]);
     setInput('');
+    setHasRun(true);
+
+    // Answer from local data when we can. Most questions are lookups, and this
+    // path costs no request, no key and no waiting.
+    const local = resolveLocally(trimmed, effectiveAppContext);
+    if (local) {
+      setSteps([{ type: 'tool_result', label: 'Answered from your own data — no model call.' }]);
+      setConversation((prev) => [...prev, { role: 'assistant', content: local.answer }]);
+      if (local.navigate) effectiveAppContext?.goToSection?.(local.navigate);
+      window.setTimeout(() => setSteps([]), 1200);
+      return;
+    }
+
     setSteps([{ type: 'thinking', label: 'Starting agent…' }]);
     setIsRunning(true);
-    setHasRun(true);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -255,7 +274,7 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
     }
   };
 
-  if (!isOpen) return null;
+  if (!presence.mounted) return null;
 
   const hasError = steps.some((s) => s.type === 'error');
   const lastStepIdx = steps.length - 1;
@@ -284,7 +303,7 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
     <>
       {/* Backdrop */}
       <div
-        className="agent-backdrop"
+        className={`agent-backdrop is-${presence.stage}`}
         onClick={onClose}
         aria-label="Close Agent"
         role="button"
@@ -292,7 +311,7 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
       />
 
       {/* Panel */}
-      <div className="agent-panel" role="dialog" aria-modal="true" aria-label="AI Agent Command Center">
+      <div className={`agent-panel is-${presence.stage}`} role="dialog" aria-modal="true" aria-label="AI Agent Command Center">
         {/* Header */}
         <div className="agent-header">
           <div className="agent-header-title">
