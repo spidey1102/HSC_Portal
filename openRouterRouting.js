@@ -16,7 +16,7 @@ export const PORTAL_AI_ROUTES = Object.freeze({
     }),
   }),
   paperMetadataPrimary: Object.freeze({
-    model: 'google/gemini-3.1-flash-lite',
+    model: 'google/gemini-3.5-flash-lite',
     provider: Object.freeze({
       only: Object.freeze(['google-ai-studio']),
       allow_fallbacks: false,
