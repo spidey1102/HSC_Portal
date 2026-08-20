@@ -5,6 +5,7 @@ import firebaseConfig from '../../firebase-applet-config.json' with { type: 'jso
 const DEFAULT_DATABASE_ID = '(default)';
 const APP_NAME = 'hsc-portal-server';
 const IDENTITY_LOOKUP_TIMEOUT_MS = 8 * 1000;
+let firestoreInstance = null;
 
 function readServiceAccount() {
   const raw = String(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim();
@@ -31,8 +32,15 @@ export function getFirebaseAdminApp() {
 }
 
 export function getAdminFirestore() {
+  if (firestoreInstance) return firestoreInstance;
+
   const databaseId = String(process.env.FIREBASE_FIRESTORE_DATABASE_ID || DEFAULT_DATABASE_ID).trim();
-  return getFirestore(getFirebaseAdminApp(), databaseId);
+  firestoreInstance = getFirestore(getFirebaseAdminApp(), databaseId);
+  // Vercel's serverless runtime can stall when the Admin SDK opens its gRPC
+  // transport. Metadata reads and writes use only operations supported by REST,
+  // so force HTTP/1.1 before the client performs its first request.
+  firestoreInstance.settings({ preferRest: true });
+  return firestoreInstance;
 }
 
 export async function requireAuthenticatedUser(req) {
