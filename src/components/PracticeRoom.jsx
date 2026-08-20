@@ -317,15 +317,16 @@ export default function PracticeRoom({
     () => getChallengeRecommendations(paperMetadata.questions),
     [paperMetadata.questions],
   );
+  const hasFallbackRecommendation = challengeRecommendations[0]?.isFallback === true;
 
   useEffect(() => {
     if (!openChallengeWhenReady || paperMetadata.status !== 'ready') return;
     setOpenChallengeWhenReady(false);
     setIsChallengeOpen(true);
     flash(challengeRecommendations.length
-      ? 'Recommended challenges are ready'
-      : 'This paper has no unusually challenging questions tagged yet');
-  }, [challengeRecommendations.length, flash, openChallengeWhenReady, paperMetadata.status]);
+      ? hasFallbackRecommendation ? 'A suggested question is ready' : 'Recommended challenges are ready'
+      : 'Question pages could not be prepared for this paper');
+  }, [challengeRecommendations.length, flash, hasFallbackRecommendation, openChallengeWhenReady, paperMetadata.status]);
 
   const handleAnalysePaperMetadata = async () => {
     if (paperMetadata.status === 'analysing') {
@@ -365,7 +366,7 @@ export default function PracticeRoom({
   const handleRecommendChallenge = () => {
     if (paperMetadata.status === 'ready') {
       setIsChallengeOpen(true);
-      if (!challengeRecommendations.length) flash('No unusually challenging questions were tagged in this paper');
+      if (!challengeRecommendations.length) flash('Question pages could not be prepared for this paper');
       return;
     }
 
@@ -609,8 +610,10 @@ export default function PracticeRoom({
               <div className="kick"><Sparkles size={12} /> Recommended challenge</div>
               <p className="dim" style={{ margin: '3px 0 0', fontSize: '12.5px' }}>
                 {challengeRecommendations.length
-                  ? 'These questions are tagged for unusual context, careful reasoning, or non-routine exam skills.'
-                  : 'The paper structure is ready, but no questions were tagged as unusually challenging.'}
+                  ? hasFallbackRecommendation
+                    ? 'This is the paper’s most substantial question. Try it carefully, then continue with the rest of the paper.'
+                    : 'These questions are tagged for unusual context, careful reasoning, or non-routine exam skills.'
+                  : 'The paper structure is ready, but no page-addressable questions could be prepared.'}
               </p>
             </div>
             <button type="button" className="btn btn-secondary btn-icon" onClick={() => setIsChallengeOpen(false)} aria-label="Close recommended challenges" title="Close">
@@ -627,7 +630,7 @@ export default function PracticeRoom({
                   className="reader-challenge-card"
                   onClick={() => handleOpenChallenge(question)}
                 >
-                  <span className={`challenge-level is-${question.challenge.level}`}>{challengeLevelLabel(question.challenge.level)}</span>
+                  <span className={`challenge-level is-${question.challenge.level}`}>{question.isFallback ? 'Suggested' : challengeLevelLabel(question.challenge.level)}</span>
                   <strong>Question {question.id}</strong>
                   <span className="num dim">{question.marks !== null && question.marks !== undefined ? `${question.marks} marks` : 'Marks not stated'} · Page {question.page}</span>
                   <span className="challenge-reason">{challengeReasonLabel(question)}</span>
@@ -636,7 +639,7 @@ export default function PracticeRoom({
               ))}
             </div>
           ) : (
-            <div className="reader-challenge-empty">Try the paper’s later multi-part questions, or use Margin to ask about a section you find difficult.</div>
+            <div className="reader-challenge-empty">Try reopening the paper once its question pages are available, or use Margin to ask about a section you find difficult.</div>
           )}
         </section>
       )}

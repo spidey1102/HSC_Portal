@@ -29,6 +29,10 @@ export function challengeLevelLabel(level) {
 }
 
 export function challengeReasonLabel(question) {
+  if (question?.isFallback) {
+    return 'The most substantial page-addressable question in this paper.';
+  }
+
   const challenge = question?.challenge || {};
   if (challenge.note) return challenge.note;
 
@@ -42,15 +46,15 @@ export function challengeReasonLabel(question) {
 
 /**
  * Chooses the strongest page-addressable questions from a cached paper analysis.
- * Only non-routine questions are surfaced, so the feature never claims that an
- * ordinary question is a recommended challenge merely to fill a card.
+ * Challenging and stretch questions always lead. If a paper's metadata contains
+ * no such tag, one substantial routine question is still surfaced rather than
+ * leaving an HSC student with an empty recommendation panel.
  */
 export function getChallengeRecommendations(questions, limit = 3) {
-  const pool = (Array.isArray(questions) ? questions : [])
+  const ranked = (Array.isArray(questions) ? questions : [])
     .filter((question) => {
       const page = Number(question?.page);
-      const level = question?.challenge?.level;
-      return Number.isInteger(page) && page > 0 && (level === 'challenging' || level === 'stretch');
+      return Number.isInteger(page) && page > 0;
     })
     .map((question) => ({
       ...question,
@@ -63,5 +67,10 @@ export function getChallengeRecommendations(questions, limit = 3) {
       || String(left.id).localeCompare(String(right.id), undefined, { numeric: true })
     ));
 
-  return pool.slice(0, Math.max(1, Math.min(3, limit)));
+  const tagged = ranked.filter((question) => (
+    question?.challenge?.level === 'challenging' || question?.challenge?.level === 'stretch'
+  ));
+  if (tagged.length) return tagged.slice(0, Math.max(1, Math.min(3, limit)));
+
+  return ranked.length ? [{ ...ranked[0], isFallback: true }] : [];
 }
