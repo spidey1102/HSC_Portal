@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Download, ExternalLink, Trash2 } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Download, ExternalLink, Settings2, Trash2 } from 'lucide-react';
 import { ALLOWANCES, MAX_RUNG, clampRung } from '../utils/practiceLadder';
 import { exportExamsToIcs } from '../utils/exportIcs';
 
@@ -34,6 +34,9 @@ function leadingBlanks(year, monthIndex) {
 export default function CalendarView({
   exams = [],
   ladder = [],
+  mySubjects = [],
+  availableSubjects = [],
+  onSubjectsChange,
   onAssessmentsChanged,
 }) {
   // Held in state so the month grid does not rebuild on every render.
@@ -43,12 +46,18 @@ export default function CalendarView({
   const [draftDate, setDraftDate] = useState(null);
   const [draftSubject, setDraftSubject] = useState('');
   const [draftNote, setDraftNote] = useState('');
+  const [editingSubjects, setEditingSubjects] = useState(() => mySubjects.length === 0);
+  const [draftSubjects, setDraftSubjects] = useState(() => mySubjects);
 
   useEffect(() => {
     const refresh = () => setAssessments(readAssessments());
     window.addEventListener('storage', refresh);
     return () => window.removeEventListener('storage', refresh);
   }, []);
+
+  useEffect(() => {
+    if (!editingSubjects) setDraftSubjects(mySubjects);
+  }, [editingSubjects, mySubjects]);
 
   const persist = (next) => {
     setAssessments(next);
@@ -135,6 +144,24 @@ export default function CalendarView({
     return { year: next.getFullYear(), month: next.getMonth() };
   });
 
+  const toggleDraftSubject = (name) => {
+    setDraftSubjects((current) => (
+      current.includes(name) ? current.filter((subject) => subject !== name) : [...current, name]
+    ));
+  };
+
+  const applySubjects = () => {
+    const selected = [...new Set(draftSubjects)].filter(Boolean);
+    if (selected.length === 0) return;
+    onSubjectsChange?.(selected);
+    setEditingSubjects(false);
+  };
+
+  const startEditingSubjects = () => {
+    setDraftSubjects(mySubjects);
+    setEditingSubjects(true);
+  };
+
   const saveDraft = () => {
     if (!draftDate || !draftSubject.trim()) return;
     persist([...assessments, {
@@ -171,6 +198,53 @@ export default function CalendarView({
             </div>
           </div>
         ))}
+
+        <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: '1px solid var(--color-divider)' }}>
+          <div className="kick">My subjects</div>
+          <p className="dim" style={{ fontSize: '11.5px', margin: '6px 0 10px' }}>
+            {mySubjects.length > 0
+              ? `${mySubjects.length} selected. These set the written exams and study run-in shown here.`
+              : 'Choose the subjects you are sitting to see your written exams and study run-in.'}
+          </p>
+
+          {!editingSubjects ? (
+            <button type="button" className="btn btn-secondary" style={{ fontSize: '13px' }} onClick={startEditingSubjects}>
+              <Settings2 size={14} />
+              Edit subjects
+            </button>
+          ) : (
+            <>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+                {availableSubjects.map((name) => {
+                  const selected = draftSubjects.includes(name);
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      className={selected ? 'btn btn-primary' : 'btn btn-secondary'}
+                      aria-pressed={selected}
+                      onClick={() => toggleDraftSubject(name)}
+                      style={{ padding: '5px 8px', fontSize: '11px', minHeight: 'unset' }}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <button type="button" className="btn btn-primary" style={{ fontSize: '12px' }} onClick={applySubjects} disabled={draftSubjects.length === 0}>
+                  <Check size={13} />
+                  Save {draftSubjects.length || ''} subject{draftSubjects.length === 1 ? '' : 's'}
+                </button>
+                {mySubjects.length > 0 && (
+                  <button type="button" className="btn btn-ghost" style={{ fontSize: '12px' }} onClick={() => setEditingSubjects(false)}>
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '18px' }}>
           <button

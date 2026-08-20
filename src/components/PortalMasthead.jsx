@@ -1,5 +1,6 @@
 import { Palette, Search } from 'lucide-react';
 import UserButton from './UserButton';
+import { getPlatformShortcuts } from '../utils/platformShortcuts';
 
 export const PORTAL_SECTIONS = [
   { id: 'today', label: 'Today' },
@@ -23,6 +24,8 @@ export default function PortalMasthead({
   onOpenCustomise,
   showActions = true,
 }) {
+  const shortcuts = getPlatformShortcuts();
+
   return (
     <header>
       <div className="mast">
@@ -49,7 +52,7 @@ export default function PortalMasthead({
               >
                 <Search size={14} />
                 Search or ask
-                <span className="kbd" style={{ opacity: 0.6 }}>⌘K</span>
+                <span className="kbd" style={{ opacity: 0.6 }}>{shortcuts.primaryK}</span>
               </button>
               <button
                 type="button"

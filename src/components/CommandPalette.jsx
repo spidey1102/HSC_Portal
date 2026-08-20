@@ -10,6 +10,7 @@ import { applyLibraryQuery, parseLibraryQuery } from '../utils/libraryQuery';
 import { usePresence } from '../utils/usePresence';
 import { getAllowanceForRung } from '../utils/practiceLadder';
 import { getPaperIdentity } from '../utils/paperIdentity';
+import { getPlatformShortcuts } from '../utils/platformShortcuts';
 
 const MAX_PAPERS = 3;
 
@@ -33,6 +34,7 @@ export default function CommandPalette({
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef(null);
   const presence = usePresence(isOpen, 220);
+  const shortcuts = getPlatformShortcuts();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -59,7 +61,7 @@ export default function CommandPalette({
         id: 'library',
         icon: Timer,
         name: query.trim() ? `Search the library for “${query.trim()}”` : 'Open the library index',
-        hint: '⌘⏎',
+        hint: shortcuts.primaryEnter,
         run: () => onNavigate?.('library', query.trim()),
       },
       {
@@ -82,11 +84,11 @@ export default function CommandPalette({
         id: 'ask',
         icon: Gauge,
         name: query.trim() ? `Ask the agent: “${query.trim()}”` : 'Ask the agent about your marks',
-        hint: '⌥⏎',
+        hint: shortcuts.alternateEnter,
         run: () => onAsk?.(query.trim()),
       },
     ];
-  }, [ladder, query, onNavigate, onAsk]);
+  }, [ladder, query, onNavigate, onAsk, shortcuts.alternateEnter, shortcuts.primaryEnter]);
 
   const rows = useMemo(() => ([
     ...paperMatches.map((paper) => ({ kind: 'paper', paper })),
@@ -162,7 +164,7 @@ export default function CommandPalette({
             placeholder="chem 2021 trial no sol"
             aria-label="Search or ask"
           />
-          <span className="kbd">esc</span>
+          <span className="kbd">{shortcuts.escape}</span>
         </div>
 
         <div className="cmdk-scroll">
@@ -216,9 +218,9 @@ export default function CommandPalette({
 
         <div className="cmdk-foot">
           <span>↑↓ move</span>
-          <span>↵ begin at your allowance</span>
-          <span>⇧↵ begin to time</span>
-          <span>⌥↵ ask the agent</span>
+          <span>{shortcuts.enter} begin at your allowance</span>
+          <span>{shortcuts.shiftEnter} begin to time</span>
+          <span>{shortcuts.alternateEnter} ask the agent</span>
         </div>
       </div>
     </div>

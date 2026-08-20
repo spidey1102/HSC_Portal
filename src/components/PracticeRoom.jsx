@@ -38,6 +38,7 @@ import {
 import { usePdfZoom } from '../utils/usePdfZoom';
 import { usePresence } from '../utils/usePresence';
 import { parsePaperTiming, describeTiming } from '../utils/paperTiming';
+import { isPrimaryModifier } from '../utils/platformShortcuts';
 
 const TIMER_STORAGE_KEY = 'hsc_timer_duration_secs';
 const SCALE_STEP = 1.2;
@@ -158,7 +159,7 @@ export default function PracticeRoom({
       const tag = event.target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
-      if (event.metaKey || event.ctrlKey) {
+      if (isPrimaryModifier(event)) {
         if (event.key === '+' || event.key === '=') { event.preventDefault(); zoom.zoomBy(SCALE_STEP); }
         else if (event.key === '-') { event.preventDefault(); zoom.zoomBy(1 / SCALE_STEP); }
         else if (event.key === '0') { event.preventDefault(); zoom.fitToWidth(widestPage); }

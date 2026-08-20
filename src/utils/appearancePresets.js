@@ -15,6 +15,7 @@ export const APPEARANCE_DEFAULTS = {
   accent: 'gold',
   density: 'book',
   layout: 'standard',
+  portalLayout: 'new',
   showRecommendations: true,
 };
 
@@ -149,9 +150,12 @@ export function loadAppearanceSettings() {
     const layout = LAYOUT_OPTIONS.some((option) => option.value === parsed?.layout)
       ? parsed.layout
       : APPEARANCE_DEFAULTS.layout;
+    const portalLayout = ['new', 'classic'].includes(parsed?.portalLayout)
+      ? parsed.portalLayout
+      : APPEARANCE_DEFAULTS.portalLayout;
     const showRecommendations = parsed?.showRecommendations !== false;
 
-    return { mode, preset, accent, density, layout, showRecommendations };
+    return { mode, preset, accent, density, layout, portalLayout, showRecommendations };
   } catch (error) {
     return { ...APPEARANCE_DEFAULTS };
   }

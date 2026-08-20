@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import Tooltip from './Tooltip';
 import { ANNOTATION_COLORS, HIGHLIGHT_COLORS, MAX_STROKE_WIDTH, MIN_STROKE_WIDTH } from '../../utils/annotations';
+import { getPlatformShortcuts } from '../../utils/platformShortcuts';
 
 const TOOLS = [
   { id: 'select', title: 'Select', hint: 'V', Icon: MousePointer2 },
@@ -101,12 +102,13 @@ export default function AnnotationToolbar({
 }) {
   const inkVisible = tool !== 'select' && tool !== 'hand' && tool !== 'eraser';
   const swatches = palette === 'highlight' ? HIGHLIGHT_COLORS : ANNOTATION_COLORS;
+  const shortcuts = getPlatformShortcuts();
 
   return (
     <div className="tool-row">
       <ToolGroup label="History">
-        <ToolButton title="Undo" hint="⌘Z" Icon={Undo2} expand={false} disabled={!canUndo} onClick={onUndo} />
-        <ToolButton title="Redo" hint="⇧⌘Z" Icon={Redo2} expand={false} disabled={!canRedo} onClick={onRedo} />
+        <ToolButton title="Undo" hint={shortcuts.undo} Icon={Undo2} expand={false} disabled={!canUndo} onClick={onUndo} />
+        <ToolButton title="Redo" hint={shortcuts.redo} Icon={Redo2} expand={false} disabled={!canRedo} onClick={onRedo} />
       </ToolGroup>
 
       <ToolGroup label="Annotation tools">
@@ -164,9 +166,9 @@ export default function AnnotationToolbar({
       </div>
 
       <ToolGroup label="Zoom">
-        <ToolButton title="Zoom out" hint="⌘−" Icon={ZoomOut} expand={false} disabled={scale <= minScale} onClick={() => onZoom(-1)} />
-        <ToolButton title="Zoom in" hint="⌘+" Icon={ZoomIn} expand={false} disabled={scale >= maxScale} onClick={() => onZoom(1)} />
-        <Tooltip label="Fit the page width" hint="⌘0">
+        <ToolButton title="Zoom out" hint={shortcuts.zoomOut} Icon={ZoomOut} expand={false} disabled={scale <= minScale} onClick={() => onZoom(-1)} />
+        <ToolButton title="Zoom in" hint={shortcuts.zoomIn} Icon={ZoomIn} expand={false} disabled={scale >= maxScale} onClick={() => onZoom(1)} />
+        <Tooltip label="Fit the page width" hint={shortcuts.fitWidth}>
           {(tipId) => (
             <button
               type="button"
@@ -181,7 +183,7 @@ export default function AnnotationToolbar({
           )}
         </Tooltip>
         {onHide && (
-          <ToolButton title="Hide the tools" hint="⌘." Icon={PanelBottomClose} expand={false} onClick={onHide} />
+          <ToolButton title="Hide the tools" hint={shortcuts.hideTools} Icon={PanelBottomClose} expand={false} onClick={onHide} />
         )}
       </ToolGroup>
     </div>

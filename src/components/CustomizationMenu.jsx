@@ -176,6 +176,33 @@ export default function CustomizationMenu({
           </div>
 
           <div className="dialog-row">
+            <div className="kick" style={{ marginBottom: '9px' }}>Portal design</div>
+            <div className="seg" style={{ flexWrap: 'wrap' }}>
+              <label className="seg-opt" title="The redesigned Paper Room workspace">
+                <input
+                  type="radio"
+                  name="customisation-portal-layout"
+                  checked={(settings.portalLayout || 'new') === 'new'}
+                  onChange={() => onChange({ portalLayout: 'new' })}
+                />
+                <span>New Paper Room</span>
+              </label>
+              <label className="seg-opt" title="The original portal dashboard, cards, and sidebar">
+                <input
+                  type="radio"
+                  name="customisation-portal-layout"
+                  checked={settings.portalLayout === 'classic'}
+                  onChange={() => onChange({ portalLayout: 'classic' })}
+                />
+                <span>Classic portal</span>
+              </label>
+            </div>
+            <p className="dim" style={{ fontSize: '11.5px', margin: '8px 0 0' }}>
+              Switches the home workspace only. Your papers, synced setup, AI tools, and Practice Room stay the same.
+            </p>
+          </div>
+
+          <div className="dialog-row">
             <div className="kick" style={{ marginBottom: '9px' }}>AI provider</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
               <label className="radio">
