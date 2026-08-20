@@ -1,52 +1,21 @@
-import { useEffect, useState } from 'react';
-import { Check, X, Monitor, Moon, Palette, Sun, KeyRound, Server, UserRound, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { Eye, EyeOff, Trash2, X } from 'lucide-react';
+import { useEscapeKey } from '../utils/useEscapeKey';
+import { usePresence } from '../utils/usePresence';
 import {
-  APPEARANCE_PRESETS,
   ACCENT_OPTIONS,
+  APPEARANCE_DEFAULTS,
   DENSITY_OPTIONS,
   LAYOUT_OPTIONS,
+  MODE_OPTIONS,
 } from '../utils/appearancePresets';
 
-const MODE_OPTIONS = [
-  {
-    value: 'system',
-    label: 'System',
-    description: 'Follow your device theme.',
-    icon: Monitor,
-  },
-  {
-    value: 'light',
-    label: 'Light',
-    description: 'Force the brighter theme.',
-    icon: Sun,
-  },
-  {
-    value: 'dark',
-    label: 'Dark',
-    description: 'Force the darker theme.',
-    icon: Moon,
-  },
-];
-
-function OptionButton({ active, label, description, icon: Icon, onClick }) {
-  return (
-    <button
-      type="button"
-      className={`appearance-option ${active ? 'is-active' : ''}`}
-      onClick={onClick}
-    >
-      <span className="appearance-option-icon">
-        <Icon size={16} />
-      </span>
-      <span className="appearance-option-copy">
-        <span className="appearance-option-label">{label}</span>
-        <span className="appearance-option-description">{description}</span>
-      </span>
-      {active && <Check size={16} className="appearance-option-check" />}
-    </button>
-  );
-}
-
+/**
+ * Customisation — themes, presets, and the AI key.
+ *
+ * One dialog, ruled into sections. Nothing here changes the type sizes; the
+ * ground, the rule colour and the row density are the only levers.
+ */
 export default function CustomizationMenu({
   isOpen,
   settings,
@@ -56,248 +25,229 @@ export default function CustomizationMenu({
   onClose,
 }) {
   const [showPersonalKey, setShowPersonalKey] = useState(false);
+  const presence = usePresence(isOpen, 220);
 
-  useEffect(() => {
-    if (!isOpen) return undefined;
+  useEscapeKey(isOpen, onClose);
 
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        onClose?.();
-      }
-    };
+  if (!presence.mounted) return null;
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
+  const usesPersonalKey = aiSettings.providerMode === 'personal';
 
   return (
-    <>
-      <div className="appearance-backdrop" onClick={onClose} aria-hidden="true" />
-      <div className="appearance-modal" role="dialog" aria-modal="true" aria-label="Customize appearance">
-        <div className="appearance-modal-card" onClick={(event) => event.stopPropagation()}>
-          <div className="appearance-modal-header">
-            <div className="appearance-title-block">
-              <span className="appearance-modal-icon">
-                <Palette size={18} />
-              </span>
-              <div>
-                <div className="appearance-title">Customisation</div>
-                <div className="appearance-subtitle">Themes, colors, and a few extra layout choices</div>
-              </div>
+    <div className={`dialog-backdrop is-${presence.stage}`} role="presentation" onMouseDown={onClose}>
+      <section
+        className="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="customisation-title"
+        style={{ width: 'min(700px, 100%)' }}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="dialog-head">
+          <div>
+            <div className="kick">Preferences</div>
+            <h3 id="customisation-title">Customisation</h3>
+            <p>Themes, colours, and a few extra layout choices</p>
+          </div>
+          <button type="button" className="btn btn-icon btn-secondary" onClick={onClose} aria-label="Close customisation">
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="dialog-scroll">
+          <div className="dialog-row">
+            <div className="kick" style={{ marginBottom: '9px' }}>Theme mode</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
+              {MODE_OPTIONS.map((option) => (
+                <label
+                  key={option.value}
+                  className="seg-opt"
+                  style={{
+                    border: '1px solid var(--color-divider)',
+                    borderRadius: 'var(--radius-md)',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: '3px',
+                    padding: '10px 12px',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="customisation-mode"
+                    checked={settings.mode === option.value}
+                    onChange={() => onChange({ mode: option.value })}
+                  />
+                  <span style={{ fontFamily: 'var(--font-heading)', fontSize: '15px' }}>{option.label}</span>
+                  <span className="dim" style={{ fontSize: '11px' }}>{option.description}</span>
+                </label>
+              ))}
             </div>
-            <button type="button" className="appearance-close-btn" onClick={onClose} aria-label="Close customisation menu">
-              <X size={16} />
-            </button>
           </div>
 
-          <div className="appearance-modal-body">
-            <section className="appearance-section">
-              <div className="appearance-section-header">
-                <div className="appearance-section-title">Theme mode</div>
-                <div className="appearance-section-note">Keep the current light/dark toggle or let the app follow your system.</div>
-              </div>
-              <div className="appearance-option-grid">
-                {MODE_OPTIONS.map((option) => (
-                  <OptionButton
-                    key={option.value}
-                    active={settings.mode === option.value}
-                    label={option.label}
-                    description={option.description}
-                    icon={option.icon}
-                    onClick={() => onChange({ mode: option.value })}
+          <div className="dialog-row" style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 260px' }}>
+              <div style={{ fontFamily: 'var(--font-heading)', fontSize: '16px' }}>Show the prescribed sitting on Today</div>
+              <div className="dim" style={{ fontSize: '12px' }}>Turn off to open straight into the library index.</div>
+            </div>
+            <div className="seg">
+              {[true, false].map((value) => (
+                <label key={String(value)} className="seg-opt">
+                  <input
+                    type="radio"
+                    name="customisation-prescription"
+                    checked={(settings.showRecommendations !== false) === value}
+                    onChange={() => onChange({ showRecommendations: value })}
                   />
-                ))}
-              </div>
-            </section>
+                  <span>{value ? 'On' : 'Off'}</span>
+                </label>
+              ))}
+            </div>
+          </div>
 
-            <section className="appearance-section">
-              <div className="appearance-section-header">
-                <div className="appearance-section-title">Suggested Next</div>
-                <div className="appearance-section-note">Show or hide the recommendation box above paper search.</div>
-              </div>
-              <div className="appearance-option-grid appearance-option-grid--compact">
-                <OptionButton
-                  active={settings.showRecommendations !== false}
-                  label={settings.showRecommendations !== false ? 'Show Suggested Next' : 'Hide Suggested Next'}
-                  description={settings.showRecommendations !== false
-                    ? 'Recommendations are visible on the paper library.'
-                    : 'The paper library opens directly to search and results.'}
-                  icon={settings.showRecommendations !== false ? Eye : EyeOff}
-                  onClick={() => onChange({ showRecommendations: settings.showRecommendations === false })}
-                />
-              </div>
-            </section>
-
-            <section className="appearance-section">
-              <div className="appearance-section-header">
-                <div className="appearance-section-title">Presets</div>
-                <div className="appearance-section-note">Use one of the existing looks or switch to a new study palette.</div>
-              </div>
-              <div className="appearance-preset-grid">
-                {Object.entries(APPEARANCE_PRESETS).map(([key, preset]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    className={`appearance-preset-card ${settings.preset === key ? 'is-active' : ''}`}
-                    onClick={() => onChange({ preset: key })}
-                  >
-                    <div className="appearance-preset-topline">
-                      <span className="appearance-preset-label">{preset.label}</span>
-                      {settings.preset === key && <Check size={14} className="appearance-option-check" />}
-                    </div>
-                    <div className="appearance-preset-swatches">
-                      {(preset.swatches || []).map((color) => (
-                        <span key={color} className="appearance-preset-swatch" style={{ backgroundColor: color }} />
-                      ))}
-                    </div>
-                    <div className="appearance-preset-description">{preset.description}</div>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section className="appearance-section">
-              <div className="appearance-section-header">
-                <div className="appearance-section-title">Accent color</div>
-                <div className="appearance-section-note">This updates buttons, highlights, and primary actions.</div>
-              </div>
-              <div className="appearance-swatch-row">
-                {Object.entries(ACCENT_OPTIONS).map(([key, accent]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    className={`appearance-swatch ${settings.accent === key ? 'is-active' : ''}`}
-                    onClick={() => onChange({ accent: key })}
-                    title={accent.description}
-                    aria-label={accent.label}
-                  >
-                    <span className="appearance-swatch-chip" style={{ backgroundColor: accent.accent }} />
-                    <span className="appearance-swatch-label">{accent.label}</span>
-                    {settings.accent === key && <Check size={14} className="appearance-option-check" />}
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section className="appearance-section">
-              <div className="appearance-section-header">
-                <div className="appearance-section-title">Page layout</div>
-                <div className="appearance-section-note">Focus hides dashboard extras to make browsing papers calmer and easier to scan.</div>
-              </div>
-              <div className="appearance-option-grid appearance-option-grid--compact">
-                {LAYOUT_OPTIONS.map((option) => (
-                  <OptionButton
-                    key={option.value}
-                    active={settings.layout === option.value}
-                    label={option.label}
-                    description={option.description}
-                    icon={Palette}
-                    onClick={() => onChange({ layout: option.value })}
-                  />
-                ))}
-              </div>
-            </section>
-
-            <section className="appearance-section">
-              <div className="appearance-section-header">
-                <div className="appearance-section-title">Spacing</div>
-                <div className="appearance-section-note">A small extra option for dense or relaxed layouts.</div>
-              </div>
-              <div className="appearance-option-grid appearance-option-grid--compact">
+          <div className="dialog-row">
+            <div className="kick" style={{ marginBottom: '9px' }}>Density</div>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="seg">
                 {DENSITY_OPTIONS.map((option) => (
-                  <OptionButton
-                    key={option.value}
-                    active={settings.density === option.value}
-                    label={option.label}
-                    description={option.description}
-                    icon={Palette}
-                    onClick={() => onChange({ density: option.value })}
-                  />
+                  <label key={option.value} className="seg-opt" title={option.description}>
+                    <input
+                      type="radio"
+                      name="customisation-density"
+                      checked={settings.density === option.value}
+                      onChange={() => onChange({ density: option.value })}
+                    />
+                    <span>{option.label}</span>
+                  </label>
                 ))}
               </div>
-            </section>
-
-            <section className="appearance-section">
-              <div className="appearance-section-header">
-                <div className="appearance-section-title">AI provider</div>
-                <div className="appearance-section-note">Choose the portal AI or use your own OpenRouter key for this browser session.</div>
-              </div>
-              <div className="appearance-option-grid appearance-option-grid--compact">
-                <OptionButton
-                  active={aiSettings.providerMode !== 'personal'}
-                  label="Use portal AI"
-                  description="Uses the server-side key configured by HSC Portal."
-                  icon={Server}
-                  onClick={() => onAiSettingsChange?.({ providerMode: 'portal' })}
-                />
-                <OptionButton
-                  active={aiSettings.providerMode === 'personal'}
-                  label="Use my OpenRouter key"
-                  description="Uses your own key for AI requests in this browser session."
-                  icon={UserRound}
-                  onClick={() => onAiSettingsChange?.({ providerMode: 'personal' })}
-                />
-              </div>
-
-              {aiSettings.providerMode === 'personal' && (
-                <div style={{ marginTop: '12px', padding: '12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--sidebar-border)' }}>
-                  <label htmlFor="personal-openrouter-key" style={{ display: 'block', marginBottom: '7px', fontSize: '12px', fontWeight: 700, color: 'var(--text-normal)' }}>
-                    OpenRouter API key
-                  </label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      id="personal-openrouter-key"
-                      type={showPersonalKey ? 'text' : 'password'}
-                      value={aiSettings.personalKey || ''}
-                      onChange={(event) => onAiSettingsChange?.({ personalKey: event.target.value })}
-                      className="discord-input"
-                      placeholder="sk-or-v1-…"
-                      autoComplete="off"
-                      spellCheck="false"
-                      style={{ flex: 1, minWidth: 0 }}
-                    />
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => setShowPersonalKey((visible) => !visible)}
-                      aria-label={showPersonalKey ? 'Hide personal API key' : 'Show personal API key'}
-                      title={showPersonalKey ? 'Hide key' : 'Show key'}
-                      style={{ padding: '8px 10px' }}
-                    >
-                      {showPersonalKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                    {!!aiSettings.personalKey && (
-                      <button
-                        type="button"
-                        className="btn-secondary"
-                        onClick={() => onAiSettingsChange?.({ personalKey: '', providerMode: 'portal' })}
-                        title="Remove personal key"
-                        aria-label="Remove personal key"
-                        style={{ padding: '8px 10px', color: 'var(--status-danger)' }}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '7px', marginTop: '9px', color: 'var(--text-muted)', fontSize: '12px', lineHeight: 1.45 }}>
-                    <KeyRound size={15} style={{ flexShrink: 0, marginTop: '1px' }} />
-                    <span>{aiSettings.personalKey
-                      ? 'Your key is stored only in this browser tab’s session storage. It is not synced, saved to your HSC Portal profile, or shown to other users. It is sent to the portal only for your AI requests and is discarded after each request.'
-                      : 'Add a personal key to enable this option. Until then, AI requests continue to use the portal server key when it is configured.'}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </section>
+              <span className="dim" style={{ fontSize: '11.5px' }}>
+                Affects the index rows and margins, never the type sizes.
+              </span>
+            </div>
           </div>
 
-          <div className="appearance-modal-footer">
-            Appearance settings save automatically. Personal OpenRouter keys remain only in the current browser session.
+          <div className="dialog-row">
+            <div className="kick" style={{ marginBottom: '9px' }}>Rule colour</div>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {Object.entries(ACCENT_OPTIONS).map(([key, option]) => {
+                const isActive = settings.accent === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => onChange({ accent: key })}
+                    title={`${option.label} — ${option.description}`}
+                    aria-label={option.label}
+                    aria-pressed={isActive}
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      padding: 0,
+                      cursor: 'pointer',
+                      background: option.accent,
+                      border: `1px solid ${isActive ? 'var(--color-text)' : 'var(--color-divider)'}`,
+                      outline: isActive ? '2px solid var(--color-accent)' : 'none',
+                      outlineOffset: '2px',
+                    }}
+                  />
+                );
+              })}
+              <span className="dim" style={{ fontSize: '11.5px', marginLeft: '4px' }}>
+                {ACCENT_OPTIONS[settings.accent]?.label || 'Gold'}, as stroke only
+              </span>
+            </div>
+          </div>
+
+          <div className="dialog-row">
+            <div className="kick" style={{ marginBottom: '9px' }}>Page layout</div>
+            <div className="seg">
+              {LAYOUT_OPTIONS.map((option) => (
+                <label key={option.value} className="seg-opt" title={option.description}>
+                  <input
+                    type="radio"
+                    name="customisation-layout"
+                    checked={settings.layout === option.value}
+                    onChange={() => onChange({ layout: option.value })}
+                  />
+                  <span>{option.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="dialog-row">
+            <div className="kick" style={{ marginBottom: '9px' }}>AI provider</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
+              <label className="radio">
+                <input
+                  type="radio"
+                  name="customisation-ai"
+                  checked={!usesPersonalKey}
+                  onChange={() => onAiSettingsChange?.({ providerMode: 'portal' })}
+                />
+                <span className="dot" />
+                <span>Portal key — uses the key configured by the portal</span>
+              </label>
+              <label className="radio">
+                <input
+                  type="radio"
+                  name="customisation-ai"
+                  checked={usesPersonalKey}
+                  onChange={() => onAiSettingsChange?.({ providerMode: 'personal' })}
+                />
+                <span className="dot" />
+                <span>Personal key — kept in this browser only</span>
+              </label>
+            </div>
+
+            {usesPersonalKey && (
+              <>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '11px' }}>
+                  <input
+                    className="input"
+                    type={showPersonalKey ? 'text' : 'password'}
+                    value={aiSettings.personalKey || ''}
+                    onChange={(event) => onAiSettingsChange?.({ personalKey: event.target.value })}
+                    placeholder="sk-or-v1-…"
+                    autoComplete="off"
+                    spellCheck="false"
+                    aria-label="OpenRouter API key"
+                    style={{ flex: 1, minWidth: 0 }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-icon"
+                    onClick={() => setShowPersonalKey((visible) => !visible)}
+                    aria-label={showPersonalKey ? 'Hide the key' : 'Show the key'}
+                  >
+                    {showPersonalKey ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-icon"
+                    onClick={() => onAiSettingsChange?.({ personalKey: '', providerMode: 'portal' })}
+                    disabled={!aiSettings.personalKey}
+                    aria-label="Remove the key"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+                <p className="dim" style={{ fontSize: '11.5px', marginTop: '9px', marginBottom: 0 }}>
+                  The key stays in this browser tab’s session storage. It is never synced, never saved to your
+                  profile, and is discarded after each request.
+                </p>
+              </>
+            )}
           </div>
         </div>
-      </div>
-    </>
+
+        <div className="dialog-foot" style={{ justifyContent: 'flex-end' }}>
+          <button type="button" className="btn btn-secondary" onClick={() => onChange({ ...APPEARANCE_DEFAULTS })}>
+            Reset to defaults
+          </button>
+          <button type="button" className="btn btn-primary" onClick={onClose}>Done</button>
+        </div>
+      </section>
+    </div>
   );
 }

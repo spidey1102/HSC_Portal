@@ -27,7 +27,9 @@ function normaliseMetadata(data, { cached = true } = {}) {
     confidence: data?.confidence || null,
     notes: data?.notes || '',
     sourceFingerprint: data?.sourceFingerprint || '',
-    error: '',
+    retryAfterSeconds: Number(data?.retryAfterSeconds) || null,
+    // A recorded server-side failure is worth showing; a healthy record carries no error.
+    error: data?.status === 'error' ? String(data?.error || 'The last analysis of this paper failed.') : '',
   };
 }
 

@@ -1,88 +1,74 @@
-import React, { useState, useEffect } from 'react';
-import { Book, ExternalLink, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { ExternalLink, RefreshCw } from 'lucide-react';
 
+/** The shared Drive folder the portal's textbooks live in. */
+export const TEXTBOOKS_FOLDER_ID = '1vAADiVrKUIR_iApOoBdghSvKU6JhIwKT';
+export const TEXTBOOKS_FOLDER_URL = `https://drive.google.com/drive/folders/${TEXTBOOKS_FOLDER_ID}`;
+const TEXTBOOKS_EMBED_URL = `https://drive.google.com/embeddedfolderview?id=${TEXTBOOKS_FOLDER_ID}#grid`;
+
+/**
+ * Textbooks opens the shared Drive folder in place rather than listing cards
+ * that each link out to the same folder. Drive's embedded folder view is used
+ * for the grid; the button beside it opens the real thing in a new tab, for
+ * anyone whose browser or account blocks the frame.
+ */
 export default function TextbooksView() {
-  const [textbooks, setTextbooks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    fetch('/textbooks.json')
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to load textbooks.');
-        return res.json();
-      })
-      .then((data) => {
-        setTextbooks(data.textbooks || []);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setError(err.message);
-        setLoading(false);
-      });
-  }, []);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isBlocked, setIsBlocked] = useState(false);
 
   return (
-    <section className="content-band">
-      <div className="hero-stack" style={{ marginBottom: '20px' }}>
-        <div className="eyebrow">Library</div>
-        <div className="hero-title">
-          <h2 className="page-title">Textbooks and reference material</h2>
-          <p className="page-copy">
-            Open subject folders without leaving the portal.
+    <div className="textbooks-view">
+      <div className="textbooks-head">
+        <div>
+          <div className="kick">Reference shelf</div>
+          <h4 style={{ margin: '5px 0 0' }}>Textbooks and reference material</h4>
+          <p className="dim" style={{ fontSize: '12.5px', margin: '4px 0 0' }}>
+            The shared Drive folder, opened in place. Sign in to Google if a file asks for access.
           </p>
         </div>
+        <a
+          className="btn btn-secondary"
+          href={TEXTBOOKS_FOLDER_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ flex: 'none' }}
+        >
+          Open in Drive
+          <ExternalLink size={14} />
+        </a>
       </div>
 
-      {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0', gap: '16px' }}>
-          <RefreshCw size={28} color="var(--text-muted)" className="spin" />
-          <h3 style={{ color: 'var(--text-normal)' }}>Loading textbooks</h3>
-        </div>
-      ) : error ? (
-        <div style={{ padding: '24px', background: 'rgba(163,61,61,0.08)', borderRadius: '16px', color: 'var(--header-primary)', border: '1px solid rgba(163,61,61,0.16)' }}>
-          <h3 style={{ marginBottom: '8px', color: 'var(--status-danger)' }}>Load error</h3>
-          <p>{error}</p>
-        </div>
-      ) : textbooks.length > 0 ? (
-        <div className="papers-grid">
-          {textbooks.map((book) => (
-            <div key={book.id} className="paper-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div className="pill" style={{ width: 'fit-content', backgroundColor: 'rgba(53,91,79,0.08)', color: 'var(--brand-experiment)' }}>
-                  <Book size={12} />
-                  <span>{book.subject}</span>
-                </div>
+      <div className="textbooks-frame">
+        {isLoading && !isBlocked && (
+          <div className="textbooks-state">
+            <RefreshCw size={22} className="spin" />
+            <p className="dim" style={{ fontSize: '13px', marginTop: '10px' }}>Opening the shelf…</p>
+          </div>
+        )}
 
-                <h3 style={{ fontSize: '17px', color: 'var(--header-primary)', lineHeight: 1.35 }}>
-                  {book.title}
-                </h3>
-
-                <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
-                  {book.description}
-                </p>
-              </div>
-
-              <a
-                href={book.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-primary"
-                style={{ width: '100%', justifyContent: 'center', marginTop: '18px' }}
-              >
-                <ExternalLink size={16} />
-                Open in Google Drive
-              </a>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="empty-state">
-          <h3 style={{ color: 'var(--header-primary)', marginBottom: '8px' }}>No textbooks found</h3>
-          <p>We could not find any textbooks to display right now.</p>
-        </div>
-      )}
-    </section>
+        {isBlocked ? (
+          <div className="textbooks-state">
+            <h5 style={{ margin: 0 }}>Drive would not open in place</h5>
+            <p className="dim" style={{ fontSize: '13px', maxWidth: '46ch', textAlign: 'center', margin: '8px 0 14px' }}>
+              Your browser or Google account is blocking the embedded view. The folder itself is fine —
+              open it in a new tab instead.
+            </p>
+            <a className="btn btn-primary" href={TEXTBOOKS_FOLDER_URL} target="_blank" rel="noopener noreferrer">
+              Open in Drive
+              <ExternalLink size={14} />
+            </a>
+          </div>
+        ) : (
+          <iframe
+            title="HSC textbooks — shared Google Drive folder"
+            src={TEXTBOOKS_EMBED_URL}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            onLoad={() => setIsLoading(false)}
+            onError={() => { setIsLoading(false); setIsBlocked(true); }}
+          />
+        )}
+      </div>
+    </div>
   );
 }

@@ -1,51 +1,52 @@
 import { DatabaseZap } from 'lucide-react';
+import { useEscapeKey } from '../utils/useEscapeKey';
+import { usePresence } from '../utils/usePresence';
 
+/**
+ * One-time notice about the data-service move. Shown before anything else, so
+ * it uses the same ruled dialog as the rest of the portal.
+ */
 export default function FirebaseResetNotice({ isOpen, onDismiss }) {
-  if (!isOpen) return null;
+  const presence = usePresence(isOpen, 220);
+  useEscapeKey(isOpen, onDismiss);
+
+  if (!presence.mounted) return null;
 
   return (
-    <div
-      className="modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="firebase-reset-notice-title"
-      aria-describedby="firebase-reset-notice-description"
-      style={{ zIndex: 10000 }}
-    >
-      <div className="modal-content" style={{ maxWidth: '460px', padding: '28px' }}>
-        <div
-          aria-hidden="true"
-          style={{
-            width: '42px',
-            height: '42px',
-            display: 'grid',
-            placeItems: 'center',
-            borderRadius: '12px',
-            background: 'color-mix(in srgb, var(--brand-experiment) 14%, transparent)',
-            color: 'var(--brand-experiment)',
-            marginBottom: '16px',
-          }}
-        >
-          <DatabaseZap size={22} />
+    <div className={`dialog-backdrop is-${presence.stage}`} role="presentation" style={{ zIndex: 10000 }}>
+      <section
+        className="dialog dialog--narrow"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="firebase-reset-notice-title"
+        aria-describedby="firebase-reset-notice-description"
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+          <span aria-hidden="true" style={{ color: 'var(--color-accent)', display: 'flex' }}>
+            <DatabaseZap size={18} />
+          </span>
+          <span className="kick">A one-time notice</span>
         </div>
-        <h2 id="firebase-reset-notice-title" style={{ margin: '0 0 10px' }}>
-          Your HSC Portal setup needs a fresh start
-        </h2>
-        <p id="firebase-reset-notice-description" style={{ color: 'var(--text-secondary)', lineHeight: 1.55, margin: '0 0 12px' }}>
-          We have moved HSC Portal to a dedicated, more reliable data service. Your previous synced setup could not be transferred, so please sign in again and choose your subjects and preferences.
+
+        <h3 id="firebase-reset-notice-title" style={{ margin: '6px 0 10px', fontSize: '25px' }}>
+          Your setup needs a fresh start
+        </h3>
+
+        <p
+          id="firebase-reset-notice-description"
+          style={{ fontSize: '13.5px', textAlign: 'justify', color: 'color-mix(in srgb, var(--color-text) 78%, transparent)' }}
+        >
+          We have moved the portal to a dedicated, more reliable data service. Your previous synced setup could not be
+          transferred, so please sign in again and choose your subjects and preferences.
         </p>
-        <p style={{ color: 'var(--text-secondary)', lineHeight: 1.55, margin: '0 0 24px' }}>
+        <p style={{ fontSize: '13.5px', textAlign: 'justify', color: 'color-mix(in srgb, var(--color-text) 78%, transparent)' }}>
           Your paper library is unchanged. This message appears only once on this device.
         </p>
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={onDismiss}
-          style={{ width: '100%', padding: '12px', justifyContent: 'center' }}
-        >
-          Continue to HSC Portal
+
+        <button type="button" className="btn btn-primary btn-block" onClick={onDismiss}>
+          Continue to the portal
         </button>
-      </div>
+      </section>
     </div>
   );
 }

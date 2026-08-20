@@ -9,6 +9,8 @@
 import { getPaperIdentity } from './paperIdentity.js';
 import { findAgenticPaperMatches } from './agenticPaperSearch.js';
 import { getOpenRouterRequestHeaders } from './openRouterKeySettings.js';
+import { buildWeakSpots, chooseNextSubject, findAllowance, getAllowanceForRung } from './practiceLadder.js';
+import { saveMistake } from './practiceRecords.js';
 
 // ─── Tool Definitions (OpenAI function-calling schema) ────────────────────────
 
@@ -130,6 +132,117 @@ export const AGENT_TOOLS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'get_ladder',
+      description: 'Returns the practice ladder: every subject the student studies, its confidence rung (1-5), the time allowance that rung earns, and their most recent mark. Use this before giving any advice about difficulty, timing or what to practise.',
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'recommend_next_paper',
+      description: 'Returns the paper the ladder would prescribe next, with the allowance it should be sat at. Prefer this over search_papers when the student asks what to do rather than what exists.',
+      parameters: {
+        type: 'object',
+        properties: {
+          subject: {
+            type: 'string',
+            description: 'Optional subject name to restrict the recommendation to.',
+          },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_weak_topics',
+      description: 'Returns the topics the student\'s logged mistakes cluster on, heaviest first. Use this to ground revision advice in what they actually got wrong.',
+      parameters: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number', description: 'How many topics to return. Defaults to 6.' },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_upcoming_exams',
+      description: 'Returns the student\'s upcoming written exams with the number of days until each one.',
+      parameters: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number', description: 'How many exams to return. Defaults to 6.' },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'log_mistake',
+      description: 'Adds an entry to the student\'s mistake notebook. Only call this when the student has described a specific error they made and asked for it to be recorded.',
+      parameters: {
+        type: 'object',
+        properties: {
+          subject: { type: 'string', description: 'Subject the mistake belongs to.' },
+          topic: { type: 'string', description: 'Topic, e.g. "Buffers and titration curves".' },
+          question: { type: 'string', description: 'Question reference, e.g. "19" or "4(b)".' },
+          category: {
+            type: 'string',
+            description: 'Type of error.',
+            enum: ['Knowledge gap', 'Misread question', 'Method — wrong approach', 'Calculation slip', 'Time management', 'Exam technique', 'Other'],
+          },
+          note: { type: 'string', description: 'What went wrong, and the rule for next time.' },
+        },
+        required: ['subject', 'topic', 'note'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'begin_sitting',
+      description: 'Opens a paper in the practice room with the clock already set to the given allowance. Use only when the student has clearly asked to start a paper now.',
+      parameters: {
+        type: 'object',
+        properties: {
+          paper_id: { type: 'string', description: 'The paper_id returned by search_papers or recommend_next_paper.' },
+          allowance: {
+            type: 'string',
+            description: 'Time allowance to sit it at. Defaults to the allowance the ladder earns for that subject.',
+            enum: ['untimed', 'plus20', 'plus10', 'toTime', 'minus10'],
+          },
+        },
+        required: ['paper_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'open_section',
+      description: 'Navigates the portal to one of its sections. Use when the student asks to go somewhere rather than asking a question.',
+      parameters: {
+        type: 'object',
+        properties: {
+          section: {
+            type: 'string',
+            enum: ['today', 'library', 'calendar', 'notebook', 'history', 'textbooks'],
+          },
+        },
+        required: ['section'],
+      },
+    },
+  },
 ];
 
 // ─── Tool Executor ─────────────────────────────────────────────────────────────
@@ -151,7 +264,22 @@ export async function executeTool(toolName, args, appContext) {
     toggleBookmark,
     addCalendarEvent,
     selectedLevel,
+    ladder = [],
+    mistakes = [],
+    exams = [],
+    satPaperIds = new Set(),
+    beginSitting,
+    goToSection,
   } = appContext;
+
+  /** Resolves the `v_n` id the search tools hand back to a real paper. */
+  const findPaperById = (paperId) => {
+    const split = String(paperId || '').indexOf('_');
+    if (split === -1) return null;
+    const v = String(paperId).slice(0, split);
+    const n = String(paperId).slice(split + 1);
+    return papers.find((paper) => String(paper.v) === v && paper.n === n) || null;
+  };
 
   switch (toolName) {
     case 'search_papers': {
@@ -287,6 +415,151 @@ export async function executeTool(toolName, args, appContext) {
       } catch {
         return { papers_viewed: 0, papers_completed: 0, papers_bookmarked: bookmarks.size };
       }
+    }
+
+    case 'get_ladder': {
+      if (ladder.length === 0) {
+        return { subjects: [], message: 'No subjects pinned yet, so the ladder is empty.' };
+      }
+      return {
+        subjects: ladder.map((entry) => ({
+          subject: entry.subject,
+          rung: entry.rung,
+          max_rung: 5,
+          allowance: entry.allowance.label,
+          sittings: entry.sittings,
+          last_percent: entry.lastPercent,
+          streak_above_holding_mark: entry.streak,
+          self_reported: Boolean(entry.isSeeded),
+        })),
+      };
+    }
+
+    case 'recommend_next_paper': {
+      if (ladder.length === 0) {
+        return { success: false, message: 'No subjects pinned, so nothing can be prescribed yet.' };
+      }
+
+      const wanted = String(args.subject || '').trim().toLowerCase();
+      const entry = (wanted && ladder.find((row) => row.subject.toLowerCase() === wanted))
+        || chooseNextSubject(ladder);
+      const subjectIndex = subjects.indexOf(entry.subject);
+
+      const candidates = papers
+        .filter((paper) => paper.s === subjectIndex
+          && paper.l === selectedLevel
+          && !satPaperIds.has(getPaperIdentity(paper)))
+        .sort((left, right) => {
+          const solutions = (right.w === 1 ? 1 : 0) - (left.w === 1 ? 1 : 0);
+          if (solutions !== 0) return solutions;
+          return (parseInt(String(right.y), 10) || 0) - (parseInt(String(left.y), 10) || 0);
+        });
+
+      if (candidates.length === 0) {
+        return {
+          success: false,
+          subject: entry.subject,
+          message: `Every ${entry.subject} paper at this year level has already been sat.`,
+        };
+      }
+
+      const paper = candidates[0];
+      return {
+        success: true,
+        subject: entry.subject,
+        rung: entry.rung,
+        allowance: entry.allowance.label,
+        allowance_id: entry.allowance.id,
+        reason: entry.sittings === 0
+          ? 'No sittings logged for this subject yet, so it goes first.'
+          : `Weakest current form on the ladder (rung ${entry.rung} of 5).`,
+        paper: {
+          paper_id: `${paper.v}_${paper.n}`,
+          name: paper.n,
+          school: schools[paper.h] || null,
+          year: paper.y,
+          has_solutions: paper.w === 1,
+        },
+        alternatives: candidates.slice(1, 4).map((option) => ({
+          paper_id: `${option.v}_${option.n}`,
+          name: option.n,
+          school: schools[option.h] || null,
+          year: option.y,
+        })),
+      };
+    }
+
+    case 'get_weak_topics': {
+      const limit = typeof args.limit === 'number' ? Math.min(args.limit, 20) : 6;
+      const spots = buildWeakSpots(mistakes, limit);
+      if (spots.length === 0) {
+        return { count: 0, topics: [], message: 'The mistake notebook is empty.' };
+      }
+      return {
+        count: spots.length,
+        total_mistakes_logged: mistakes.length,
+        topics: spots.map((spot) => ({ topic: spot.topic, subject: spot.subject || null, wrong: spot.count })),
+      };
+    }
+
+    case 'list_upcoming_exams': {
+      const limit = typeof args.limit === 'number' ? Math.min(args.limit, 20) : 6;
+      if (exams.length === 0) {
+        return { count: 0, exams: [], message: 'No published written exams ahead for these subjects.' };
+      }
+      return {
+        count: exams.length,
+        exams: exams.slice(0, limit).map((exam) => ({
+          subject: exam.label,
+          date: exam.date,
+          when: exam.when,
+          days_away: exam.daysAway,
+        })),
+      };
+    }
+
+    case 'log_mistake': {
+      const { subject, topic, question = '', category = 'Other', note } = args;
+      if (!subject || !topic || !note) {
+        return { success: false, error: 'subject, topic and note are all required.' };
+      }
+      try {
+        saveMistake({
+          paper: null,
+          subjectName: subject,
+          schoolName: '',
+          mistake: { questionId: question, topic, category, note },
+        });
+        return { success: true, message: `Logged "${topic}" under ${subject} in the notebook.` };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    }
+
+    case 'begin_sitting': {
+      const paper = findPaperById(args.paper_id);
+      if (!paper) return { success: false, error: `No paper matches id "${args.paper_id}".` };
+      if (typeof beginSitting !== 'function') return { success: false, error: 'Starting a sitting is not available here.' };
+
+      const ladderEntry = ladder.find((entry) => entry.subject === subjects[paper.s]);
+      const fallback = ladderEntry ? ladderEntry.allowance : getAllowanceForRung(1);
+      const allowance = findAllowance(args.allowance) || fallback;
+
+      beginSitting(paper, allowance.id);
+      return {
+        success: true,
+        message: `Opening ${paper.n} at ${allowance.label.toLowerCase()}.`,
+        allowance: allowance.label,
+      };
+    }
+
+    case 'open_section': {
+      const section = String(args.section || '').trim();
+      const allowed = ['today', 'library', 'calendar', 'notebook', 'history', 'textbooks'];
+      if (!allowed.includes(section)) return { success: false, error: `Unknown section "${section}".` };
+      if (typeof goToSection !== 'function') return { success: false, error: 'Navigation is not available here.' };
+      goToSection(section);
+      return { success: true, message: `Opened ${section}.` };
     }
 
     default:
@@ -470,6 +743,20 @@ function formatToolLabel(toolName, args) {
       return `Adding "${args.title}" to calendar…`;
     case 'get_study_stats':
       return 'Checking your study statistics…';
+    case 'get_ladder':
+      return 'Reading your ladder…';
+    case 'recommend_next_paper':
+      return args.subject ? `Choosing a ${args.subject} paper…` : 'Choosing your next paper…';
+    case 'get_weak_topics':
+      return 'Reading your mistake notebook…';
+    case 'list_upcoming_exams':
+      return 'Checking your exam timetable…';
+    case 'log_mistake':
+      return `Logging "${args.topic}"…`;
+    case 'begin_sitting':
+      return 'Opening the paper…';
+    case 'open_section':
+      return `Opening ${args.section}…`;
     default:
       return `Running ${toolName}…`;
   }
@@ -490,6 +777,22 @@ function formatToolResultLabel(toolName, result) {
       return result.success ? result.message : `Failed: ${result.error}`;
     case 'get_study_stats':
       return `${result.papers_completed} completed, ${result.papers_viewed} viewed, ${result.papers_bookmarked} bookmarked.`;
+    case 'get_ladder':
+      return result.subjects?.length
+        ? `${result.subjects.length} subject${result.subjects.length === 1 ? '' : 's'} on the ladder.`
+        : 'The ladder is empty.';
+    case 'recommend_next_paper':
+      return result.success
+        ? `${result.subject} — ${result.paper.name} at ${String(result.allowance).toLowerCase()}.`
+        : (result.message || 'Nothing to prescribe.');
+    case 'get_weak_topics':
+      return result.count ? `${result.count} topic${result.count === 1 ? '' : 's'} worth revisiting.` : 'No mistakes logged.';
+    case 'list_upcoming_exams':
+      return result.count ? `${result.count} exam${result.count === 1 ? '' : 's'} ahead.` : 'No exams found.';
+    case 'log_mistake':
+    case 'begin_sitting':
+    case 'open_section':
+      return result.success ? result.message : `Failed: ${result.error}`;
     default:
       return result.success ? 'Done.' : (result.error || 'Unknown result.');
   }
