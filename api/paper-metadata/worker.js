@@ -1,15 +1,16 @@
-import { getAdminFirestore, requireAuthenticatedUser } from '../lib/firebaseAdmin.js';
+import { requireAuthenticatedUser } from '../lib/firebaseAdmin.js';
+import { getPaperMetadata } from '../lib/portalStorage.js';
 import {
   getPaperSourceFingerprint,
   loadPaperRecord,
-} from '../agent/paper-context.js';
+} from '../lib/paperSource.js';
 import {
   metadataDocumentId,
   runPaperAnalysisWorker,
 } from '../paper-metadata.js';
 
 // This route is intentionally separate from the job-claim endpoint. It may use
-// the full Vercel Hobby limit while the reader polls the shared Firestore status.
+// the full Vercel Hobby limit while the reader polls the shared Supabase status.
 export const maxDuration = 300;
 
 function sendJson(res, status, payload) {
@@ -41,9 +42,7 @@ export default async function handler(req, res) {
     }
 
     const sourceFingerprint = getPaperSourceFingerprint(paper);
-    const ref = getAdminFirestore().collection('paperMetadata').doc(metadataDocumentId(paper));
-    const snapshot = await ref.get();
-    const data = snapshot.exists ? snapshot.data() : null;
+    const data = await getPaperMetadata(metadataDocumentId(paper));
     if (data?.status !== 'analysing' || data?.sourceFingerprint !== sourceFingerprint) {
       sendJson(res, 202, { status: data?.status || 'missing', started: false });
       return;
@@ -52,7 +51,6 @@ export default async function handler(req, res) {
     // The caller does not wait for this response; its purpose is to give the
     // long-running job its own invocation and duration budget.
     await runPaperAnalysisWorker({
-      ref,
       paper,
       sourceFingerprint,
       requestStartedAt: Date.now(),

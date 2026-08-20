@@ -1,6 +1,11 @@
-import { FieldValue } from 'firebase-admin/firestore';
 import { getDeadline } from '@vercel/functions';
-import { getAdminFirestore, requireAuthenticatedUser } from './lib/firebaseAdmin.js';
+import { requireAuthenticatedUser } from './lib/firebaseAdmin.js';
+import {
+  claimPaperAnalysis,
+  completePaperAnalysis,
+  getPaperMetadata,
+  recordPaperAnalysisFailure,
+} from './lib/portalStorage.js';
 import {
   getPaperSourceFingerprint,
   loadPaperRecord,
@@ -12,7 +17,6 @@ import { getCompletionRoute, isRetryableProviderStatus, userSafeProviderError } 
 export const maxDuration = 60;
 
 const PAPER_ID_FIELDS = ['v', 's', 'l', 'c', 'y', 'h', 'w', 'n'];
-const METADATA_COLLECTION = 'paperMetadata';
 const EXTRACTION_VERSION = 'question-marks-v2-challenge';
 const ANALYSIS_LOCK_MS = 6 * 60 * 1000;
 const MAX_ANALYSIS_TEXT_CHARS = 150000;
@@ -339,7 +343,7 @@ function publicMetadata(data, { cached = true } = {}) {
     confidence: data?.confidence || null,
     notes: data?.notes || '',
     sourceFingerprint: data?.sourceFingerprint || '',
-    extractedAt: data?.extractedAt?.toDate?.().toISOString?.() || null,
+    extractedAt: data?.extractedAt || null,
     analysisStartedAtMillis: Number(data?.analysisStartedAtMillis) || null,
     retryAfterSeconds: data?.status === 'analysing' ? 4 : null,
     error: data?.status === 'error' ? String(data?.errorMessage || 'The last analysis of this paper failed.') : '',
@@ -352,46 +356,35 @@ function isCurrentCacheEntry(data, sourceFingerprint) {
 }
 
 async function readMetadata({ paper, sourceFingerprint }) {
-  const db = getAdminFirestore();
-  const ref = db.collection(METADATA_COLLECTION).doc(metadataDocumentId(paper));
-  const snapshot = await ref.get();
-  if (!snapshot.exists) return { ref, data: null, failure: null };
-
-  const data = snapshot.data();
-  if (!isCurrentCacheEntry(data, sourceFingerprint)) return { ref, data: null, failure: null };
-  if (data?.status === 'ready') return { ref, data, failure: null };
-  if (data?.status === 'analysing') {
-    const startedAtMillis = Number(data?.analysisStartedAtMillis) || 0;
+  const data = await getPaperMetadata(metadataDocumentId(paper));
+  if (!data) return { data: null, failure: null };
+  if (!isCurrentCacheEntry(data, sourceFingerprint)) return { data: null, failure: null };
+  if (data.status === 'ready') return { data, failure: null };
+  if (data.status === 'analysing') {
+    const startedAtMillis = Number(data.analysisStartedAtMillis) || 0;
     if (startedAtMillis && Date.now() - startedAtMillis < ANALYSIS_LOCK_MS) {
-      return { ref, data, failure: null };
+      return { data, failure: null };
     }
-    return { ref, data: null, failure: null };
+    return { data: null, failure: null };
   }
   // A recorded failure is reported so the reader can show why, rather than looking
   // like a paper that has simply never been analysed.
-  if (data?.status === 'error') return { ref, data: null, failure: data };
-  return { ref, data: null, failure: null };
+  if (data.status === 'error') return { data: null, failure: data };
+  return { data: null, failure: null };
 }
 
-async function recordAnalysisFailure(ref, error) {
-  if (Number(error?.status) === 429) {
-    await ref.set({
-      status: 'missing',
-      analysisStartedAtMillis: FieldValue.delete(),
-      updatedAt: FieldValue.serverTimestamp(),
-    }, { merge: true });
-    return;
-  }
-
-  await ref.set({
-    status: 'error',
-    errorMessage: String(error?.message || 'The shared paper analysis could not be completed.').slice(0, 500),
-    analysisStartedAtMillis: FieldValue.delete(),
-    updatedAt: FieldValue.serverTimestamp(),
-  }, { merge: true });
+async function recordAnalysisFailure({ paperKey, sourceFingerprint, error }) {
+  await recordPaperAnalysisFailure({
+    paperKey,
+    sourceFingerprint,
+    error,
+    // Provider throttling should release the shared job immediately so another
+    // student can retry after the provider recovers.
+    allowRetry: Number(error?.status) === 429,
+  });
 }
 
-export async function runPaperAnalysisWorker({ ref, paper, sourceFingerprint, requestStartedAt }) {
+export async function runPaperAnalysisWorker({ paper, sourceFingerprint, requestStartedAt }) {
   try {
     // pdf.js and its worker bundle are loaded only inside the separate, long-running
     // analysis route. The short job-claim route must be able to respond before
@@ -423,17 +416,14 @@ export async function runPaperAnalysisWorker({ ref, paper, sourceFingerprint, re
       { timeoutMs: providerTimeoutMs },
     );
     const analysis = normaliseAnalysis(answer, sourceFingerprint);
-    await ref.set({
-      ...analysis,
-      paperKey: paperIdentity(paper),
-      paperId: String(paper.v),
-      paperName: paper.n,
+    await completePaperAnalysis({
+      paperKey: metadataDocumentId(paper),
+      sourceFingerprint,
+      analysis,
+      paper,
       pagesAnalysed: extracted.pagesExtracted,
       totalPages: extracted.totalPages,
-      analysisStartedAtMillis: FieldValue.delete(),
-      extractedAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    }, { merge: true });
+    });
     console.info('[paper-metadata] deferred analysis completed', {
       paperId: String(paper.v),
       questions: analysis.questionCount,
@@ -446,7 +436,11 @@ export async function runPaperAnalysisWorker({ ref, paper, sourceFingerprint, re
       elapsedMs: Date.now() - requestStartedAt,
     });
     try {
-      await recordAnalysisFailure(ref, error);
+      await recordAnalysisFailure({
+        paperKey: metadataDocumentId(paper),
+        sourceFingerprint,
+        error,
+      });
     } catch (recordError) {
       console.error('[paper-metadata] failed to record deferred analysis error', {
         paperId: String(paper.v),
@@ -517,57 +511,37 @@ export default async function handler(req, res) {
       return;
     }
 
-    const ref = initial.ref;
     const now = Date.now();
-    const claimPayload = {
-      paperKey: paperIdentity(paper),
+    logPhase('claiming analysis job');
+    const claimedData = await claimPaperAnalysis({
+      paperKey: metadataDocumentId(paper),
       paperId: String(paper.v),
       paperName: paper.n,
       sourceFingerprint,
       extractionVersion: EXTRACTION_VERSION,
-      status: 'analysing',
       analysisStartedAtMillis: now,
-      updatedAt: FieldValue.serverTimestamp(),
-    };
+      lockMs: ANALYSIS_LOCK_MS,
+    });
 
-    // Firestore transactions can retry their read-write cycle and were hanging in
-    // Vercel for the full route duration. A document create is atomic: exactly one
-    // concurrent request wins the missing-document claim; every other request reads
-    // the winner's state and simply reports that analysis is already underway.
-    logPhase('claiming analysis job');
-    let claim = { state: 'claimed' };
-    if (initial.failure) {
-      await ref.set({ ...claimPayload, errorMessage: FieldValue.delete() }, { merge: true });
-    } else {
-      try {
-        await ref.create(claimPayload);
-      } catch (error) {
-        const isAlreadyClaimed = error?.code === 6
-          || error?.code === 'already-exists'
-          || Number(error?.status) === 409;
-        if (!isAlreadyClaimed) throw error;
-
-        const current = await ref.get();
-        const data = current.exists ? current.data() : null;
-        const startedAtMillis = Number(data?.analysisStartedAtMillis) || 0;
-        if (data?.status === 'ready' && isCurrentCacheEntry(data, sourceFingerprint)) {
-          claim = { state: 'ready', data };
-        } else if (data?.status === 'analysing' && now - startedAtMillis < ANALYSIS_LOCK_MS) {
-          claim = { state: 'analysing', data };
-        } else {
-          await ref.set({ ...claimPayload, errorMessage: FieldValue.delete() }, { merge: true });
-        }
-      }
+    if (!claimedData) {
+      throw new Error('The shared paper analysis could not be claimed. Please retry.');
     }
 
-    logPhase('analysis job claim completed', { state: claim.state });
+    const claimState = claimedData.status === 'ready' && isCurrentCacheEntry(claimedData, sourceFingerprint)
+      ? 'ready'
+      : claimedData.status === 'analysing'
+        && Number(claimedData.analysisStartedAtMillis) !== now
+        && now - Number(claimedData.analysisStartedAtMillis) < ANALYSIS_LOCK_MS
+        ? 'analysing'
+        : 'claimed';
+    logPhase('analysis job claim completed', { state: claimState });
 
-    if (claim.state === 'ready') {
-      sendJson(res, 200, publicMetadata(claim.data));
+    if (claimState === 'ready') {
+      sendJson(res, 200, publicMetadata(claimedData));
       return;
     }
-    if (claim.state === 'analysing') {
-      sendJson(res, 202, publicMetadata(claim.data));
+    if (claimState === 'analysing') {
+      sendJson(res, 202, publicMetadata(claimedData));
       return;
     }
 

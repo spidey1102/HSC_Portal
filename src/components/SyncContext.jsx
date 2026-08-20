@@ -1,77 +1,97 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
-import { db } from '../lib/firebase';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 
 const SyncContext = createContext();
+const USER_DATA_ENDPOINT = '/api/user-data';
 
 function sameStoredValue(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+async function requestUserData(user, method, data) {
+  const token = await user.getIdToken();
+  const response = await fetch(USER_DATA_ENDPOINT, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(method === 'PUT' ? { 'Content-Type': 'application/json' } : {}),
+    },
+    ...(method === 'PUT' ? { body: JSON.stringify({ data }) } : {}),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error || 'The study data could not be synchronised.');
+  return payload;
 }
 
 export function SyncProvider({ children }) {
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const dataRef = useRef(null);
+  const writeQueueRef = useRef(Promise.resolve());
 
   useEffect(() => {
+    let cancelled = false;
     dataRef.current = null;
+    writeQueueRef.current = Promise.resolve();
+
     if (!user) {
       setData(null);
       return undefined;
     }
 
-    const userRef = doc(db, 'users', user.uid);
-    const unsubscribe = onSnapshot(userRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const nextData = docSnap.data();
-        dataRef.current = nextData;
-        setData(nextData);
-        return;
-      }
-
-      // Keep an optimistic local copy before creating the document. This prevents
-      // duplicate initialisation writes if the listener reports a missing document
-      // again before Firestore delivers the first snapshot.
-      const initialData = {
-        bookmarks: [],
-        assessments: [],
-        appearance: {},
-        selectedSubject: null,
-        selectedLevel: 12,
-        mySubjects: [],
-        viewedPapers: [],
-        completedPapers: [],
-        practiceReviews: [],
-        mistakeLog: [],
-      };
-      dataRef.current = initialData;
-      setData(initialData);
-      setDoc(userRef, { ...initialData, updatedAt: new Date() }).catch((error) => {
-        console.warn('Could not initialise synced study data:', error);
+    setData(null);
+    requestUserData(user, 'GET')
+      .then((payload) => {
+        if (cancelled) return;
+        const remoteData = payload?.data && typeof payload.data === 'object' ? payload.data : {};
+        dataRef.current = remoteData;
+        setData(remoteData);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.warn('Could not load synced study data:', error);
+        // Keep the portal usable offline or during a temporary server issue.
+        dataRef.current = {};
+        setData({});
       });
-    });
 
-    return unsubscribe;
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
-  const updateRemoteFields = useCallback(async (patch) => {
-    if (!user || !patch || Object.keys(patch).length === 0) return;
+  const updateRemoteFields = useCallback((patch) => {
+    if (!user || !patch || Object.keys(patch).length === 0) return Promise.resolve();
 
     const currentData = dataRef.current || {};
     const changedPatch = Object.fromEntries(
       Object.entries(patch).filter(([key, value]) => !sameStoredValue(currentData[key], value)),
     );
-    if (Object.keys(changedPatch).length === 0) return;
+    if (Object.keys(changedPatch).length === 0) return Promise.resolve();
 
-    // Update the mirror before awaiting Firestore so rapid duplicate browser
-    // events collapse to one write rather than burning through daily quota.
-    dataRef.current = { ...currentData, ...changedPatch };
-    const userRef = doc(db, 'users', user.uid);
-    await setDoc(userRef, { ...changedPatch, updatedAt: new Date() }, { merge: true });
+    const nextData = { ...currentData, ...changedPatch };
+    // Optimistic state means rapid duplicate browser events collapse locally before
+    // the queued API call is sent, rather than consuming a database write each time.
+    dataRef.current = nextData;
+    setData(nextData);
+
+    const queuedWrite = writeQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        const saved = await requestUserData(user, 'PUT', nextData);
+        const savedData = saved?.data && typeof saved.data === 'object' ? saved.data : nextData;
+        dataRef.current = savedData;
+        setData(savedData);
+        return savedData;
+      });
+    writeQueueRef.current = queuedWrite;
+    return queuedWrite;
   }, [user]);
 
-  const updateRemote = useCallback((key, value) => updateRemoteFields({ [key]: value }), [updateRemoteFields]);
+  const updateRemote = useCallback(
+    (key, value) => updateRemoteFields({ [key]: value }),
+    [updateRemoteFields],
+  );
 
   return (
     <SyncContext.Provider value={{ data, updateRemote, updateRemoteFields }}>

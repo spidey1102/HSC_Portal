@@ -1,58 +1,17 @@
-import { cert, getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
 import firebaseConfig from '../../firebase-applet-config.json' with { type: 'json' };
 
-const DEFAULT_DATABASE_ID = '(default)';
-const APP_NAME = 'hsc-portal-server';
 const IDENTITY_LOOKUP_TIMEOUT_MS = 8 * 1000;
-let firestoreInstance = null;
 
-function readServiceAccount() {
-  const raw = String(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim();
-  if (!raw) {
-    throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON must be configured for the shared paper metadata cache.');
-  }
-
-  try {
-    const serviceAccount = JSON.parse(raw);
-    if (!serviceAccount.project_id || !serviceAccount.client_email || !serviceAccount.private_key) {
-      throw new Error('The service-account JSON is missing required fields.');
-    }
-    return serviceAccount;
-  } catch (error) {
-    throw new Error(`FIREBASE_SERVICE_ACCOUNT_JSON is invalid: ${error.message}`);
-  }
-}
-
-export function getFirebaseAdminApp() {
-  const existing = getApps().find((app) => app.name === APP_NAME);
-  if (existing) return existing;
-
-  return initializeApp({ credential: cert(readServiceAccount()) }, APP_NAME);
-}
-
-export function getAdminFirestore() {
-  if (firestoreInstance) return firestoreInstance;
-
-  const databaseId = String(process.env.FIREBASE_FIRESTORE_DATABASE_ID || DEFAULT_DATABASE_ID).trim();
-  firestoreInstance = getFirestore(getFirebaseAdminApp(), databaseId);
-  // Vercel's serverless runtime can stall when the Admin SDK opens its gRPC
-  // transport. Metadata reads and writes use only operations supported by REST,
-  // so force HTTP/1.1 before the client performs its first request.
-  firestoreInstance.settings({ preferRest: true });
-  return firestoreInstance;
-}
-
+/**
+ * Verifies the browser's Firebase ID token without loading Firebase Admin or
+ * Firestore. The Firebase web API key is public by design; the Identity Toolkit
+ * accepts the token only when Firebase confirms the corresponding active account.
+ */
 export async function requireAuthenticatedUser(req) {
   const header = String(req.headers?.authorization || '');
   const match = header.match(/^Bearer\s+(.+)$/i);
-  if (!match) throw new Error('Sign in is required to analyse a new paper.');
+  if (!match) throw new Error('Sign in is required to continue.');
 
-  // The Firebase web API key is intentionally public and already ships with the
-  // browser application. Using the documented accounts:lookup endpoint avoids the
-  // Admin SDK certificate fetch that can stall a Vercel cold start for the full
-  // request duration. The returned account is accepted only when Firebase confirms
-  // the supplied ID token and the account is active.
   const apiKey = String(firebaseConfig?.apiKey || '').trim();
   if (!apiKey) throw new Error('The portal authentication configuration is unavailable.');
 
