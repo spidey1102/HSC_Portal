@@ -1,12 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { CornerDownRight, Feather, Loader2, X } from 'lucide-react';
 
 import { runAgent } from '../../utils/agentHarness';
 import { resolveLocally } from '../../utils/localAgent';
 import { buildWeakSpots } from '../../utils/practiceLadder';
 import { usePresence } from '../../utils/usePresence';
+
+// AI answers may use either LaTeX delimiters (\\(...\\), \\[...\\]) or the
+// dollar delimiters understood by remark-math. Normalise the former before the
+// Markdown pipeline parses and renders expressions with KaTeX.
+function normaliseMathDelimiters(content) {
+  return String(content || '')
+    .replace(/\\\[(.*?)\\\]/gs, (_, math) => `$$${math}$$`)
+    .replace(/\\\((.*?)\\\)/gs, (_, math) => `$${math}$`);
+}
 
 /**
  * Suggested questions, built from this paper and this student rather than a
@@ -192,7 +204,9 @@ export default function PaperMargin({
 
         {answer && (
           <div className="margin-prose agent-markdown">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{answer}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+              {normaliseMathDelimiters(answer)}
+            </ReactMarkdown>
           </div>
         )}
 
