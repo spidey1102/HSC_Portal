@@ -44,8 +44,13 @@ import { challengeLevelLabel, challengeReasonLabel, getChallengeRecommendations 
 
 const TIMER_STORAGE_KEY = 'hsc_timer_duration_secs';
 const SCALE_STEP = 1.2;
-const METADATA_POLL_ATTEMPTS = 12;
-const METADATA_POLL_MIN_SECONDS = 5;
+const METADATA_POLL_ATTEMPTS = 80;
+const METADATA_POLL_MIN_SECONDS = 4;
+
+function formatAnalysisElapsed(seconds) {
+  const safeSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+  return `${Math.floor(safeSeconds / 60)}:${String(safeSeconds % 60).padStart(2, '0')}`;
+}
 
 /** Data sheets NESA supplies in the exam room, mirrored here for the same courses. */
 function getFormulaSheet(subject) {
@@ -186,6 +191,7 @@ export default function PracticeRoom({
     status: 'loading', text: '', pagesExtracted: 0, pageStart: 0, pageEnd: 0, totalPages: 0, reason: '',
   });
   const [paperMetadata, setPaperMetadata] = useState(() => createEmptyPaperMetadata());
+  const [metadataClock, setMetadataClock] = useState(() => Date.now());
   const [isRequestingMetadata, setIsRequestingMetadata] = useState(false);
   const [isChallengeOpen, setIsChallengeOpen] = useState(false);
   const [openChallengeWhenReady, setOpenChallengeWhenReady] = useState(false);
@@ -281,6 +287,18 @@ export default function PracticeRoom({
 
     return () => { isActive = false; };
   }, [paperKey, paper]);
+
+  const metadataElapsedSeconds = paperMetadata.status === 'analysing' && paperMetadata.analysisStartedAtMillis
+    ? Math.max(0, Math.floor((metadataClock - paperMetadata.analysisStartedAtMillis) / 1000))
+    : 0;
+
+  // Keep the elapsed label alive even while the browser polls in the background.
+  useEffect(() => {
+    if (paperMetadata.status !== 'analysing') return undefined;
+    setMetadataClock(Date.now());
+    const timer = setInterval(() => setMetadataClock(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [paperMetadata.analysisStartedAtMillis, paperMetadata.status]);
 
   // An analysis claimed by this or another reader finishes on the server. Poll the
   // shared cache until it lands instead of asking the student to press Refresh.
@@ -570,8 +588,8 @@ export default function PracticeRoom({
             <ListChecks size={14} />
             {paperMetadata.status === 'ready'
               ? `${paperMetadata.questionCount} questions${paperMetadata.totalMarks !== null ? ` · ${paperMetadata.totalMarks} marks` : ''}`
-              : isRequestingMetadata ? 'Reading…'
-                : paperMetadata.status === 'analysing' ? 'Reading…'
+              : isRequestingMetadata ? 'Starting analysis…'
+                : paperMetadata.status === 'analysing' ? `Analysing ${formatAnalysisElapsed(metadataElapsedSeconds)}`
                   : paperMetadata.error ? 'Retry structure'
                     : 'Read structure'}
           </button>

@@ -1,4 +1,5 @@
 import { FieldValue } from 'firebase-admin/firestore';
+import { waitUntil, getDeadline } from '@vercel/functions';
 import { getAdminFirestore, requireAuthenticatedUser } from './lib/firebaseAdmin.js';
 import {
   extractFullPaperText,
@@ -7,7 +8,9 @@ import {
 } from './agent/paper-context.js';
 import { getCompletionRoute, isRetryableProviderStatus, userSafeProviderError } from '../openRouterRouting.js';
 
-export const maxDuration = 60;
+// A student-facing request returns immediately; the deferred shared analysis may use
+// the full five-minute Hobby-function allowance before it is considered failed.
+export const maxDuration = 300;
 
 const PAPER_ID_FIELDS = ['v', 's', 'l', 'c', 'y', 'h', 'w', 'n'];
 const METADATA_COLLECTION = 'paperMetadata';
@@ -19,14 +22,18 @@ const MAX_ANALYSIS_OUTPUT_TOKENS = 8000;
 // The whole request has to finish inside maxDuration. Reserve a margin so a slow
 // provider is reported as a timeout instead of the runtime killing the function
 // mid-write and leaving the shared document locked as 'analysing'.
-const FUNCTION_BUDGET_MS = 54 * 1000;
-const RESPONSE_RESERVE_MS = 3 * 1000;
+const FALLBACK_FUNCTION_BUDGET_MS = 294 * 1000;
+const RESPONSE_RESERVE_MS = 4 * 1000;
 const MIN_PROVIDER_TIMEOUT_MS = 8 * 1000;
-const ANALYSIS_PROVIDER_TIMEOUT_MS = 45 * 1000;
+const ANALYSIS_PROVIDER_TIMEOUT_MS = 240 * 1000;
 const MAX_JSON_REPAIR_STEPS = 400;
 
 function remainingBudgetMs(startedAt) {
-  return FUNCTION_BUDGET_MS - RESPONSE_RESERVE_MS - (Date.now() - startedAt);
+  const deadline = getDeadline?.();
+  if (deadline instanceof Date && Number.isFinite(deadline.getTime())) {
+    return deadline.getTime() - Date.now() - RESPONSE_RESERVE_MS;
+  }
+  return FALLBACK_FUNCTION_BUDGET_MS - RESPONSE_RESERVE_MS - (Date.now() - startedAt);
 }
 
 function sendJson(res, status, payload) {
@@ -334,6 +341,8 @@ function publicMetadata(data, { cached = true } = {}) {
     notes: data?.notes || '',
     sourceFingerprint: data?.sourceFingerprint || '',
     extractedAt: data?.extractedAt?.toDate?.().toISOString?.() || null,
+    analysisStartedAtMillis: Number(data?.analysisStartedAtMillis) || null,
+    retryAfterSeconds: data?.status === 'analysing' ? 4 : null,
     error: data?.status === 'error' ? String(data?.errorMessage || 'The last analysis of this paper failed.') : '',
   };
 }
@@ -351,18 +360,93 @@ async function readMetadata({ paper, sourceFingerprint }) {
 
   const data = snapshot.data();
   if (!isCurrentCacheEntry(data, sourceFingerprint)) return { ref, data: null, failure: null };
-  if (data?.status === 'ready') return { ref, data, failure: null };
+  if (data?.status === 'ready' || data?.status === 'analysing') return { ref, data, failure: null };
   // A recorded failure is reported so the reader can show why, rather than looking
   // like a paper that has simply never been analysed.
   if (data?.status === 'error') return { ref, data: null, failure: data };
   return { ref, data: null, failure: null };
 }
 
+async function recordAnalysisFailure(ref, error) {
+  if (Number(error?.status) === 429) {
+    await ref.set({
+      status: 'missing',
+      analysisStartedAtMillis: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return;
+  }
+
+  await ref.set({
+    status: 'error',
+    errorMessage: String(error?.message || 'The shared paper analysis could not be completed.').slice(0, 500),
+    analysisStartedAtMillis: FieldValue.delete(),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+}
+
+async function runDeferredPaperAnalysis({ ref, paper, sourceFingerprint, requestStartedAt }) {
+  try {
+    console.info('[paper-metadata] deferred analysis started', { paperId: String(paper.v) });
+    const extractionBudgetMs = remainingBudgetMs(requestStartedAt);
+    if (extractionBudgetMs < MIN_PROVIDER_TIMEOUT_MS) {
+      throw new Error('The analysis job ran out of time before PDF extraction could begin. Please retry this paper.');
+    }
+
+    const extracted = await extractFullPaperText(paper, { timeoutMs: extractionBudgetMs });
+    if (extracted.status !== 'ready' || !extracted.text) {
+      throw new Error(extracted.reason || 'The PDF does not expose readable text for question extraction.');
+    }
+
+    const providerTimeoutMs = remainingBudgetMs(requestStartedAt);
+    if (providerTimeoutMs < MIN_PROVIDER_TIMEOUT_MS) {
+      throw new Error('The analysis job ran out of time before the AI response was ready. Please retry this paper.');
+    }
+
+    console.info('[paper-metadata] PDF extracted; requesting analysis', {
+      paperId: String(paper.v),
+      pages: extracted.pagesExtracted,
+      elapsedMs: Date.now() - requestStartedAt,
+    });
+    const answer = await callPaperAnalysis(
+      buildAnalysisPrompt(paper, extracted.text),
+      { timeoutMs: providerTimeoutMs },
+    );
+    const analysis = normaliseAnalysis(answer, sourceFingerprint);
+    await ref.set({
+      ...analysis,
+      paperKey: paperIdentity(paper),
+      paperId: String(paper.v),
+      paperName: paper.n,
+      pagesAnalysed: extracted.pagesExtracted,
+      totalPages: extracted.totalPages,
+      analysisStartedAtMillis: FieldValue.delete(),
+      extractedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    console.info('[paper-metadata] deferred analysis completed', {
+      paperId: String(paper.v),
+      questions: analysis.questionCount,
+      elapsedMs: Date.now() - requestStartedAt,
+    });
+  } catch (error) {
+    console.error('[paper-metadata] deferred analysis failed', {
+      paperId: String(paper.v),
+      message: error?.message || String(error),
+      elapsedMs: Date.now() - requestStartedAt,
+    });
+    try {
+      await recordAnalysisFailure(ref, error);
+    } catch (recordError) {
+      console.error('[paper-metadata] failed to record deferred analysis error', {
+        paperId: String(paper.v),
+        message: recordError?.message || String(recordError),
+      });
+    }
+  }
+}
+
 export default async function handler(req, res) {
-  // Only a request that successfully claimed a fresh analysis may mark its document
-  // as failed. This prevents auth, lookup, or response errors from corrupting an
-  // already-ready shared cache entry.
-  let claimedAnalysisRef = null;
   const requestStartedAt = Date.now();
 
   if (!['GET', 'POST'].includes(req.method)) {
@@ -396,7 +480,7 @@ export default async function handler(req, res) {
 
     const initial = await readMetadata({ paper, sourceFingerprint });
     if (initial.data) {
-      sendJson(res, 200, publicMetadata(initial.data));
+      sendJson(res, initial.data.status === 'analysing' ? 202 : 200, publicMetadata(initial.data));
       return;
     }
 
@@ -420,7 +504,7 @@ export default async function handler(req, res) {
       }
       const startedAtMillis = Number(data?.analysisStartedAtMillis) || 0;
       if (data?.status === 'analysing' && now - startedAtMillis < ANALYSIS_LOCK_MS) {
-        return { state: 'analysing' };
+        return { state: 'analysing', data };
       }
 
       transaction.set(ref, {
@@ -442,64 +526,27 @@ export default async function handler(req, res) {
       return;
     }
     if (claim.state === 'analysing') {
-      sendJson(res, 202, { status: 'analysing', cached: false, retryAfterSeconds: 10 });
+      sendJson(res, 202, publicMetadata(claim.data));
       return;
     }
 
-    claimedAnalysisRef = ref;
-    const extracted = await extractFullPaperText(paper, { timeoutMs: remainingBudgetMs(requestStartedAt) });
-    if (extracted.status !== 'ready' || !extracted.text) {
-      throw new Error(extracted.reason || 'The PDF does not expose readable text for question extraction.');
-    }
-
-    const providerTimeoutMs = Math.max(remainingBudgetMs(requestStartedAt), MIN_PROVIDER_TIMEOUT_MS);
-    const answer = await callPaperAnalysis(
-      buildAnalysisPrompt(paper, extracted.text),
-      { timeoutMs: providerTimeoutMs },
-    );
-    const analysis = normaliseAnalysis(answer, sourceFingerprint);
-    const stored = {
-      ...analysis,
-      paperKey: paperIdentity(paper),
-      paperId: String(paper.v),
-      paperName: paper.n,
-      pagesAnalysed: extracted.pagesExtracted,
-      totalPages: extracted.totalPages,
-      analysisStartedAtMillis: FieldValue.delete(),
-      extractedAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    };
-    await ref.set(stored, { merge: true });
-    claimedAnalysisRef = null;
-    sendJson(res, 200, publicMetadata({ ...analysis, paperKey: paperIdentity(paper) }, { cached: false }));
+    waitUntil(runDeferredPaperAnalysis({
+      ref,
+      paper,
+      sourceFingerprint,
+      requestStartedAt,
+    }));
+    sendJson(res, 202, {
+      status: 'analysing',
+      cached: false,
+      analysisStartedAtMillis: now,
+      retryAfterSeconds: 4,
+    });
   } catch (error) {
-    if (claimedAnalysisRef) {
-      try {
-        if (Number(error?.status) === 429) {
-          // Quota exhaustion is transient. Clear the claim rather than turning it
-          // into a shared cached failure that would block a later student retry.
-          await claimedAnalysisRef.set({
-            status: 'missing',
-            analysisStartedAtMillis: FieldValue.delete(),
-            updatedAt: FieldValue.serverTimestamp(),
-          }, { merge: true });
-        } else {
-          await claimedAnalysisRef.set({
-            status: 'error',
-            errorMessage: String(error?.message || 'The shared paper analysis could not be completed.').slice(0, 500),
-            analysisStartedAtMillis: FieldValue.delete(),
-            updatedAt: FieldValue.serverTimestamp(),
-          }, { merge: true });
-        }
-      } catch (recordError) {
-        // Preserve the original failure for the client even if error recording is unavailable.
-      }
-    }
-
     const status = /Sign in is required|sign-in session/i.test(String(error?.message || ''))
       ? 401
       : Number(error?.status) === 429 ? 429 : 500;
-    sendJson(res, status, { error: error?.message || 'The shared paper analysis could not be completed.' });
+    sendJson(res, status, { error: error?.message || 'The shared paper analysis could not be started.' });
   }
 }
 

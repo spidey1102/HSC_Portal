@@ -8,6 +8,7 @@ export function createEmptyPaperMetadata(status = 'loading') {
     confidence: null,
     notes: '',
     retryAfterSeconds: null,
+    analysisStartedAtMillis: null,
     error: '',
   };
 }
@@ -53,6 +54,7 @@ function normaliseMetadata(data, { cached = true } = {}) {
     notes: data?.notes || '',
     sourceFingerprint: data?.sourceFingerprint || '',
     retryAfterSeconds: Number(data?.retryAfterSeconds) || null,
+    analysisStartedAtMillis: Number(data?.analysisStartedAtMillis) || null,
     // A recorded server-side failure is worth showing; a healthy record carries no error.
     error: data?.status === 'error' ? String(data?.error || 'The last analysis of this paper failed.') : '',
   };
@@ -93,7 +95,7 @@ export async function analysePaperMetadata(paper, idToken) {
   const payload = await response.json().catch(() => ({}));
 
   if (response.status === 202) {
-    return { ...createEmptyPaperMetadata('analysing'), ...payload };
+    return normaliseMetadata({ ...payload, status: 'analysing' }, { cached: false });
   }
   if (!response.ok) {
     throw new Error(payload?.error || 'The paper structure could not be analysed.');
