@@ -11,6 +11,7 @@ import { findAgenticPaperMatches } from './agenticPaperSearch.js';
 import { getOpenRouterRequestHeaders } from './openRouterKeySettings.js';
 import { buildWeakSpots, chooseNextSubject, findAllowance, getAllowanceForRung } from './practiceLadder.js';
 import { saveMistake } from './practiceRecords.js';
+import { buildConversationContext } from './agentConversation.js';
 
 // ─── Tool Definitions (OpenAI function-calling schema) ────────────────────────
 
@@ -607,9 +608,10 @@ function buildActivePaperContext(appContext) {
  * @param {object} options
  * @param {function} options.onStep - Called on each step: { type, label, data }
  * @param {AbortSignal} options.signal - Abort signal to cancel mid-run
+ * @param {Array<{role: 'user'|'assistant', content: string}>} options.history - Prior visible turns for a contextual follow-up
  * @returns {Promise<{ answer: string, steps: Array }>}
  */
-export async function runAgent(userMessage, appContext, { onStep, signal } = {}) {
+export async function runAgent(userMessage, appContext, { onStep, signal, history = [] } = {}) {
   const steps = [];
 
   const emit = (step) => {
@@ -622,7 +624,11 @@ export async function runAgent(userMessage, appContext, { onStep, signal } = {})
     ? `${activePaperContext}\n\nSTUDENT REQUEST:\n${userMessage}`
     : userMessage;
 
+  // Persisted UI history contains only completed user/assistant turns. The
+  // current run's assistant/tool messages remain in this local array so the
+  // function-calling protocol stays intact without being stored or replayed.
   const messages = [
+    ...buildConversationContext(history),
     { role: 'user', content: requestContent },
   ];
 

@@ -9,6 +9,13 @@ import { CornerDownRight, Feather, Loader2, X } from 'lucide-react';
 import { runAgent } from '../../utils/agentHarness';
 import { resolveLocally } from '../../utils/localAgent';
 import { buildWeakSpots } from '../../utils/practiceLadder';
+import { getPaperIdentity } from '../../utils/paperIdentity';
+import {
+  clearConversation,
+  getPaperMarginConversationScope,
+  loadConversation,
+  saveConversation,
+} from '../../utils/agentConversation';
 import { usePresence } from '../../utils/usePresence';
 
 // AI answers may use either LaTeX delimiters (\\(...\\), \\[...\\]) or the
@@ -64,13 +71,15 @@ export default function PaperMargin({
   quotedText = '',
   onQuoteConsumed,
 }) {
+  const conversationScope = useMemo(
+    () => getPaperMarginConversationScope(getPaperIdentity(paper)),
+    [paper],
+  );
   const [question, setQuestion] = useState('');
-  const [asked, setAsked] = useState('');
-  const [answer, setAnswer] = useState('');
+  const [conversation, setConversation] = useState(() => loadConversation(conversationScope));
   const [ledger, setLedger] = useState([]);
   const [status, setStatus] = useState('idle');
   const [errorMessage, setErrorMessage] = useState('');
-  const [answeredLocally, setAnsweredLocally] = useState(false);
   const abortRef = useRef(null);
   const inputRef = useRef(null);
   const presence = usePresence(isOpen, 260);
@@ -84,6 +93,17 @@ export default function PaperMargin({
     () => buildPrompts({ paper, subjectName, ladderEntry, mistakes: appContext.mistakes || [] }),
     [paper, subjectName, ladderEntry, appContext.mistakes],
   );
+
+  useEffect(() => {
+    setConversation(loadConversation(conversationScope));
+    setQuestion('');
+    setLedger([]);
+    setErrorMessage('');
+  }, [conversationScope]);
+
+  useEffect(() => {
+    saveConversation(conversationScope, conversation);
+  }, [conversationScope, conversation]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -118,9 +138,9 @@ export default function PaperMargin({
     const trimmed = String(text || '').trim();
     if (!trimmed || status === 'running') return;
 
-    setAsked(trimmed);
+    const priorConversation = conversation;
     setQuestion('');
-    setAnswer('');
+    setConversation((current) => [...current, { role: 'user', content: trimmed }]);
     setLedger([]);
     setErrorMessage('');
 
@@ -128,13 +148,11 @@ export default function PaperMargin({
     // index searches — with no request and no key.
     const local = resolveLocally(trimmed, appContext);
     if (local) {
-      setAnswer(local.answer);
-      setAnsweredLocally(true);
+      setConversation((current) => [...current, { role: 'assistant', content: local.answer }]);
       setStatus('idle');
       return;
     }
 
-    setAnsweredLocally(false);
     setStatus('running');
     const controller = new AbortController();
     abortRef.current = controller;
@@ -142,6 +160,7 @@ export default function PaperMargin({
     try {
       const result = await runAgent(trimmed, appContext, {
         signal: controller.signal,
+        history: priorConversation,
         onStep: (step) => {
           // Only completed actions reach the ledger; thinking is not an action.
           if (step.type === 'tool_result') {
@@ -149,7 +168,7 @@ export default function PaperMargin({
           }
         },
       });
-      setAnswer(result.answer);
+      setConversation((current) => [...current, { role: 'assistant', content: result.answer }]);
       setStatus('idle');
     } catch (error) {
       if (error.name !== 'AbortError') {
@@ -159,7 +178,14 @@ export default function PaperMargin({
     } finally {
       abortRef.current = null;
     }
-  }, [appContext, status]);
+  }, [appContext, conversation, status]);
+
+  const clearHistory = useCallback(() => {
+    clearConversation(conversationScope);
+    setConversation([]);
+    setLedger([]);
+    setErrorMessage('');
+  }, [conversationScope]);
 
   if (!presence.mounted) return null;
 
@@ -172,6 +198,11 @@ export default function PaperMargin({
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ color: 'var(--color-accent)', display: 'flex' }}><Feather size={15} /></span>
+          {conversation.length > 0 && (
+            <button type="button" className="tool-btn" onClick={clearHistory} aria-label="Clear margin conversation" title="Clear conversation">
+              Clear
+            </button>
+          )}
           <button type="button" className="tool-btn" onClick={onClose} aria-label="Close the margin">
             <X size={15} />
           </button>
@@ -179,7 +210,7 @@ export default function PaperMargin({
       </div>
 
       <div className="margin-scroll">
-        {!asked && (
+        {conversation.length === 0 && (
           <p className="dim" style={{ fontSize: '13px' }}>
             {paper?.n}{subjectName ? ` · ${subjectName}` : ''}
             {ladderEntry ? ` · rung ${ladderEntry.rung} of 5, ${ladderEntry.allowance.label.toLowerCase()}` : ''}.
@@ -188,26 +219,26 @@ export default function PaperMargin({
           </p>
         )}
 
-        {asked && (
-          <>
-            <div className="margin-said">You asked</div>
-            <p style={{ fontSize: '14px', margin: '4px 0 16px' }}>{asked}</p>
-          </>
-        )}
+        {conversation.map((message, index) => (
+          <div key={`${message.role}-${index}`} style={{ marginBottom: message.role === 'assistant' ? '18px' : '10px' }}>
+            <div className="margin-said">{message.role === 'user' ? 'You asked' : 'AI response'}</div>
+            {message.role === 'assistant' ? (
+              <div className="margin-prose agent-markdown">
+                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                  {normaliseMathDelimiters(message.content)}
+                </ReactMarkdown>
+              </div>
+            ) : (
+              <p style={{ fontSize: '14px', margin: '4px 0 0' }}>{message.content}</p>
+            )}
+          </div>
+        ))}
 
         {status === 'running' && (
           <p className="dim" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
             <Loader2 size={14} className="spin" />
             Reading the paper…
           </p>
-        )}
-
-        {answer && (
-          <div className="margin-prose agent-markdown">
-            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-              {normaliseMathDelimiters(answer)}
-            </ReactMarkdown>
-          </div>
         )}
 
         {errorMessage && (
@@ -224,12 +255,6 @@ export default function PaperMargin({
               </div>
             ))}
           </div>
-        )}
-
-        {answer && answeredLocally && (
-          <p className="dim" style={{ fontSize: '11px', marginTop: '10px' }}>
-            Answered from your own records — no model was called.
-          </p>
         )}
 
         <div className="kick" style={{ margin: '18px 0 8px' }}>Or ask</div>

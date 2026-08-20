@@ -3,6 +3,12 @@ import { runAgent } from '../utils/agentHarness.js';
 import { resolveLocally } from '../utils/localAgent.js';
 import { usePresence } from '../utils/usePresence.js';
 import { useEscapeKey } from '../utils/useEscapeKey.js';
+import {
+  AGENT_COMMAND_CONVERSATION_SCOPE,
+  clearConversation,
+  loadConversation,
+  saveConversation,
+} from '../utils/agentConversation.js';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -102,10 +108,9 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
 
   // Every other overlay in the portal closes on Escape; this one did not.
   useEscapeKey(isOpen, onClose);
-  const [conversation, setConversation] = useState([]);
+  const [conversation, setConversation] = useState(() => loadConversation(AGENT_COMMAND_CONVERSATION_SCOPE));
   const [steps, setSteps] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
-  const [hasRun, setHasRun] = useState(false);
   const [selectedPaper, setSelectedPaper] = useState(null);
   const [paperPickerOpen, setPaperPickerOpen] = useState(false);
   const [paperQuery, setPaperQuery] = useState('');
@@ -173,6 +178,10 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
     handleClear();
   };
 
+  useEffect(() => {
+    saveConversation(AGENT_COMMAND_CONVERSATION_SCOPE, conversation);
+  }, [conversation]);
+
   // Auto-scroll to latest step
   useEffect(() => {
     if (logRef.current) {
@@ -191,9 +200,9 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
     const trimmed = (query || input).trim();
     if (!trimmed || isRunning) return;
 
+    const priorConversation = conversation;
     setConversation((prev) => [...prev, { role: 'user', content: trimmed }]);
     setInput('');
-    setHasRun(true);
 
     // Answer from local data when we can. Most questions are lookups, and this
     // path costs no request, no key and no waiting.
@@ -215,6 +224,7 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
     try {
       const result = await runAgent(trimmed, effectiveAppContext, {
         signal: controller.signal,
+        history: priorConversation,
         onStep: (step) => {
           setSteps((prev) => {
             // Replace the last "thinking" step if this is a non-thinking step (avoid doubles)
@@ -257,9 +267,9 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
   };
 
   const handleClear = () => {
+    clearConversation(AGENT_COMMAND_CONVERSATION_SCOPE);
     setConversation([]);
     setSteps([]);
-    setHasRun(false);
     setInput('');
     inputRef.current?.focus();
   };
@@ -322,7 +332,7 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
             </div>
           </div>
           <div className="agent-header-actions">
-            {hasRun && (
+            {conversation.length > 0 && (
               <button className="agent-action-btn" onClick={handleClear} title="Clear conversation" aria-label="Clear">
                 <IconClear />
                 <span>Clear</span>
