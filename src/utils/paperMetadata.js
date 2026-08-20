@@ -60,12 +60,12 @@ function normaliseMetadata(data, { cached = true } = {}) {
   };
 }
 
-function metadataRequestUrl(paper) {
+function metadataRequestUrl(paper, suffix = '') {
   const params = new URLSearchParams({
     paperId: String(paper?.v || ''),
     paperName: String(paper?.n || ''),
   });
-  return `/api/paper-metadata?${params.toString()}`;
+  return `/api/paper-metadata${suffix}?${params.toString()}`;
 }
 
 async function readMetadataResponse(paper) {
@@ -95,6 +95,17 @@ export async function analysePaperMetadata(paper, idToken) {
   const payload = await response.json().catch(() => ({}));
 
   if (response.status === 202) {
+    // The claim endpoint returns immediately. Start the long worker request without
+    // awaiting it so the reader can render its elapsed analysis timer straight away.
+    if (payload?.started) {
+      void fetch(metadataRequestUrl(paper, '/worker'), {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${idToken}` },
+      }).catch(() => {
+        // The shared job stays marked as analysing and can be retried once its lock
+        // expires if the browser loses its worker-start request.
+      });
+    }
     return normaliseMetadata({ ...payload, status: 'analysing' }, { cached: false });
   }
   if (!response.ok) {

@@ -1,5 +1,5 @@
 import { FieldValue } from 'firebase-admin/firestore';
-import { waitUntil, getDeadline } from '@vercel/functions';
+import { getDeadline } from '@vercel/functions';
 import { getAdminFirestore, requireAuthenticatedUser } from './lib/firebaseAdmin.js';
 import {
   extractFullPaperText,
@@ -8,14 +8,14 @@ import {
 } from './agent/paper-context.js';
 import { getCompletionRoute, isRetryableProviderStatus, userSafeProviderError } from '../openRouterRouting.js';
 
-// A student-facing request returns immediately; the deferred shared analysis may use
-// the full five-minute Hobby-function allowance before it is considered failed.
-export const maxDuration = 300;
+// This route only claims a shared job and returns immediately. The separate worker
+// route owns the five-minute analysis allowance.
+export const maxDuration = 60;
 
 const PAPER_ID_FIELDS = ['v', 's', 'l', 'c', 'y', 'h', 'w', 'n'];
 const METADATA_COLLECTION = 'paperMetadata';
 const EXTRACTION_VERSION = 'question-marks-v2-challenge';
-const ANALYSIS_LOCK_MS = 2 * 60 * 1000;
+const ANALYSIS_LOCK_MS = 6 * 60 * 1000;
 const MAX_ANALYSIS_TEXT_CHARS = 150000;
 const MAX_ANALYSIS_OUTPUT_TOKENS = 8000;
 
@@ -360,7 +360,14 @@ async function readMetadata({ paper, sourceFingerprint }) {
 
   const data = snapshot.data();
   if (!isCurrentCacheEntry(data, sourceFingerprint)) return { ref, data: null, failure: null };
-  if (data?.status === 'ready' || data?.status === 'analysing') return { ref, data, failure: null };
+  if (data?.status === 'ready') return { ref, data, failure: null };
+  if (data?.status === 'analysing') {
+    const startedAtMillis = Number(data?.analysisStartedAtMillis) || 0;
+    if (startedAtMillis && Date.now() - startedAtMillis < ANALYSIS_LOCK_MS) {
+      return { ref, data, failure: null };
+    }
+    return { ref, data: null, failure: null };
+  }
   // A recorded failure is reported so the reader can show why, rather than looking
   // like a paper that has simply never been analysed.
   if (data?.status === 'error') return { ref, data: null, failure: data };
@@ -385,7 +392,7 @@ async function recordAnalysisFailure(ref, error) {
   }, { merge: true });
 }
 
-async function runDeferredPaperAnalysis({ ref, paper, sourceFingerprint, requestStartedAt }) {
+export async function runPaperAnalysisWorker({ ref, paper, sourceFingerprint, requestStartedAt }) {
   try {
     console.info('[paper-metadata] deferred analysis started', { paperId: String(paper.v) });
     const extractionBudgetMs = remainingBudgetMs(requestStartedAt);
@@ -530,15 +537,13 @@ export default async function handler(req, res) {
       return;
     }
 
-    waitUntil(runDeferredPaperAnalysis({
-      ref,
-      paper,
-      sourceFingerprint,
-      requestStartedAt,
-    }));
+    // Return before any PDF or AI work begins. The browser starts the independent
+    // worker route after receiving this response, so this request cannot be held
+    // open by the long-running analysis.
     sendJson(res, 202, {
       status: 'analysing',
       cached: false,
+      started: true,
       analysisStartedAtMillis: now,
       retryAfterSeconds: 4,
     });
