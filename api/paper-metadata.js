@@ -582,10 +582,13 @@ export default async function handler(req, res) {
       retryAfterSeconds: 4,
     });
   } catch (error) {
-    const status = /Sign in is required|sign-in session/i.test(String(error?.message || ''))
-      ? 401
-      : Number(error?.status) === 429 ? 429 : 500;
-    sendJson(res, status, { error: error?.message || 'The shared paper analysis could not be started.' });
+    const isAuthenticationError = /Sign in is required|sign-in session/i.test(String(error?.message || ''));
+    const isQuotaError = Number(error?.status) === 429 || Number(error?.code) === 429;
+    const status = isAuthenticationError ? 401 : isQuotaError ? 429 : 500;
+    const message = isQuotaError
+      ? 'Paper analysis is temporarily busy. Please try again later.'
+      : error?.message || 'The shared paper analysis could not be started.';
+    sendJson(res, status, { error: message });
   }
 }
 
