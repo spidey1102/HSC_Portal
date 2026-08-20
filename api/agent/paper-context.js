@@ -1,5 +1,5 @@
-import fs from 'fs'
 import { resolve } from 'path'
+import { getPaperSourceFingerprint, loadPaperRecord } from '../lib/paperSource.js'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { WorkerMessageHandler } from 'pdfjs-dist/legacy/build/pdf.worker.mjs'
 
@@ -26,15 +26,6 @@ const MIN_PDF_FETCH_TIMEOUT_MS = 5 * 1000
 const contextCache = new Map()
 const pdfByteCache = new Map()
 
-export function loadPaperRecord(paperId, paperName) {
-  const raw = fs.readFileSync(resolve(process.cwd(), 'public', 'papers.json'), 'utf-8')
-  const papers = JSON.parse(raw).papers || []
-  return papers.find((paper) => (
-    String(paper.v) === String(paperId)
-    && (!paperName || paper.n === paperName)
-  )) || null
-}
-
 function paperUrl(filePath) {
   const safePath = String(filePath || '')
     .split('/')
@@ -47,13 +38,7 @@ function paperCacheKey(paper) {
   return `${paper.v}::${paper.n}`
 }
 
-export function getPaperSourceFingerprint(paper) {
-  return JSON.stringify({
-    paperId: String(paper?.v || ''),
-    paperName: String(paper?.n || ''),
-    sourcePath: String(paper?.cf || ''),
-  })
-}
+export { getPaperSourceFingerprint, loadPaperRecord }
 
 function normaliseText(items) {
   return items

@@ -2,10 +2,9 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getDeadline } from '@vercel/functions';
 import { getAdminFirestore, requireAuthenticatedUser } from './lib/firebaseAdmin.js';
 import {
-  extractFullPaperText,
   getPaperSourceFingerprint,
   loadPaperRecord,
-} from './agent/paper-context.js';
+} from './lib/paperSource.js';
 import { getCompletionRoute, isRetryableProviderStatus, userSafeProviderError } from '../openRouterRouting.js';
 
 // This route only claims a shared job and returns immediately. The separate worker
@@ -394,6 +393,10 @@ async function recordAnalysisFailure(ref, error) {
 
 export async function runPaperAnalysisWorker({ ref, paper, sourceFingerprint, requestStartedAt }) {
   try {
+    // pdf.js and its worker bundle are loaded only inside the separate, long-running
+    // analysis route. The short job-claim route must be able to respond before
+    // these expensive modules initialise on a cold invocation.
+    const { extractFullPaperText } = await import('./agent/paper-context.js');
     console.info('[paper-metadata] deferred analysis started', { paperId: String(paper.v) });
     const extractionBudgetMs = remainingBudgetMs(requestStartedAt);
     if (extractionBudgetMs < MIN_PROVIDER_TIMEOUT_MS) {
