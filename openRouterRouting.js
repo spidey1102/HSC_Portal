@@ -19,6 +19,15 @@ export const PORTAL_AI_ROUTES = Object.freeze({
       allow_fallbacks: false,
     }),
   }),
+  // Used only when the primary free Gemma endpoint returns a temporary 429/5xx
+  // capacity failure. This model is separately allowed in the workspace guardrail.
+  chatFallback: Object.freeze({
+    model: 'google/gemma-4-26b-a4b-it:free',
+    provider: Object.freeze({
+      only: Object.freeze(['google-ai-studio']),
+      allow_fallbacks: false,
+    }),
+  }),
   paperMetadataPrimary: Object.freeze({
     model: 'google/gemini-3.5-flash-lite',
     provider: Object.freeze({

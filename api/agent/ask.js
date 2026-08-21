@@ -50,14 +50,8 @@ export default async function handler(req, res) {
       return
     }
 
-    const completionRoute = getCompletionRoute({
-      route: 'chat',
-      keySelection,
-      requestedModel: String(parsed.model || SHARED_OPENROUTER_MODEL).trim() || SHARED_OPENROUTER_MODEL,
-    })
-
-    // Proxy request to OpenRouter
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const requestedModel = String(parsed.model || SHARED_OPENROUTER_MODEL).trim() || SHARED_OPENROUTER_MODEL
+    const requestCompletion = (completionRoute) => fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${keySelection.key}`,
@@ -76,9 +70,21 @@ export default async function handler(req, res) {
       }),
     })
 
-    const rawText = await response.text()
+    let completionRoute = getCompletionRoute({ route: 'chat', keySelection, requestedModel })
+    let response = await requestCompletion(completionRoute)
+    let rawText = await response.text()
     let payload = null
     try { payload = JSON.parse(rawText) } catch (err) { /* ignore */ }
+
+    // A one-step fallback keeps portal chat usable through short provider capacity
+    // events without changing the paper-analysis route or a student's own API key.
+    if (keySelection.source === 'server' && (response.status === 429 || response.status >= 500)) {
+      completionRoute = getCompletionRoute({ route: 'chatFallback', keySelection, requestedModel })
+      response = await requestCompletion(completionRoute)
+      rawText = await response.text()
+      payload = null
+      try { payload = JSON.parse(rawText) } catch (err) { /* ignore */ }
+    }
 
     if (!response.ok) {
       const providerMessage = payload?.error?.message || rawText || `OpenRouter request failed with status ${response.status}.`
