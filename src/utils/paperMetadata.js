@@ -38,6 +38,9 @@ function normaliseQuestion(question) {
         .filter((reason, index, all) => CHALLENGE_REASONS.has(reason) && all.indexOf(reason) === index)
         .slice(0, 2),
       note: String(rawChallenge.note || '').trim().slice(0, 220),
+      // The server only persists a subpartId that matches an extracted direct
+      // subpart. Keep it through the browser normalizer for the challenge card.
+      subpartId: String(rawChallenge.subpartId || '').trim(),
     },
   };
 }
