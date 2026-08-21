@@ -9,9 +9,11 @@ export const SHARED_OPENROUTER_MODEL = 'openrouter/free';
 
 export const PORTAL_AI_ROUTES = Object.freeze({
   chat: Object.freeze({
-    model: 'google/gemma-4-31b-it',
+    // The workspace guardrail explicitly permits the free Gemma variant.
+    // The unqualified paid model slug is a separate OpenRouter model and is blocked.
+    model: 'google/gemma-4-31b-it:free',
     // Google AI Studio no longer serves this Gemma model through OpenRouter.
-    // OpenInference is both an active Gemma 4 31B provider and permitted by the
+    // OpenInference is both an active free-Gemma provider and permitted by the
     // workspace's provider allowlist. Paper extraction remains on Google AI Studio.
     provider: Object.freeze({
       only: Object.freeze(['open-inference']),
