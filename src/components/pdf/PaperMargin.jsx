@@ -7,7 +7,6 @@ import 'katex/dist/katex.min.css';
 import { CornerDownRight, Feather, Loader2, X } from 'lucide-react';
 
 import { runAgent } from '../../utils/agentHarness';
-import { resolveLocally } from '../../utils/localAgent';
 import { buildWeakSpots } from '../../utils/practiceLadder';
 import { getPaperIdentity } from '../../utils/paperIdentity';
 import {
@@ -143,15 +142,6 @@ export default function PaperMargin({
     setConversation((current) => [...current, { role: 'user', content: trimmed }]);
     setLedger([]);
     setErrorMessage('');
-
-    // The local resolver handles lookups — the ladder, weak topics, countdowns,
-    // index searches — with no request and no key.
-    const local = resolveLocally(trimmed, appContext);
-    if (local) {
-      setConversation((current) => [...current, { role: 'assistant', content: local.answer }]);
-      setStatus('idle');
-      return;
-    }
 
     setStatus('running');
     const controller = new AbortController();
