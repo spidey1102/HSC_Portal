@@ -571,6 +571,42 @@ export async function executeTool(toolName, args, appContext) {
 // ─── Agent Execution Loop ──────────────────────────────────────────────────────
 
 const MAX_TURNS = 6; // prevent infinite loops
+// The free chat routes have a modest input-throughput allowance. A full 30+ page
+// PDF plus tool definitions can otherwise exhaust it before the model can reply.
+const MAX_ACTIVE_PAPER_CONTEXT_CHARS = 26000;
+
+function createPaperContextExcerpt(rawText) {
+  const source = String(rawText || '').trim();
+  if (source.length <= MAX_ACTIVE_PAPER_CONTEXT_CHARS) {
+    return { text: source, abridged: false };
+  }
+
+  const firstPageIndex = source.search(/Page\s+\d+\s*:/i);
+  const preamble = firstPageIndex > 0 ? source.slice(0, Math.min(firstPageIndex, 1600)).trim() : '';
+  const pages = source.match(/Page\s+\d+\s*:[\s\S]*?(?=\nPage\s+\d+\s*:|$)/gi) || [];
+
+  if (pages.length < 2) {
+    return {
+      text: `${source.slice(0, MAX_ACTIVE_PAPER_CONTEXT_CHARS - 120)}\n\n[The remainder of this paper is omitted to keep the live study assistant responsive.]`,
+      abridged: true,
+    };
+  }
+
+  const available = Math.max(6000, MAX_ACTIVE_PAPER_CONTEXT_CHARS - preamble.length - 480);
+  const perPage = Math.max(360, Math.floor(available / pages.length));
+  const excerpts = pages.map((page) => (
+    page.length > perPage ? `${page.slice(0, perPage).trim()} …` : page.trim()
+  ));
+
+  return {
+    text: [
+      preamble,
+      '[This is a page-by-page excerpt of a long paper. It includes the start of every page. If the student selected or pasted a passage, treat that passage as the authoritative full text for their specific question.]',
+      excerpts.join('\n\n'),
+    ].filter(Boolean).join('\n\n'),
+    abridged: true,
+  };
+}
 
 function buildActivePaperContext(appContext) {
   const activePaper = appContext?.currentPaper;
@@ -588,9 +624,13 @@ function buildActivePaperContext(appContext) {
   ];
 
   if (activePaper.textStatus === 'ready' && activePaper.text) {
+    const excerpt = createPaperContextExcerpt(activePaper.text);
+    const pageRange = activePaper.totalPages || activePaper.pageEnd || activePaper.pagesExtracted || 'available';
     details.push(
-      `Complete PDF text is supplied from pages 1–${activePaper.totalPages || activePaper.pageEnd || activePaper.pagesExtracted || 'available'}. You may use any included page, but distinguish the paper text from your own advice.`,
-      `Complete paper text:\n${String(activePaper.text)}`,
+      excerpt.abridged
+        ? `A page-by-page excerpt is supplied from pages 1–${pageRange}. You may use included material, but do not claim to have read omitted text. A student-selected or pasted passage is complete for that question.`
+        : `Complete PDF text is supplied from pages 1–${pageRange}. You may use any included page, but distinguish the paper text from your own advice.`,
+      `${excerpt.abridged ? 'Paper excerpts' : 'Complete paper text'}:\n${excerpt.text}`,
     );
   } else {
     details.push(`PDF text is not available for this paper. ${activePaper.textReason || 'Use the paper metadata only and ask the student to paste an excerpt for question-specific help.'}`);

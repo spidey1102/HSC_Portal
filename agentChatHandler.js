@@ -76,42 +76,52 @@ export async function handleAgentChatRequest(req, res, apiKey) {
     ? messages
     : [{ role: 'system', content: AGENT_SYSTEM_PROMPT }, ...messages];
 
-  const completionRoute = getCompletionRoute({
-    route: 'chat',
-    keySelection,
-    requestedModel: String(parsed.model || SHARED_OPENROUTER_MODEL).trim() || SHARED_OPENROUTER_MODEL,
-  });
-
-  const requestBody = {
-    ...completionRoute,
-    messages: fullMessages,
-    max_tokens: 1024,
-    temperature: 0.2,
-  };
-
-  if (Array.isArray(tools) && tools.length > 0) {
-    requestBody.tools = tools;
-    requestBody.tool_choice = tool_choice || 'auto';
-  }
+  const requestedModel = String(parsed.model || SHARED_OPENROUTER_MODEL).trim() || SHARED_OPENROUTER_MODEL;
+  const routeNames = keySelection.source === 'server'
+    ? ['chat', 'chatFallback', 'chatEmergencyFallback']
+    : ['chat'];
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${keySelection.key}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://hsc-portal.vercel.app',
-        'X-Title': 'HSC Portal Agent',
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    const raw = await response.text();
+    let response = null;
+    let raw = '';
     let payload = null;
-    try {
-      payload = JSON.parse(raw);
-    } catch {
-      // keep raw fallback
+
+    // The Margin uses this endpoint rather than /api/agent/ask. Try the two
+    // Google free routes and then NVIDIA only for temporary capacity failures.
+    for (const routeName of routeNames) {
+      const completionRoute = getCompletionRoute({ route: routeName, keySelection, requestedModel });
+      const requestBody = {
+        ...completionRoute,
+        messages: fullMessages,
+        max_tokens: 1024,
+        temperature: 0.2,
+      };
+
+      if (Array.isArray(tools) && tools.length > 0) {
+        requestBody.tools = tools;
+        requestBody.tool_choice = tool_choice || 'auto';
+      }
+
+      response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${keySelection.key}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://hsc-portal.vercel.app',
+          'X-Title': 'HSC Portal Agent',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      raw = await response.text();
+      payload = null;
+      try {
+        payload = JSON.parse(raw);
+      } catch {
+        // keep raw fallback
+      }
+
+      if (response.ok || (response.status !== 429 && response.status < 500)) break;
     }
 
     if (!response.ok) {
