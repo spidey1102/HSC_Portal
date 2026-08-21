@@ -70,20 +70,23 @@ export default async function handler(req, res) {
       }),
     })
 
-    let completionRoute = getCompletionRoute({ route: 'chat', keySelection, requestedModel })
-    let response = await requestCompletion(completionRoute)
-    let rawText = await response.text()
+    const routeNames = keySelection.source === 'server'
+      ? ['chat', 'chatFallback', 'chatEmergencyFallback']
+      : ['chat']
+    let completionRoute = null
+    let response = null
+    let rawText = ''
     let payload = null
-    try { payload = JSON.parse(rawText) } catch (err) { /* ignore */ }
 
-    // A one-step fallback keeps portal chat usable through short provider capacity
-    // events without changing the paper-analysis route or a student's own API key.
-    if (keySelection.source === 'server' && (response.status === 429 || response.status >= 500)) {
-      completionRoute = getCompletionRoute({ route: 'chatFallback', keySelection, requestedModel })
+    // The portal-owned route uses two independent Google free models followed by
+    // an NVIDIA free model. We move on only for temporary capacity failures.
+    for (const routeName of routeNames) {
+      completionRoute = getCompletionRoute({ route: routeName, keySelection, requestedModel })
       response = await requestCompletion(completionRoute)
       rawText = await response.text()
       payload = null
       try { payload = JSON.parse(rawText) } catch (err) { /* ignore */ }
+      if (response.ok || (response.status !== 429 && response.status < 500)) break
     }
 
     if (!response.ok) {

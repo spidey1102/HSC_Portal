@@ -28,6 +28,16 @@ export const PORTAL_AI_ROUTES = Object.freeze({
       allow_fallbacks: false,
     }),
   }),
+  // Independent-provider fallback for a Google AI Studio-wide temporary outage
+  // or free-tier throttle. This NVIDIA model and provider are already permitted
+  // by the active workspace guardrail.
+  chatEmergencyFallback: Object.freeze({
+    model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+    provider: Object.freeze({
+      only: Object.freeze(['nvidia']),
+      allow_fallbacks: false,
+    }),
+  }),
   paperMetadataPrimary: Object.freeze({
     model: 'google/gemini-3.5-flash-lite',
     provider: Object.freeze({
