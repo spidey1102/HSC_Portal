@@ -40,7 +40,12 @@ import { usePdfZoom } from '../utils/usePdfZoom';
 import { usePresence } from '../utils/usePresence';
 import { parsePaperTiming, describeTiming } from '../utils/paperTiming';
 import { isPrimaryModifier } from '../utils/platformShortcuts';
-import { challengeLevelLabel, challengeReasonLabel, getChallengeRecommendations } from '../utils/challengeRecommendations';
+import {
+  challengeLevelLabel,
+  challengeQuestionLabel,
+  challengeReasonLabel,
+  getChallengeRecommendations,
+} from '../utils/challengeRecommendations';
 
 const TIMER_STORAGE_KEY = 'hsc_timer_duration_secs';
 const SCALE_STEP = 1.2;
@@ -402,14 +407,15 @@ export default function PracticeRoom({
   };
 
   const handleOpenChallenge = (question) => {
-    const page = Number(question?.page);
+    const page = Number(question?.targetPage ?? question?.page);
     if (!Number.isInteger(page) || page < 1) {
       flash('This recommendation does not have a page number yet');
       return;
     }
+    const label = challengeQuestionLabel(question);
     setChallengePage(page);
     setIsChallengeOpen(false);
-    flash(`Question ${question.id} — page ${page}`);
+    flash(`${label} — page ${page}`);
   };
 
   // Record that this paper was opened.
@@ -649,8 +655,8 @@ export default function PracticeRoom({
                   onClick={() => handleOpenChallenge(question)}
                 >
                   <span className={`challenge-level is-${question.challenge.level}`}>{question.isFallback ? 'Suggested' : challengeLevelLabel(question.challenge.level)}</span>
-                  <strong>Question {question.id}</strong>
-                  <span className="num dim">{question.marks !== null && question.marks !== undefined ? `${question.marks} marks` : 'Marks not stated'} · Page {question.page}</span>
+                  <strong>{challengeQuestionLabel(question)}</strong>
+                  <span className="num dim">{question.targetMarks !== null && question.targetMarks !== undefined ? `${question.targetMarks} marks` : 'Marks not stated'} · Page {question.targetPage}</span>
                   <span className="challenge-reason">{challengeReasonLabel(question)}</span>
                   <span className="challenge-go">Take me there →</span>
                 </button>

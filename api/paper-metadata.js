@@ -17,7 +17,7 @@ import { getCompletionRoute, isRetryableProviderStatus, userSafeProviderError } 
 export const maxDuration = 60;
 
 const PAPER_ID_FIELDS = ['v', 's', 'l', 'c', 'y', 'h', 'w', 'n'];
-const EXTRACTION_VERSION = 'question-marks-v2-challenge';
+const EXTRACTION_VERSION = 'question-marks-v3-challenge-subpart';
 const ANALYSIS_LOCK_MS = 6 * 60 * 1000;
 const MAX_ANALYSIS_TEXT_CHARS = 150000;
 const MAX_ANALYSIS_OUTPUT_TOKENS = 8000;
@@ -76,21 +76,37 @@ const CHALLENGE_REASON_CODES = new Set([
   'extended-response',
 ]);
 
-function normaliseChallenge(rawChallenge) {
+function normaliseSubpartId(value) {
+  const id = String(value || '').trim().replace(/\s+/g, ' ');
+  if (!id) return '';
+
+  // Models sometimes return "(b)" or "b." even when the extracted PDF label
+  // is simply "b". Store one predictable display form for matching and rendering.
+  const match = id.match(/^\(?\s*([a-z]|\d+|[ivxlcdm]+)\s*\)?[.:]?$/i);
+  return match ? match[1].toLowerCase() : id;
+}
+
+function normaliseChallenge(rawChallenge, subparts = []) {
   const level = CHALLENGE_LEVELS.has(rawChallenge?.level) ? rawChallenge.level : 'routine';
   const reasons = (Array.isArray(rawChallenge?.reasons) ? rawChallenge.reasons : [])
     .map((reason) => String(reason || '').trim())
     .filter((reason, index, all) => CHALLENGE_REASON_CODES.has(reason) && all.indexOf(reason) === index)
     .slice(0, 2);
   const note = String(rawChallenge?.note || '').trim().replace(/\s+/g, ' ').slice(0, 220);
+  const requestedSubpartId = normaliseSubpartId(rawChallenge?.subpartId);
+  const matchingSubpart = subparts.find((subpart) => (
+    normaliseSubpartId(subpart?.id) === requestedSubpartId
+  ));
 
-  return { level, reasons, note };
+  // Never surface an invented part label. A missing or mismatched value remains a
+  // valid whole-question challenge and is deliberately rendered without brackets.
+  return { level, reasons, note, subpartId: matchingSubpart?.id || '' };
 }
 
 function normaliseQuestion(rawQuestion, index) {
   const subparts = (Array.isArray(rawQuestion?.subparts) ? rawQuestion.subparts : [])
     .map((subpart, subpartIndex) => {
-      const id = String(subpart?.id || subpart?.label || '').trim().replace(/\s+/g, ' ');
+      const id = normaliseSubpartId(subpart?.id || subpart?.label);
       if (!id) return null;
       return {
         id,
@@ -109,7 +125,7 @@ function normaliseQuestion(rawQuestion, index) {
     marks: marks ?? (subpartMarks > 0 ? subpartMarks : null),
     page: normaliseNumber(rawQuestion?.page),
     subparts,
-    challenge: normaliseChallenge(rawQuestion?.challenge),
+    challenge: normaliseChallenge(rawQuestion?.challenge, subparts),
   };
 }
 
@@ -224,8 +240,9 @@ function buildAnalysisPrompt(paper, paperText) {
     'For every substantive HSC-style paper, identify at least one strongest question as "challenging" or "stretch". Choose the question with the most demanding reasoning, application, or marks; do not mark every substantive question routine merely because the paper is broadly accessible.',
     'For challenge.reasons, select zero to two exact codes only from: unfamiliar-context, multi-step-reasoning, cross-topic-synthesis, data-interpretation, common-misconception, non-routine-method, extended-response. challenge.note must be one plain, factual sentence of no more than 24 words explaining the selection, or an empty string for routine questions.',
     'Do not invent marks. Use null when a mark cannot be established. Do not treat instructions, multiple-choice option labels, tables, source labels, or section headings as questions.',
-    'For a question with subparts, preserve the top-level question as one item; only use subparts for a, b, i, ii style labels. totalMarks should be the printed paper total if stated, otherwise the sum of reliable top-level marks, otherwise null.',
-    'Use this exact shape: {"totalMarks":number|null,"confidence":"high"|"medium"|"low","notes":"short caveat or empty string","questions":[{"id":"1","marks":number|null,"page":number|null,"subparts":[{"id":"a","marks":number|null,"page":number|null}],"challenge":{"level":"routine"|"challenging"|"stretch","reasons":["unfamiliar-context"],"note":"short explanation or empty string"}}]}.',
+    'For a question with subparts, preserve the top-level question as one item; only use subparts for a, b, i, ii style labels. When a challenge is chiefly about one direct subpart, set challenge.subpartId to that exact extracted label. For Mathematics Extension 1 and Mathematics Extension 2 papers, every challenging or stretch recommendation with explicit lettered or roman subparts must identify the specific relevant subpart whenever one can be established. Use null only when the challenge genuinely concerns the entire top-level question or no exact direct subpart can be determined.',
+    'totalMarks should be the printed paper total if stated, otherwise the sum of reliable top-level marks, otherwise null.',
+    'Use this exact shape: {"totalMarks":number|null,"confidence":"high"|"medium"|"low","notes":"short caveat or empty string","questions":[{"id":"1","marks":number|null,"page":number|null,"subparts":[{"id":"a","marks":number|null,"page":number|null}],"challenge":{"level":"routine"|"challenging"|"stretch","reasons":["unfamiliar-context"],"note":"short explanation or empty string","subpartId":"a"|null}}]}.',
     '',
     `Paper: ${paper.n}`,
     `Source category: ${PAPER_CATEGORY_LABELS[paper.c] || 'unknown'}`,

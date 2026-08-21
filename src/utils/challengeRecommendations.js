@@ -14,7 +14,7 @@ const REASON_LABELS = Object.freeze({
   'extended-response': 'a sustained written response',
 });
 
-function questionScore(question) {
+function challengeScore(question) {
   const challenge = question?.challenge || {};
   const levelScore = LEVEL_SCORES[challenge.level] || 0;
   const reasonScore = Math.min(2, Array.isArray(challenge.reasons) ? challenge.reasons.length : 0);
@@ -22,10 +22,49 @@ function questionScore(question) {
   return levelScore + reasonScore + markScore;
 }
 
+function getChallengeSubpart(question) {
+  const subpartId = String(question?.challenge?.subpartId || '').trim();
+  if (!subpartId) return null;
+
+  return (Array.isArray(question?.subparts) ? question.subparts : []).find((subpart) => (
+    String(subpart?.id || '').trim().toLowerCase() === subpartId.toLowerCase()
+  )) || null;
+}
+
+function isKnownPage(value) {
+  const page = Number(value);
+  return Number.isInteger(page) && page > 0;
+}
+
+/**
+ * The selected recommendation keeps its top-level question identity but carries
+ * an optional direct subpart target. This prevents cards from pretending that a
+ * whole long question is the challenge when the model identified Question 8(c).
+ */
+function prepareRecommendation(question) {
+  const challengeSubpart = getChallengeSubpart(question);
+  const targetPage = isKnownPage(challengeSubpart?.page)
+    ? Number(challengeSubpart.page)
+    : Number(question?.page);
+
+  return {
+    ...question,
+    challengeSubpart,
+    targetPage,
+    targetMarks: challengeSubpart?.marks ?? question?.marks ?? null,
+  };
+}
+
 export function challengeLevelLabel(level) {
   if (level === 'stretch') return 'Stretch';
   if (level === 'challenging') return 'Challenging';
   return 'Practice';
+}
+
+export function challengeQuestionLabel(question) {
+  const questionId = String(question?.id || '').trim();
+  const subpartId = String(question?.challengeSubpart?.id || '').trim();
+  return `Question ${questionId}${subpartId ? `(${subpartId})` : ''}`;
 }
 
 export function challengeReasonLabel(question) {
@@ -52,18 +91,16 @@ export function challengeReasonLabel(question) {
  */
 export function getChallengeRecommendations(questions, limit = 3) {
   const ranked = (Array.isArray(questions) ? questions : [])
-    .filter((question) => {
-      const page = Number(question?.page);
-      return Number.isInteger(page) && page > 0;
-    })
+    .map(prepareRecommendation)
+    .filter((question) => isKnownPage(question.targetPage))
     .map((question) => ({
       ...question,
-      challengeScore: questionScore(question),
+      challengeScore: challengeScore(question),
     }))
     .sort((left, right) => (
       right.challengeScore - left.challengeScore
-      || Number(right.marks || 0) - Number(left.marks || 0)
-      || Number(left.page) - Number(right.page)
+      || Number(right.targetMarks || 0) - Number(left.targetMarks || 0)
+      || Number(left.targetPage) - Number(right.targetPage)
       || String(left.id).localeCompare(String(right.id), undefined, { numeric: true })
     ));
 
