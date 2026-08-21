@@ -12,11 +12,10 @@ export const PORTAL_AI_ROUTES = Object.freeze({
     // The workspace guardrail explicitly permits the free Gemma variant.
     // The unqualified paid model slug is a separate OpenRouter model and is blocked.
     model: 'google/gemma-4-31b-it:free',
-    // Google AI Studio no longer serves this Gemma model through OpenRouter.
-    // OpenInference is both an active free-Gemma provider and permitted by the
-    // workspace's provider allowlist. Paper extraction remains on Google AI Studio.
+    // The free Gemma variant is currently served through Google AI Studio on
+    // OpenRouter. Paper extraction uses the same provider but a separate model.
     provider: Object.freeze({
-      only: Object.freeze(['open-inference']),
+      only: Object.freeze(['google-ai-studio']),
       allow_fallbacks: false,
     }),
   }),
