@@ -45,6 +45,58 @@ export const AGENT_TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'recommend_weak_topic_questions',
+      description: 'Find exactly five distinct cached questions for the student\'s most frequently logged weak topic. Use when the student asks what they should practise for a weak area, asks for questions based on their mistakes, or asks for targeted weak-topic practice. If the notebook has no logged mistakes, explain that no personalised weak topic has been recorded yet and invite them to name a topic.',
+      parameters: {
+        type: 'object',
+        properties: {
+          subject: {
+            type: 'string',
+            description: 'Optional course name to prefer when the student has weak topics across multiple subjects.',
+          },
+          difficulty: {
+            type: 'string',
+            enum: ['any', 'challenging', 'stretch'],
+            description: 'Optional difficulty filter. Use any unless the student asks for a hard or stretch set.',
+          },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'find_similar_cached_questions',
+      description: 'Find exactly five distinct cached questions similar to a topic, skill, or question the student is currently working on. Use when the student asks for similar questions, more questions like this one, or another question that practises the same idea. When the student refers to a question in the active paper, pass question_reference so the saved Question Map topic or skill is used deterministically.',
+      parameters: {
+        type: 'object',
+        properties: {
+          topic: {
+            type: 'string',
+            description: 'The topic or assessed skill that makes the desired questions similar, for example "projectile motion", "buffers", or "trigonometric equations". Omit this when question_reference identifies a labelled question in the active paper.',
+          },
+          question_reference: {
+            type: 'string',
+            description: 'Optional active-paper reference such as "14", "14(a)", or "14(a)(ii)". Use this instead of guessing a topic when the student refers to the question they have open.',
+          },
+          subject: {
+            type: 'string',
+            description: 'Optional course name to restrict the similar questions.',
+          },
+          difficulty: {
+            type: 'string',
+            enum: ['any', 'challenging', 'stretch'],
+            description: 'Optional difficulty filter. Use any unless the student asks for a hard or stretch set.',
+          },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'search_papers',
       description: 'Search the HSC paper database and return matching papers. Use this whenever the user asks to find, search, show, or look up papers.',
       parameters: {
@@ -272,6 +324,56 @@ export const AGENT_TOOLS = [
   },
 ];
 
+function normaliseQuestionReference(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/question\s*/g, '')
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function questionSearchLabel(question) {
+  const labels = [
+    ...(Array.isArray(question?.topics) ? question.topics : []),
+    question?.skill,
+    question?.commandVerb,
+  ];
+  return labels.map((label) => String(label || '').trim()).find(Boolean) || '';
+}
+
+function resolveActiveQuestionReference(currentPaper, reference) {
+  const wanted = normaliseQuestionReference(reference);
+  const questions = Array.isArray(currentPaper?.structure?.questions)
+    ? currentPaper.structure.questions
+    : [];
+  if (!wanted || questions.length === 0) return null;
+
+  for (const question of questions) {
+    const questionId = String(question?.id || '').trim();
+    const questionKey = normaliseQuestionReference(questionId);
+    if (!questionKey) continue;
+
+    if (wanted === questionKey) {
+      const topic = questionSearchLabel(question);
+      if (topic) return { topic, questionId, subpartId: '', source: `Question ${questionId}` };
+    }
+
+    for (const subpart of (Array.isArray(question?.subparts) ? question.subparts : [])) {
+      const subpartId = String(subpart?.id || '').trim();
+      const combinedKey = normaliseQuestionReference(`${questionId}(${subpartId})`);
+      if (!subpartId || wanted !== combinedKey) continue;
+      const topic = questionSearchLabel(subpart);
+      if (topic) return {
+        topic,
+        questionId,
+        subpartId,
+        source: `Question ${questionId}(${subpartId})`,
+      };
+    }
+  }
+
+  return null;
+}
+
 // ─── Tool Executor ─────────────────────────────────────────────────────────────
 
 /**
@@ -309,24 +411,82 @@ export async function executeTool(toolName, args, appContext) {
     return papers.find((paper) => String(paper.v) === v && paper.n === n) || null;
   };
 
+  const requestCachedQuestions = async ({ topic, subject, difficulty }) => {
+    const response = await fetch('/api/agent-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'search_cached_questions',
+        search: {
+          topic,
+          subject,
+          difficulty,
+          excludeQuestionKeys: getCachedQuestionResultKeys(appContext?.conversationHistory || []),
+        },
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) return { error: payload?.error || 'The cached question search could not be completed.' };
+    return payload;
+  };
+
   switch (toolName) {
-    case 'search_cached_questions': {
-      const response = await fetch('/api/agent-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'search_cached_questions',
-          search: {
-            topic: args.topic,
-            subject: args.subject,
-            difficulty: args.difficulty,
-            excludeQuestionKeys: getCachedQuestionResultKeys(appContext?.conversationHistory || []),
-          },
-        }),
+    case 'search_cached_questions':
+      return requestCachedQuestions(args);
+
+    case 'recommend_weak_topic_questions': {
+      const wantedSubject = String(args.subject || '').trim().toLowerCase();
+      const weakest = buildWeakSpots(mistakes, 20).find((spot) => (
+        !wantedSubject || String(spot.subject || '').trim().toLowerCase() === wantedSubject
+      ));
+      if (!weakest?.topic) {
+        return {
+          found: 0,
+          returned: 0,
+          questions: [],
+          message: wantedSubject
+            ? `No logged weak topic exists for ${args.subject} yet.`
+            : 'No weak topic has been logged yet. Record a mistake in the notebook or name a topic to practise.',
+        };
+      }
+      const result = await requestCachedQuestions({
+        topic: weakest.topic,
+        subject: weakest.subject || args.subject,
+        difficulty: args.difficulty,
       });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) return { error: payload?.error || 'The cached question search could not be completed.' };
-      return payload;
+      return {
+        ...result,
+        mode: 'weak_topic',
+        weakTopic: { topic: weakest.topic, subject: weakest.subject || '', mistakes: Number(weakest.count) || 0 },
+      };
+    }
+
+    case 'find_similar_cached_questions': {
+      const questionReference = String(args.question_reference || '').trim();
+      const resolved = questionReference
+        ? resolveActiveQuestionReference(appContext?.currentPaper, questionReference)
+        : null;
+      const topic = resolved?.topic || String(args.topic || '').trim();
+      if (!topic) {
+        return {
+          found: 0,
+          returned: 0,
+          questions: [],
+          message: questionReference
+            ? `I could not find a labelled topic or skill for ${questionReference} in the active Question Map. Name the topic you want to practise instead.`
+            : 'Name a topic or reference a labelled question in the active paper so I can find similar questions.',
+        };
+      }
+      const result = await requestCachedQuestions({
+        topic,
+        subject: resolved ? (appContext?.currentPaper?.subject || args.subject) : args.subject,
+        difficulty: args.difficulty,
+      });
+      return {
+        ...result,
+        mode: 'similar_questions',
+        similarTo: resolved || null,
+      };
     }
 
     case 'search_papers': {
@@ -789,7 +949,8 @@ export async function runAgent(userMessage, appContext, { onStep, signal, histor
           toolResult = { error: err.message };
         }
 
-        if (toolName === 'search_cached_questions' && Array.isArray(toolResult?.questions)) {
+        if (['search_cached_questions', 'recommend_weak_topic_questions', 'find_similar_cached_questions'].includes(toolName)
+          && Array.isArray(toolResult?.questions)) {
           discoveredQuestionResults.push(...toolResult.questions);
         }
 
@@ -833,6 +994,10 @@ function formatToolLabel(toolName, args) {
   switch (toolName) {
     case 'search_cached_questions':
       return `Searching the cached Question Maps for ${args.topic || 'matching questions'}…`;
+    case 'recommend_weak_topic_questions':
+      return 'Finding questions for your most logged weak topic…';
+    case 'find_similar_cached_questions':
+      return `Finding questions similar to ${args.topic || 'this question'}…`;
     case 'search_papers':
       return `Searching for "${args.query}"…`;
     case 'get_bookmarks':
@@ -867,7 +1032,9 @@ function formatToolLabel(toolName, args) {
 function formatToolResultLabel(toolName, result) {
   switch (toolName) {
     case 'search_cached_questions':
-      if (result.returned === 0) return 'No unused cached questions matched that request.';
+    case 'recommend_weak_topic_questions':
+    case 'find_similar_cached_questions':
+      if (result.returned === 0) return result.message || 'No unused cached questions matched that request.';
       return `Found ${result.returned} new cached question${result.returned === 1 ? '' : 's'}.`;
     case 'search_papers':
       if (result.found === 0) return 'No matching papers found.';

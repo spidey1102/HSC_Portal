@@ -156,28 +156,73 @@ export async function searchCachedQuestions({
       if (score <= 0) continue;
 
       const key = questionResultKey(paper.paperIdentity, id);
-      if (excluded.has(key)) continue;
-      candidates.push({
-        score,
-        key,
-        paperIdentity: paper.paperIdentity,
-        paperName: paper.n || String(row.paper_name || ''),
-        paperYear: Number.isFinite(paper.y) ? paper.y : null,
-        subject: subjectName,
-        school: schoolName,
-        question: {
-          id,
-          page,
-          marks: question?.marks === null || question?.marks === undefined ? null : Number(question.marks),
-          topics: Array.isArray(question?.topics) ? question.topics.slice(0, 3) : [],
-          skill: String(question?.skill || '').trim(),
-          commandVerb: String(question?.commandVerb || '').trim(),
-          challenge: {
-            level: ['routine', 'challenging', 'stretch'].includes(level) ? level : 'routine',
-            subpartId: String(question?.challenge?.subpartId || '').trim(),
+      if (!excluded.has(key)) {
+        candidates.push({
+          score,
+          key,
+          paperIdentity: paper.paperIdentity,
+          paperName: paper.n || String(row.paper_name || ''),
+          paperYear: Number.isFinite(paper.y) ? paper.y : null,
+          subject: subjectName,
+          school: schoolName,
+          question: {
+            id,
+            page,
+            marks: question?.marks === null || question?.marks === undefined ? null : Number(question.marks),
+            topics: Array.isArray(question?.topics) ? question.topics.slice(0, 3) : [],
+            skill: String(question?.skill || '').trim(),
+            commandVerb: String(question?.commandVerb || '').trim(),
+            challenge: {
+              level: ['routine', 'challenging', 'stretch'].includes(level) ? level : 'routine',
+              subpartId: String(question?.challenge?.subpartId || '').trim(),
+            },
           },
-        },
-      });
+        });
+      }
+
+      const subparts = Array.isArray(question?.subparts) ? question.subparts : [];
+      for (const subpart of subparts) {
+        const subpartId = String(subpart?.id || '').trim();
+        const subpartPage = Number(subpart?.page ?? page);
+        if (!subpartId || !Number.isInteger(subpartPage) || subpartPage < 1) continue;
+
+        const subpartQuestion = {
+          ...question,
+          topics: Array.isArray(subpart?.topics) ? subpart.topics : [],
+          skill: String(subpart?.skill || '').trim(),
+          commandVerb: String(subpart?.commandVerb || '').trim(),
+        };
+        const hasOwnLabels = subpartQuestion.topics.some((label) => String(label || '').trim())
+          || Boolean(subpartQuestion.skill)
+          || Boolean(subpartQuestion.commandVerb);
+        if (!hasOwnLabels) continue;
+        const subpartScore = questionRelevance(subpartQuestion, topic);
+        if (subpartScore <= 0) continue;
+
+        const subpartKey = questionResultKey(paper.paperIdentity, `${id}(${subpartId})`);
+        if (excluded.has(subpartKey)) continue;
+        candidates.push({
+          score: subpartScore,
+          key: subpartKey,
+          paperIdentity: paper.paperIdentity,
+          paperName: paper.n || String(row.paper_name || ''),
+          paperYear: Number.isFinite(paper.y) ? paper.y : null,
+          subject: subjectName,
+          school: schoolName,
+          question: {
+            id,
+            page: subpartPage,
+            marks: subpart?.marks === null || subpart?.marks === undefined ? null : Number(subpart.marks),
+            topics: Array.isArray(subpart?.topics) ? subpart.topics.slice(0, 3) : [],
+            skill: String(subpart?.skill || '').trim(),
+            commandVerb: String(subpart?.commandVerb || '').trim(),
+            challenge: {
+              level: ['routine', 'challenging', 'stretch'].includes(level) ? level : 'routine',
+              subpartId,
+            },
+          },
+        });
+      }
     }
   }
 

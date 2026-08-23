@@ -85,11 +85,11 @@ function AgentStep({ step, isLast }) {
 // ─── Suggestion Pills ──────────────────────────────────────────────────────────
 
 const SUGGESTIONS = [
+  'Give me five questions for my weakest topic',
+  'Find five questions similar to projectile motion',
+  'Find five challenging Chemistry equilibrium questions',
   'Find 2023 Chemistry trials with solutions',
-  'Show my bookmarks',
-  'Add a Physics study session for next Monday',
   'What are my study stats?',
-  'Find recent Maths Ext 2 papers',
 ];
 
 // ─── Main Component ────────────────────────────────────────────────────────────
@@ -308,9 +308,9 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
     })
     .slice(0, 16);
   const suggestions = activePaper ? [
+    'Find questions similar to the topic I am doing',
+    'Give me five questions for my weakest topic',
     'Give me a short plan for this paper',
-    'What should I focus on while doing this paper?',
-    'How should I approach this paper under timed conditions?',
     'How should I review this paper afterwards?',
   ] : SUGGESTIONS;
 
@@ -484,7 +484,7 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={activePaper ? 'Ask about this paper…' : 'Ask me anything…'}
+            placeholder={activePaper ? 'Ask about this paper or find similar questions…' : 'Ask for papers, a topic, or five questions to practise…'}
             rows={1}
             disabled={isRunning}
             aria-label="Agent command input"

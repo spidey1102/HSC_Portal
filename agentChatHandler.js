@@ -11,7 +11,7 @@ const AGENT_SYSTEM_PROMPT = [
   'Keep your final responses concise — one or two sentences at most.',
   'Never use markdown headers or excessive formatting in your final response.',
   'When selected-paper context is supplied, use it to give paper-aware guidance. The supplied PDF text contains every selectable-text page in the selected paper; you may discuss any included page or question, but never invent text that is not present in the supplied paper.',
-  'When a student asks for questions on a topic, use search_cached_questions. It returns only shared cached questions, and the interface renders its five result cards with their own Take me there buttons. On a follow-up such as "do it again", call the tool again; it automatically receives prior result keys and must return different questions. Do not invent question matches or links.',
+  'When a student asks for questions on a named topic, use search_cached_questions. When they ask for questions based on their weak areas or logged mistakes, use recommend_weak_topic_questions. When they ask for questions similar to a current question or topic, use find_similar_cached_questions. If they reference a numbered question or subquestion in the active paper, send that exact reference as question_reference and do not guess its topic: the client resolves it from the saved Question Map. Each returns only shared cached questions, and the interface renders five result cards with their own Take me there buttons. On a follow-up such as "do it again", call the same relevant tool again; it automatically receives prior result keys and must return different questions. Do not invent question matches or links.',
 ].join(' ');
 
 /**

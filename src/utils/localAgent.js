@@ -135,6 +135,11 @@ const INTENTS = [
       /keep getting wrong/,
       /my mistakes/,
       /what should i revise/,
+    ]) && !matchesAny(text, [
+      /\bquestions?\b/,
+      /\bpractice\b/,
+      /\bdrill\b/,
+      /\bgive me\b/,
     ]),
     run: (_text, context) => {
       const spots = buildWeakSpots(context.mistakes || [], MAX_LISTED);
