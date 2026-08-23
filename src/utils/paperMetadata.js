@@ -17,6 +17,27 @@ function isKnownMark(value) {
   return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
 }
 
+const MAX_TOPIC_LABELS = 3;
+const MAX_TOPIC_LABEL_LENGTH = 48;
+const MAX_SKILL_LABEL_LENGTH = 88;
+const COMMAND_VERBS = new Set([
+  'analyse', 'assess', 'calculate', 'compare', 'construct', 'deduce', 'describe',
+  'determine', 'discuss', 'evaluate', 'explain', 'identify', 'interpret', 'justify',
+  'outline', 'predict', 'propose', 'show', 'solve', 'summarise',
+]);
+
+function normaliseTopics(value) {
+  return (Array.isArray(value) ? value : [])
+    .map((topic) => String(topic || '').trim().replace(/\s+/g, ' ').slice(0, MAX_TOPIC_LABEL_LENGTH))
+    .filter((topic, index, all) => topic && all.findIndex((candidate) => candidate.toLowerCase() === topic.toLowerCase()) === index)
+    .slice(0, MAX_TOPIC_LABELS);
+}
+
+function normaliseCommandVerb(value) {
+  const verb = String(value || '').trim().toLowerCase();
+  return COMMAND_VERBS.has(verb) ? verb : '';
+}
+
 const CHALLENGE_LEVELS = new Set(['routine', 'challenging', 'stretch']);
 const CHALLENGE_REASONS = new Set([
   'unfamiliar-context',
@@ -32,6 +53,9 @@ function normaliseQuestion(question) {
   const rawChallenge = question?.challenge || {};
   return {
     ...question,
+    topics: normaliseTopics(question?.topics),
+    skill: String(question?.skill || '').trim().replace(/\s+/g, ' ').slice(0, MAX_SKILL_LABEL_LENGTH),
+    commandVerb: normaliseCommandVerb(question?.commandVerb),
     challenge: {
       level: CHALLENGE_LEVELS.has(rawChallenge.level) ? rawChallenge.level : 'routine',
       reasons: (Array.isArray(rawChallenge.reasons) ? rawChallenge.reasons : [])

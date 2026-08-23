@@ -199,6 +199,7 @@ export default function PracticeRoom({
   const [metadataClock, setMetadataClock] = useState(() => Date.now());
   const [isRequestingMetadata, setIsRequestingMetadata] = useState(false);
   const [isChallengeOpen, setIsChallengeOpen] = useState(false);
+  const [isQuestionMapOpen, setIsQuestionMapOpen] = useState(false);
   const [openChallengeWhenReady, setOpenChallengeWhenReady] = useState(false);
   const [challengePage, setChallengePage] = useState(null);
   const [actionMessage, setActionMessage] = useState('');
@@ -386,6 +387,15 @@ export default function PracticeRoom({
     }
   };
 
+  const handleQuestionMap = () => {
+    if (paperMetadata.status === 'ready') {
+      setIsQuestionMapOpen(true);
+      return;
+    }
+
+    handleAnalysePaperMetadata();
+  };
+
   const handleRecommendChallenge = () => {
     if (paperMetadata.status === 'ready') {
       setIsChallengeOpen(true);
@@ -406,7 +416,7 @@ export default function PracticeRoom({
     handleAnalysePaperMetadata();
   };
 
-  const handleOpenChallenge = (question) => {
+  const handleOpenQuestion = (question) => {
     const page = Number(question?.targetPage ?? question?.page);
     if (!Number.isInteger(page) || page < 1) {
       flash('This recommendation does not have a page number yet');
@@ -415,6 +425,7 @@ export default function PracticeRoom({
     const label = challengeQuestionLabel(question);
     setChallengePage(page);
     setIsChallengeOpen(false);
+    setIsQuestionMapOpen(false);
     flash(`${label} — page ${page}`);
   };
 
@@ -585,15 +596,15 @@ export default function PracticeRoom({
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={handleAnalysePaperMetadata}
+            onClick={handleQuestionMap}
             disabled={isRequestingMetadata}
             title={paperMetadata.status === 'ready'
-              ? 'Question and mark structure is saved for every student'
-              : paperMetadata.error || 'Read the questions and marks out of this paper once'}
+              ? 'Open the saved question topics, skills, marks, and page map'
+              : paperMetadata.error || 'Read the questions, topics, and marks out of this paper once'}
           >
             <ListChecks size={14} />
             {paperMetadata.status === 'ready'
-              ? `${paperMetadata.questionCount} questions${paperMetadata.totalMarks !== null ? ` · ${paperMetadata.totalMarks} marks` : ''}`
+              ? `Question map · ${paperMetadata.questionCount}`
               : isRequestingMetadata ? 'Starting analysis…'
                 : paperMetadata.status === 'analysing' ? `Analysing ${formatAnalysisElapsed(metadataElapsedSeconds)}`
                   : paperMetadata.error ? 'Retry structure'
@@ -627,6 +638,55 @@ export default function PracticeRoom({
 
       {actionMessage && <div className="reader-notice">{actionMessage}</div>}
 
+      {isQuestionMapOpen && (
+        <section className="reader-question-map" aria-label="Question topic map" aria-live="polite">
+          <div className="reader-challenge-head">
+            <div>
+              <div className="kick"><ListChecks size={12} /> Question map</div>
+              <p className="dim" style={{ margin: '3px 0 0', fontSize: '12.5px' }}>
+                Topics, skills, command verbs, marks, and pages are cached once for every student.
+              </p>
+            </div>
+            <button type="button" className="btn btn-secondary btn-icon" onClick={() => setIsQuestionMapOpen(false)} aria-label="Close question map" title="Close">
+              <X size={14} />
+            </button>
+          </div>
+          <div className="reader-question-map-list">
+            {paperMetadata.questions.map((question) => {
+              const page = Number(question?.page);
+              const hasPage = Number.isInteger(page) && page >= 1;
+              const detail = [
+                question.commandVerb ? `${question.commandVerb[0].toUpperCase()}${question.commandVerb.slice(1)}` : '',
+                question.skill,
+              ].filter(Boolean).join(' · ');
+
+              return (
+                <button
+                  key={question.id}
+                  type="button"
+                  className="reader-question-map-card"
+                  disabled={!hasPage}
+                  onClick={() => handleOpenQuestion(question)}
+                  title={hasPage ? `Go to page ${page}` : 'This question does not have a reliable page number'}
+                >
+                  <span className="question-map-title">
+                    <strong>{challengeQuestionLabel(question)}</strong>
+                    <span className="num dim">{question.marks !== null && question.marks !== undefined ? `${question.marks} marks` : 'Marks not stated'}{hasPage ? ` · Page ${page}` : ''}</span>
+                  </span>
+                  {question.topics.length > 0 && (
+                    <span className="question-topic-tags">
+                      {question.topics.map((topic) => <span key={topic}>{topic}</span>)}
+                    </span>
+                  )}
+                  {detail && <span className="question-map-skill">{detail}</span>}
+                  {hasPage && <span className="challenge-go">Take me there →</span>}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {isChallengeOpen && (
         <section className="reader-challenge" aria-label="Recommended challenges" aria-live="polite">
           <div className="reader-challenge-head">
@@ -652,7 +712,7 @@ export default function PracticeRoom({
                   key={question.id}
                   type="button"
                   className="reader-challenge-card"
-                  onClick={() => handleOpenChallenge(question)}
+                  onClick={() => handleOpenQuestion(question)}
                 >
                   <span className={`challenge-level is-${question.challenge.level}`}>{question.isFallback ? 'Suggested' : challengeLevelLabel(question.challenge.level)}</span>
                   <strong>{challengeQuestionLabel(question)}</strong>

@@ -17,7 +17,7 @@ import { getCompletionRoute, isRetryableProviderStatus, userSafeProviderError } 
 export const maxDuration = 60;
 
 const PAPER_ID_FIELDS = ['v', 's', 'l', 'c', 'y', 'h', 'w', 'n'];
-const EXTRACTION_VERSION = 'question-marks-v3-challenge-subpart';
+const EXTRACTION_VERSION = 'question-marks-v4-topic-labels';
 const ANALYSIS_LOCK_MS = 6 * 60 * 1000;
 const MAX_ANALYSIS_TEXT_CHARS = 150000;
 const MAX_ANALYSIS_OUTPUT_TOKENS = 8000;
@@ -63,6 +63,31 @@ function normaliseNumber(value) {
 function normaliseQuestionId(value, fallbackIndex) {
   const id = String(value || '').trim().replace(/\s+/g, ' ');
   return id || String(fallbackIndex + 1);
+}
+
+const MAX_TOPIC_LABELS = 3;
+const MAX_TOPIC_LABEL_LENGTH = 48;
+const MAX_SKILL_LABEL_LENGTH = 88;
+const COMMAND_VERBS = new Set([
+  'analyse', 'assess', 'calculate', 'compare', 'construct', 'deduce', 'describe',
+  'determine', 'discuss', 'evaluate', 'explain', 'identify', 'interpret', 'justify',
+  'outline', 'predict', 'propose', 'show', 'solve', 'summarise',
+]);
+
+function normaliseTopicLabel(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').slice(0, MAX_TOPIC_LABEL_LENGTH);
+}
+
+function normaliseTopics(value) {
+  return (Array.isArray(value) ? value : [])
+    .map(normaliseTopicLabel)
+    .filter((topic, index, all) => topic && all.findIndex((candidate) => candidate.toLowerCase() === topic.toLowerCase()) === index)
+    .slice(0, MAX_TOPIC_LABELS);
+}
+
+function normaliseCommandVerb(value) {
+  const verb = String(value || '').trim().toLowerCase();
+  return COMMAND_VERBS.has(verb) ? verb : '';
 }
 
 const CHALLENGE_LEVELS = new Set(['routine', 'challenging', 'stretch']);
@@ -125,6 +150,9 @@ function normaliseQuestion(rawQuestion, index) {
     marks: marks ?? (subpartMarks > 0 ? subpartMarks : null),
     page: normaliseNumber(rawQuestion?.page),
     subparts,
+    topics: normaliseTopics(rawQuestion?.topics),
+    skill: String(rawQuestion?.skill || '').trim().replace(/\s+/g, ' ').slice(0, MAX_SKILL_LABEL_LENGTH),
+    commandVerb: normaliseCommandVerb(rawQuestion?.commandVerb),
     challenge: normaliseChallenge(rawQuestion?.challenge, subparts),
   };
 }
@@ -238,11 +266,12 @@ function buildAnalysisPrompt(paper, paperText) {
     'Identify each top-level numbered question exactly once. For each, extract its printed marks where reliably stated, its PDF page number, direct subparts only where their labels and marks are explicit, and a compact challenge classification.',
     'Classify the question itself, not the student. Use challenge.level "routine" for ordinary single-step practice, "challenging" when careful application or more than one step is required, and "stretch" only when the question is unusually difficult, non-routine, or deliberately unfamiliar for this course.',
     'For every substantive HSC-style paper, identify at least one strongest question as "challenging" or "stretch". Choose the question with the most demanding reasoning, application, or marks; do not mark every substantive question routine merely because the paper is broadly accessible.',
+    'For question topics, provide zero to three concise syllabus-aligned labels using the course language students would search for. Examples include Equilibrium, Acid–Base Reactions, Organic Chemistry, Complex Numbers, Calculus, Texts and Human Experiences, and Module B. Do not use generic labels such as Question 5, Section II, Diagram, or Extended Response as a topic. skill is one short phrase stating the main assessed skill, such as Apply Le Chatelier’s Principle or Analyse Language Techniques; use an empty string only when no meaningful skill can be identified. commandVerb is the printed command verb in lowercase when clear, otherwise an empty string.',
     'For challenge.reasons, select zero to two exact codes only from: unfamiliar-context, multi-step-reasoning, cross-topic-synthesis, data-interpretation, common-misconception, non-routine-method, extended-response. challenge.note must be one plain, factual sentence of no more than 24 words explaining the selection, or an empty string for routine questions.',
     'Do not invent marks. Use null when a mark cannot be established. Do not treat instructions, multiple-choice option labels, tables, source labels, or section headings as questions.',
     'For a question with subparts, preserve the top-level question as one item; only use subparts for a, b, i, ii style labels. When a challenge is chiefly about one direct subpart, set challenge.subpartId to that exact extracted label. For Mathematics Extension 1 and Mathematics Extension 2 papers, every challenging or stretch recommendation with explicit lettered or roman subparts must identify the specific relevant subpart whenever one can be established. Use null only when the challenge genuinely concerns the entire top-level question or no exact direct subpart can be determined.',
     'totalMarks should be the printed paper total if stated, otherwise the sum of reliable top-level marks, otherwise null.',
-    'Use this exact shape: {"totalMarks":number|null,"confidence":"high"|"medium"|"low","notes":"short caveat or empty string","questions":[{"id":"1","marks":number|null,"page":number|null,"subparts":[{"id":"a","marks":number|null,"page":number|null}],"challenge":{"level":"routine"|"challenging"|"stretch","reasons":["unfamiliar-context"],"note":"short explanation or empty string","subpartId":"a"|null}}]}.',
+    'Use this exact shape: {"totalMarks":number|null,"confidence":"high"|"medium"|"low","notes":"short caveat or empty string","questions":[{"id":"1","marks":number|null,"page":number|null,"subparts":[{"id":"a","marks":number|null,"page":number|null}],"topics":["Equilibrium"],"skill":"Apply Le Chatelier’s Principle","commandVerb":"explain","challenge":{"level":"routine"|"challenging"|"stretch","reasons":["unfamiliar-context"],"note":"short explanation or empty string","subpartId":"a"|null}}]}.',
     '',
     `Paper: ${paper.n}`,
     `Source category: ${PAPER_CATEGORY_LABELS[paper.c] || 'unknown'}`,

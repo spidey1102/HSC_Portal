@@ -96,6 +96,43 @@
   background: var(--color-bg); border: 1px dashed var(--color-divider); border-radius: var(--radius-md); font-size: 12.5px;
 }
 
+/* ── Question topic map ────────────────────────────────────────────────── */
+.reader-question-map {
+  flex: none;
+  padding: 10px var(--gutter) 12px;
+  background: color-mix(in srgb, var(--color-text) 3%, var(--color-bg));
+  border-bottom: 1px solid var(--color-divider);
+}
+.reader-question-map .reader-challenge-head { margin-bottom: 9px; }
+.reader-question-map .kick { display: flex; align-items: center; gap: 5px; color: var(--color-accent-800); }
+.reader-question-map-list {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px;
+  max-width: 1180px; margin: 0 auto;
+}
+.reader-question-map-card {
+  min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 7px;
+  padding: 10px 11px; text-align: left;
+  color: var(--color-text); background: var(--color-bg);
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
+  transition: transform 0.16s cubic-bezier(0.23, 1, 0.32, 1), border-color 0.16s ease, background-color 0.16s ease;
+}
+.reader-question-map-card:not(:disabled):hover {
+  transform: translateY(-1px); border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent-100) 28%, var(--color-bg));
+}
+.reader-question-map-card:disabled { opacity: 0.72; cursor: default; }
+.reader-question-map-card:active:not(:disabled) { transform: scale(0.985); }
+.question-map-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 7px; }
+.question-map-title strong { font-family: var(--font-heading); font-size: 15px; line-height: 1.1; }
+.question-map-title .num { font-size: 11px; }
+.question-topic-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.question-topic-tags > span {
+  padding: 2px 6px; border-radius: 999px;
+  color: var(--color-accent-800); background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  font: 10.5px var(--font-num);
+}
+.question-map-skill { font-size: 12px; line-height: 1.32; color: color-mix(in srgb, var(--color-text) 72%, transparent); }
+
 @media (prefers-reduced-motion: reduce) {
   .reader-challenge-card { transition: none; }
 }
