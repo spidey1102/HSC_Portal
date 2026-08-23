@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   BookOpen,
   Check,
-  ChevronDown,
   ClipboardCheck,
   Feather,
   ListChecks,
@@ -131,7 +130,7 @@ export default function PracticeRoom({
   useEffect(() => {
     setAnnotations(loadAnnotations(paper));
     setSelectedId(null);
-    setExpandedQuestionIds(new Set());
+    setFocusedQuestionId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paperKey]);
 
@@ -206,7 +205,7 @@ export default function PracticeRoom({
   const [isRequestingMetadata, setIsRequestingMetadata] = useState(false);
   const [isChallengeOpen, setIsChallengeOpen] = useState(false);
   const [isQuestionMapOpen, setIsQuestionMapOpen] = useState(false);
-  const [expandedQuestionIds, setExpandedQuestionIds] = useState(() => new Set());
+  const [focusedQuestionId, setFocusedQuestionId] = useState(null);
   const [openChallengeWhenReady, setOpenChallengeWhenReady] = useState(false);
   const [challengePage, setChallengePage] = useState(null);
   const [actionMessage, setActionMessage] = useState('');
@@ -442,15 +441,6 @@ export default function PracticeRoom({
     handleAnalysePaperMetadata();
   };
 
-  const toggleQuestionSubparts = (questionId) => {
-    setExpandedQuestionIds((current) => {
-      const next = new Set(current);
-      if (next.has(questionId)) next.delete(questionId);
-      else next.add(questionId);
-      return next;
-    });
-  };
-
   const handleOpenQuestion = (question, subpart = null) => {
     const page = Number(subpart?.page ?? question?.targetPage ?? question?.page);
     if (!Number.isInteger(page) || page < 1) {
@@ -463,6 +453,7 @@ export default function PracticeRoom({
       : challengeQuestionLabel(question);
     setChallengePage(page);
     setIsChallengeOpen(false);
+    setFocusedQuestionId(null);
     setIsQuestionMapOpen(false);
     flash(`${label} — page ${page}`);
   };
@@ -625,6 +616,7 @@ export default function PracticeRoom({
   }), [agentContext, paper, subjectName, schoolName, paperCategory, paperContext, paperMetadata]);
 
   const ladderEntry = (agentContext.ladder || []).find((entry) => entry.subject === subjectName) || null;
+  const focusedQuestion = paperMetadata.questions.find((question) => question.id === focusedQuestionId) || null;
 
   return (
     <div className="reader">
@@ -744,100 +736,145 @@ export default function PracticeRoom({
                   {paperMetadata.refresh?.eligible ? 'Refresh map' : 'Refresh later'}
                 </button>
               )}
-              <button type="button" className="btn btn-secondary btn-icon" onClick={() => setIsQuestionMapOpen(false)} aria-label="Close question map" title="Close">
+              <button type="button" className="btn btn-secondary btn-icon" onClick={() => { setFocusedQuestionId(null); setIsQuestionMapOpen(false); }} aria-label="Close question map" title="Close">
                 <X size={14} />
               </button>
             </div>
           </div>
-          <div className="reader-question-map-list">
-            {paperMetadata.questions.map((question) => {
-              const page = Number(question?.page);
-              const hasPage = Number.isInteger(page) && page >= 1;
-              const subparts = Array.isArray(question?.subparts) ? question.subparts : [];
-              const areSubpartsExpanded = expandedQuestionIds.has(question.id);
-              const subpartsPanelId = `question-subparts-${String(question.id).replace(/[^a-z0-9_-]/gi, '-')}`;
-              const detail = [
-                question.commandVerb ? `${question.commandVerb[0].toUpperCase()}${question.commandVerb.slice(1)}` : '',
-                question.skill,
-              ].filter(Boolean).join(' · ');
+          {!focusedQuestion && (
+            <div className="reader-question-map-list">
+              {paperMetadata.questions.map((question) => {
+                const page = Number(question?.page);
+                const hasPage = Number.isInteger(page) && page >= 1;
+                const subparts = Array.isArray(question?.subparts) ? question.subparts : [];
+                const detail = [
+                  question.commandVerb ? `${question.commandVerb[0].toUpperCase()}${question.commandVerb.slice(1)}` : '',
+                  question.skill,
+                ].filter(Boolean).join(' · ');
 
-              return (
-                <article key={question.id} className="reader-question-map-card">
+                return (
+                  <article key={question.id} className="reader-question-map-card">
+                    <button
+                      type="button"
+                      className="question-map-primary"
+                      disabled={!hasPage}
+                      onClick={() => handleOpenQuestion(question)}
+                      title={hasPage ? `Go to Question ${question.id} on page ${page}` : 'This question does not have a reliable page number'}
+                    >
+                      <span className="question-map-title">
+                        <strong>{challengeQuestionLabel(question)}</strong>
+                        <span className="num dim">{question.marks !== null && question.marks !== undefined ? `${question.marks} marks` : 'Marks not stated'}{hasPage ? ` · Page ${page}` : ''}</span>
+                      </span>
+                      {question.topics.length > 0 && (
+                        <span className="question-topic-tags">
+                          {question.topics.map((topic) => <span key={topic}>{topic}</span>)}
+                        </span>
+                      )}
+                      {detail && <span className="question-map-skill">{detail}</span>}
+                      {hasPage && <span className="challenge-go">Open full question →</span>}
+                    </button>
+
+                    {subparts.length > 0 && (
+                      <button
+                        type="button"
+                        className="question-map-subparts-toggle"
+                        onClick={() => setFocusedQuestionId(question.id)}
+                        aria-haspopup="dialog"
+                      >
+                        <span>{`View ${subparts.length} ${subparts.length === 1 ? 'part' : 'parts'}`}</span>
+                        <span aria-hidden="true">→</span>
+                      </button>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+
+          {focusedQuestion && (() => {
+            const page = Number(focusedQuestion?.page);
+            const hasPage = Number.isInteger(page) && page >= 1;
+            const subparts = Array.isArray(focusedQuestion?.subparts) ? focusedQuestion.subparts : [];
+            const detail = [
+              focusedQuestion.commandVerb ? `${focusedQuestion.commandVerb[0].toUpperCase()}${focusedQuestion.commandVerb.slice(1)}` : '',
+              focusedQuestion.skill,
+            ].filter(Boolean).join(' · ');
+            return (
+              <section className="question-map-focus" role="dialog" aria-modal="true" aria-labelledby="focused-question-title">
+                <div className="question-map-focus-card">
+                  <div className="question-map-focus-head">
+                    <div>
+                      <span className="kick">Question details</span>
+                      <h2 id="focused-question-title">{challengeQuestionLabel(focusedQuestion)}</h2>
+                    </div>
+                    <button type="button" className="btn btn-secondary btn-icon" onClick={() => setFocusedQuestionId(null)} aria-label="Return to all questions" title="Close question details">
+                      <X size={15} />
+                    </button>
+                  </div>
+
                   <button
                     type="button"
-                    className="question-map-primary"
+                    className="question-map-focus-primary"
                     disabled={!hasPage}
-                    onClick={() => handleOpenQuestion(question)}
-                    title={hasPage ? `Go to Question ${question.id} on page ${page}` : 'This question does not have a reliable page number'}
+                    onClick={() => handleOpenQuestion(focusedQuestion)}
+                    title={hasPage ? `Go to Question ${focusedQuestion.id} on page ${page}` : 'This question does not have a reliable page number'}
                   >
                     <span className="question-map-title">
-                      <strong>{challengeQuestionLabel(question)}</strong>
-                      <span className="num dim">{question.marks !== null && question.marks !== undefined ? `${question.marks} marks` : 'Marks not stated'}{hasPage ? ` · Page ${page}` : ''}</span>
+                      <strong>{challengeQuestionLabel(focusedQuestion)}</strong>
+                      <span className="num dim">{focusedQuestion.marks !== null && focusedQuestion.marks !== undefined ? `${focusedQuestion.marks} marks` : 'Marks not stated'}{hasPage ? ` · Page ${page}` : ''}</span>
                     </span>
-                    {question.topics.length > 0 && (
+                    {focusedQuestion.topics.length > 0 && (
                       <span className="question-topic-tags">
-                        {question.topics.map((topic) => <span key={topic}>{topic}</span>)}
+                        {focusedQuestion.topics.map((topic) => <span key={topic}>{topic}</span>)}
                       </span>
                     )}
                     {detail && <span className="question-map-skill">{detail}</span>}
                     {hasPage && <span className="challenge-go">Open full question →</span>}
                   </button>
 
-                  {subparts.length > 0 && (
-                    <div className="question-map-subparts-wrap">
-                      <button
-                        type="button"
-                        className="question-map-subparts-toggle"
-                        onClick={() => toggleQuestionSubparts(question.id)}
-                        aria-expanded={areSubpartsExpanded}
-                        aria-controls={subpartsPanelId}
-                      >
-                        <span>{areSubpartsExpanded ? 'Hide parts' : `Show ${subparts.length} ${subparts.length === 1 ? 'part' : 'parts'}`}</span>
-                        <ChevronDown size={14} className={areSubpartsExpanded ? 'is-open' : ''} aria-hidden="true" />
-                      </button>
-                      {areSubpartsExpanded && (
-                    <div id={subpartsPanelId} className="question-map-subparts" aria-label={`Parts of Question ${question.id}`}>
-                      <span className="question-map-subparts-label">Parts</span>
-                      {subparts.map((subpart) => {
-                        const subpartPage = Number(subpart?.page ?? page);
-                        const subpartHasPage = Number.isInteger(subpartPage) && subpartPage >= 1;
-                        const subpartDetail = [
-                          subpart.commandVerb ? `${subpart.commandVerb[0].toUpperCase()}${subpart.commandVerb.slice(1)}` : '',
-                          subpart.skill,
-                        ].filter(Boolean).join(' · ');
-                        return (
-                          <button
-                            key={`${question.id}-${subpart.id}`}
-                            type="button"
-                            className="question-map-subpart"
-                            disabled={!subpartHasPage}
-                            onClick={() => handleOpenQuestion(question, { ...subpart, page: subpartPage })}
-                            title={subpartHasPage ? `Go to Question ${question.id}(${subpart.id}) on page ${subpartPage}` : `Question ${question.id}(${subpart.id}) does not have a reliable page number`}
-                          >
-                            <span className="question-map-subpart-main">
-                              <span className="question-map-subpart-heading">
-                                <strong>{question.id}({subpart.id})</strong>
-                                <span className="question-map-subpart-meta">{subpart.marks !== null && subpart.marks !== undefined ? `${subpart.marks} marks` : 'Marks not stated'}{subpartHasPage ? ` · Page ${subpartPage}` : ''}</span>
-                              </span>
-                              {subpart.topics.length > 0 && (
-                                <span className="question-subpart-topic-tags">
-                                  {subpart.topics.map((topic) => <span key={topic}>{topic}</span>)}
-                                </span>
-                              )}
-                              {subpartDetail && <span className="question-map-subpart-skill">{subpartDetail}</span>}
+                  <div className="question-map-subparts question-map-focus-subparts" aria-label={`Parts of Question ${focusedQuestion.id}`}>
+                    <span className="question-map-subparts-label">Parts</span>
+                    {subparts.map((subpart) => {
+                      const subpartPage = Number(subpart?.page ?? page);
+                      const subpartHasPage = Number.isInteger(subpartPage) && subpartPage >= 1;
+                      const subpartDetail = [
+                        subpart.commandVerb ? `${subpart.commandVerb[0].toUpperCase()}${subpart.commandVerb.slice(1)}` : '',
+                        subpart.skill,
+                      ].filter(Boolean).join(' · ');
+                      return (
+                        <button
+                          key={`${focusedQuestion.id}-${subpart.id}`}
+                          type="button"
+                          className="question-map-subpart"
+                          disabled={!subpartHasPage}
+                          onClick={() => handleOpenQuestion(focusedQuestion, { ...subpart, page: subpartPage })}
+                          title={subpartHasPage ? `Go to Question ${focusedQuestion.id}(${subpart.id}) on page ${subpartPage}` : `Question ${focusedQuestion.id}(${subpart.id}) does not have a reliable page number`}
+                        >
+                          <span className="question-map-subpart-main">
+                            <span className="question-map-subpart-heading">
+                              <strong>{focusedQuestion.id}({subpart.id})</strong>
+                              <span className="question-map-subpart-meta">{subpart.marks !== null && subpart.marks !== undefined ? `${subpart.marks} marks` : 'Marks not stated'}{subpartHasPage ? ` · Page ${subpartPage}` : ''}</span>
                             </span>
-                            {subpartHasPage && <em>Take me there →</em>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                      )}
-                    </div>
-                  )}
-                </article>
-              );
-            })}
-          </div>
+                            {subpart.topics.length > 0 && (
+                              <span className="question-subpart-topic-tags">
+                                {subpart.topics.map((topic) => <span key={topic}>{topic}</span>)}
+                              </span>
+                            )}
+                            {subpartDetail && <span className="question-map-subpart-skill">{subpartDetail}</span>}
+                          </span>
+                          {subpartHasPage && <em>Take me there →</em>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button type="button" className="btn btn-secondary question-map-focus-return" onClick={() => setFocusedQuestionId(null)}>
+                    <ArrowLeft size={14} />
+                    All questions
+                  </button>
+                </div>
+              </section>
+            );
+          })()}
         </section>
       )}
 

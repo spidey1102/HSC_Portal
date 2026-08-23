@@ -147,8 +147,6 @@
 }
 .question-map-subparts-toggle:hover { background: color-mix(in srgb, var(--color-accent-100) 58%, transparent); }
 .question-map-subparts-toggle:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-.question-map-subparts-toggle svg { transition: transform 0.16s ease; }
-.question-map-subparts-toggle svg.is-open { transform: rotate(180deg); }
 .question-map-subparts {
   display: grid; gap: 5px; padding-top: 8px;
   border-top: 1px solid color-mix(in srgb, var(--color-divider) 76%, transparent);
@@ -182,9 +180,44 @@
 .question-map-subpart-skill { color: color-mix(in srgb, var(--color-text) 70%, transparent); font-size: 10.5px; line-height: 1.25; }
 .question-map-subpart em { color: var(--color-accent-800); font: 10.5px var(--font-num); font-style: normal; white-space: nowrap; }
 
+.question-map-focus {
+  position: fixed; inset: 0; z-index: 1700; display: grid; place-items: center;
+  padding: clamp(18px, 4vw, 56px); overflow: auto;
+  background: color-mix(in srgb, var(--color-bg) 96%, transparent);
+  backdrop-filter: blur(9px);
+}
+.question-map-focus-card {
+  display: grid; gap: 14px; width: min(760px, 100%); max-height: min(790px, calc(100dvh - 36px));
+  padding: clamp(18px, 3vw, 30px); overflow: auto; color: var(--color-text); background: var(--color-bg);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, var(--color-divider)); border-radius: calc(var(--radius-md) + 4px);
+  box-shadow: 0 24px 70px color-mix(in srgb, var(--color-text) 20%, transparent);
+  animation: question-map-focus-in 180ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+.question-map-focus-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.question-map-focus-head .kick { color: var(--color-accent-800); }
+.question-map-focus-head h2 { margin: 4px 0 0; font: clamp(23px, 4vw, 32px) var(--font-heading); line-height: 1; }
+.question-map-focus-primary {
+  display: grid; gap: 8px; width: 100%; padding: 13px; color: var(--color-text); background: color-mix(in srgb, var(--color-accent-100) 30%, var(--color-bg));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 28%, var(--color-divider)); border-radius: var(--radius-md); text-align: left;
+}
+.question-map-focus-primary:not(:disabled) { cursor: pointer; }
+.question-map-focus-primary:not(:disabled):hover { background: color-mix(in srgb, var(--color-accent-100) 55%, var(--color-bg)); }
+.question-map-focus-primary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+.question-map-focus-subparts { max-height: 48dvh; padding-top: 0; overflow: auto; border-top: 0; }
+.question-map-focus-return { justify-self: start; }
+@keyframes question-map-focus-in { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+@media (max-width: 620px) {
+  .question-map-focus { padding: 12px; }
+  .question-map-focus-card { max-height: calc(100dvh - 24px); padding: 16px; }
+  .question-map-focus-subparts { max-height: 50dvh; }
+  .question-map-subpart { grid-template-columns: minmax(0, 1fr); }
+  .question-map-subpart em { justify-self: start; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .reader-challenge-card,
-  .question-map-subparts-toggle svg { transition: none; }
+  .question-map-focus-card { animation: none; transition: none; }
 }
 
 /* ── Panes ────────────────────────────────────────────────────────────── */
