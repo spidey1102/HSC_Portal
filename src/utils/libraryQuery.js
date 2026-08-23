@@ -119,6 +119,25 @@ function matchSubjectPrefix(term, lookup) {
   return candidates.sort((left, right) => left.key.length - right.key.length)[0];
 }
 
+function englishTrialPaperPart(paper, subjectName) {
+  if (paper?.c !== 'T' || !/^English\b/i.test(String(subjectName || ''))) return '';
+
+  const source = [paper?.n, paper?.cf].filter(Boolean).join(' ');
+  const match = source.match(/(?:\bpaper\s*|\bp\s*)([12])\b/i);
+  return match ? `Paper ${match[1]}` : '';
+}
+
+function readPaperPartTokens(token, next) {
+  const compact = token.match(/^(?:paper|p)([12])$/);
+  if (compact) return { value: Number(compact[1]), span: 1 };
+
+  if ((token === 'paper' || token === 'p') && (next === '1' || next === '2')) {
+    return { value: Number(next), span: 2 };
+  }
+
+  return null;
+}
+
 function readYearToken(token) {
   const openEnded = token.match(/^(\d{4})\+$/);
   if (openEnded) {
@@ -195,6 +214,15 @@ export function parseLibraryQuery(query, { subjects = [] } = {}) {
       continue;
     }
 
+    const paperPart = readPaperPartTokens(token, next);
+    if (paperPart) {
+      if (!has('paperPart')) {
+        facets.push({ type: 'paperPart', value: paperPart.value, label: `Paper ${paperPart.value}` });
+      }
+      index += paperPart.span;
+      continue;
+    }
+
     const year = readYearToken(token);
     if (year) {
       if (!has('years')) {
@@ -231,7 +259,7 @@ export function parseLibraryQuery(query, { subjects = [] } = {}) {
 }
 
 /** Does one paper satisfy a parsed facet? */
-function matchesFacet(paper, facet) {
+function matchesFacet(paper, facet, { subjects = [] } = {}) {
   switch (facet.type) {
     case 'subject':
       return paper.s === facet.value;
@@ -239,6 +267,8 @@ function matchesFacet(paper, facet) {
       return paper.c === facet.value;
     case 'solutions':
       return facet.value ? paper.w === 1 : paper.w !== 1;
+    case 'paperPart':
+      return englishTrialPaperPart(paper, subjects[paper.s]) === `Paper ${facet.value}`;
     case 'years': {
       const year = parseInt(String(paper.y), 10);
       if (!Number.isFinite(year)) return false;
@@ -260,7 +290,7 @@ export function applyLibraryQuery(papers, parsed, { subjects = [], schools = [] 
   if (facets.length === 0 && terms.length === 0) return papers;
 
   return papers.filter((paper) => {
-    if (!facets.every((facet) => matchesFacet(paper, facet))) return false;
+    if (!facets.every((facet) => matchesFacet(paper, facet, { subjects }))) return false;
     if (terms.length === 0) return true;
 
     const searchable = [
@@ -300,6 +330,8 @@ function facetToToken(facet) {
       return facet.value ? 'with solutions' : 'no solutions';
     case 'type':
       return TYPE_TOKENS[facet.value] || '';
+    case 'paperPart':
+      return `paper ${facet.value}`;
     case 'subject':
       return String(facet.label).toLowerCase();
     default:
