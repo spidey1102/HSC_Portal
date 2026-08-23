@@ -9,6 +9,7 @@ export function createEmptyPaperMetadata(status = 'loading') {
     notes: '',
     retryAfterSeconds: null,
     analysisStartedAtMillis: null,
+    refresh: { eligible: false, needsRefresh: false, reason: '', retryAfterSeconds: null },
     error: '',
   };
 }
@@ -87,6 +88,15 @@ function normaliseQuestion(question) {
   };
 }
 
+function normaliseRefresh(value) {
+  return {
+    eligible: value?.eligible === true,
+    needsRefresh: value?.needsRefresh === true,
+    reason: String(value?.reason || '').trim().slice(0, 240),
+    retryAfterSeconds: Number(value?.retryAfterSeconds) || null,
+  };
+}
+
 function normaliseMetadata(data, { cached = true } = {}) {
   return {
     ...createEmptyPaperMetadata(data?.status || 'ready'),
@@ -100,16 +110,18 @@ function normaliseMetadata(data, { cached = true } = {}) {
     sourceFingerprint: data?.sourceFingerprint || '',
     retryAfterSeconds: Number(data?.retryAfterSeconds) || null,
     analysisStartedAtMillis: Number(data?.analysisStartedAtMillis) || null,
+    refresh: normaliseRefresh(data?.refresh),
     // A recorded server-side failure is worth showing; a healthy record carries no error.
     error: data?.status === 'error' ? String(data?.error || 'The last analysis of this paper failed.') : '',
   };
 }
 
-function metadataRequestUrl(paper, suffix = '') {
+function metadataRequestUrl(paper, suffix = '', { refresh = false } = {}) {
   const params = new URLSearchParams({
     paperId: String(paper?.v || ''),
     paperName: String(paper?.n || ''),
   });
+  if (refresh) params.set('refresh', '1');
   return `/api/paper-metadata${suffix}?${params.toString()}`;
 }
 
@@ -132,8 +144,8 @@ export async function getPaperMetadata(paper) {
   return readMetadataResponse(paper);
 }
 
-export async function analysePaperMetadata(paper, idToken) {
-  const response = await fetch(metadataRequestUrl(paper), {
+export async function analysePaperMetadata(paper, idToken, { refresh = false } = {}) {
+  const response = await fetch(metadataRequestUrl(paper, '', { refresh }), {
     method: 'POST',
     headers: { Authorization: `Bearer ${idToken}` },
   });

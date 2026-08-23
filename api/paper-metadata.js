@@ -5,6 +5,7 @@ import {
   completePaperAnalysis,
   getPaperMetadata,
   invalidateIncompletePaperAnalysis,
+  invalidateRefreshablePaperAnalysis,
   recordPaperAnalysisFailure,
 } from '../server/portalStorage.js';
 import {
@@ -20,6 +21,9 @@ export const maxDuration = 60;
 const PAPER_ID_FIELDS = ['v', 's', 'l', 'c', 'y', 'h', 'w', 'n'];
 const EXTRACTION_VERSION = 'question-marks-v4-topic-labels';
 const ANALYSIS_LOCK_MS = 6 * 60 * 1000;
+const STUDENT_REFRESH_COOLDOWN_MS = 12 * 60 * 60 * 1000;
+const MIN_REFRESHABLE_TOTAL_MARKS = 30;
+const MIN_REFRESHABLE_PAGES = 5;
 const MAX_ANALYSIS_TEXT_CHARS = 150000;
 const MAX_ANALYSIS_OUTPUT_TOKENS = 8000;
 
@@ -435,7 +439,44 @@ export async function callPaperAnalysis(prompt, { timeoutMs = ANALYSIS_PROVIDER_
   }
 }
 
-function publicMetadata(data, { cached = true } = {}) {
+function hasNoDetectedSubparts(data, paper) {
+  if (data?.status !== 'ready' || !SUBSTANTIVE_PAPER_CATEGORIES.has(paper?.c)) return false;
+  const questions = Array.isArray(data.questions) ? data.questions : [];
+  const hasSubparts = questions.some((question) => Array.isArray(question?.subparts) && question.subparts.length > 0);
+  const totalMarks = normaliseNumber(data.totalMarks) || 0;
+  const pageCount = Math.max(Number(data.pagesAnalysed) || 0, Number(data.totalPages) || 0);
+  return !hasSubparts && questions.length >= MIN_SUBSTANTIVE_QUESTION_RANGE
+    && (totalMarks >= MIN_REFRESHABLE_TOTAL_MARKS || pageCount >= MIN_REFRESHABLE_PAGES);
+}
+
+function refreshEligibility(data, paper) {
+  if (data?.status !== 'ready') return { eligible: false, needsRefresh: false, reason: '' };
+  if (!hasNoDetectedSubparts(data, paper)) return { eligible: false, needsRefresh: false, reason: '' };
+
+  const extractedAtMillis = Date.parse(data?.extractedAt || '');
+  const availableAtMillis = Number.isFinite(extractedAtMillis)
+    ? extractedAtMillis + STUDENT_REFRESH_COOLDOWN_MS
+    : Date.now() + STUDENT_REFRESH_COOLDOWN_MS;
+  const secondsUntilAvailable = Math.max(0, Math.ceil((availableAtMillis - Date.now()) / 1000));
+  if (secondsUntilAvailable > 0) {
+    return {
+      eligible: false,
+      needsRefresh: true,
+      reason: 'This Question Map was recently refreshed. Try again later.',
+      retryAfterSeconds: secondsUntilAvailable,
+    };
+  }
+
+  return {
+    eligible: true,
+    needsRefresh: true,
+    reason: 'This full-paper map has no detected subparts. Refresh it to capture the printed parts.',
+    retryAfterSeconds: null,
+  };
+}
+
+function publicMetadata(data, { cached = true, paper = null } = {}) {
+  const refresh = refreshEligibility(data, paper);
   return {
     status: data?.status || 'missing',
     cached,
@@ -450,6 +491,7 @@ function publicMetadata(data, { cached = true } = {}) {
     analysisStartedAtMillis: Number(data?.analysisStartedAtMillis) || null,
     retryAfterSeconds: data?.status === 'analysing' ? 4 : null,
     error: data?.status === 'error' ? String(data?.errorMessage || 'The last analysis of this paper failed.') : '',
+    refresh,
   };
 }
 
@@ -603,6 +645,7 @@ export default async function handler(req, res) {
     const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const paperId = requestUrl.searchParams.get('paperId');
     const paperName = requestUrl.searchParams.get('paperName');
+    const isRefreshRequest = requestUrl.searchParams.get('refresh') === '1';
     logPhase('request received', { method: req.method, paperId: String(paperId || '') });
     if (!paperId) {
       sendJson(res, 400, { error: 'paperId is required.' });
@@ -631,21 +674,40 @@ export default async function handler(req, res) {
     logPhase('reading metadata cache');
     const initial = await readMetadata({ paper, sourceFingerprint });
     logPhase('metadata cache read', { status: initial.data?.status || initial.failure?.status || 'missing' });
-    if (initial.data) {
-      sendJson(res, initial.data.status === 'analysing' ? 202 : 200, publicMetadata(initial.data));
+    if (initial.data && !(req.method === 'POST' && isRefreshRequest)) {
+      sendJson(res, initial.data.status === 'analysing' ? 202 : 200, publicMetadata(initial.data, { paper }));
       return;
     }
 
     if (req.method === 'GET') {
       if (initial.failure) {
-        sendJson(res, 200, publicMetadata(initial.failure));
+        sendJson(res, 200, publicMetadata(initial.failure, { paper }));
         return;
       }
       sendJson(res, 404, { status: 'missing', cached: false, error: 'No shared question-and-mark analysis exists for this paper yet.' });
       return;
     }
 
-    if (initial.incompleteReadyEntry) {
+    if (isRefreshRequest) {
+      const refresh = refreshEligibility(initial.data, paper);
+      if (!refresh.eligible) {
+        sendJson(res, 409, {
+          error: refresh.reason || 'This Question Map is already complete enough and cannot be refreshed.',
+          refresh,
+        });
+        return;
+      }
+      logPhase('invalidating refreshable ready cache');
+      const invalidated = await invalidateRefreshablePaperAnalysis({
+        paperKey: metadataDocumentId(paper),
+        sourceFingerprint,
+        cooldownMs: STUDENT_REFRESH_COOLDOWN_MS,
+      });
+      if (!invalidated) {
+        sendJson(res, 409, { error: 'This Question Map changed before it could be refreshed. Please reopen it and try again.' });
+        return;
+      }
+    } else if (initial.incompleteReadyEntry) {
       logPhase('invalidating incomplete ready cache');
       await invalidateIncompletePaperAnalysis({
         paperKey: metadataDocumentId(paper),
@@ -679,11 +741,11 @@ export default async function handler(req, res) {
     logPhase('analysis job claim completed', { state: claimState });
 
     if (claimState === 'ready') {
-      sendJson(res, 200, publicMetadata(claimedData));
+      sendJson(res, 200, publicMetadata(claimedData, { paper }));
       return;
     }
     if (claimState === 'analysing') {
-      sendJson(res, 202, publicMetadata(claimedData));
+      sendJson(res, 202, publicMetadata(claimedData, { paper }));
       return;
     }
 
@@ -708,4 +770,4 @@ export default async function handler(req, res) {
   }
 }
 
-export { metadataDocumentId, normaliseAnalysis, paperIdentity };
+export { metadataDocumentId, normaliseAnalysis, paperIdentity, refreshEligibility };

@@ -104,6 +104,8 @@
   border-bottom: 1px solid var(--color-divider);
 }
 .reader-question-map .reader-challenge-head { margin-bottom: 9px; }
+.reader-question-map-actions { display: flex; align-items: center; gap: 7px; flex: none; }
+.reader-question-map-actions .btn { white-space: nowrap; }
 .reader-question-map .kick { display: flex; align-items: center; gap: 5px; color: var(--color-accent-800); }
 .reader-question-map-list {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px;

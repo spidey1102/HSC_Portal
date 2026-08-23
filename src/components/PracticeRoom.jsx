@@ -9,6 +9,7 @@ import {
   PanelBottomOpen,
   Share2,
   Sparkles,
+  RotateCcw,
   Trash2,
   X,
 } from 'lucide-react';
@@ -355,7 +356,7 @@ export default function PracticeRoom({
       : 'Question pages could not be prepared for this paper');
   }, [challengeRecommendations.length, flash, hasFallbackRecommendation, openChallengeWhenReady, paperMetadata.status]);
 
-  const handleAnalysePaperMetadata = async () => {
+  const handleAnalysePaperMetadata = async ({ refresh = false } = {}) => {
     if (paperMetadata.status === 'analysing') {
       setIsRequestingMetadata(true);
       try {
@@ -379,12 +380,18 @@ export default function PracticeRoom({
     setPaperMetadata((current) => ({ ...current, status: 'analysing', error: '' }));
     try {
       const token = await user.getIdToken();
-      const metadata = await analysePaperMetadata(paper, token);
+      const metadata = await analysePaperMetadata(paper, token, { refresh });
       setPaperMetadata(metadata);
-      flash(metadata.status === 'analysing' ? 'Analysis has started. Check again shortly.' : 'Question structure is ready');
+      flash(metadata.status === 'analysing'
+        ? refresh ? 'Question Map refresh has started. Check again shortly.' : 'Analysis has started. Check again shortly.'
+        : 'Question structure is ready');
     } catch (error) {
-      setPaperMetadata({ ...createEmptyPaperMetadata('missing'), error: error.message || 'Paper structure could not be analysed.' });
-      flash('Could not analyse this paper');
+      setPaperMetadata(refresh
+        ? paperMetadata
+        : { ...createEmptyPaperMetadata('missing'), error: error.message || 'Paper structure could not be analysed.' });
+      flash(refresh
+        ? error.message || 'Could not refresh this Question Map'
+        : 'Could not analyse this paper');
     } finally {
       setIsRequestingMetadata(false);
     }
@@ -397,6 +404,19 @@ export default function PracticeRoom({
     }
 
     handleAnalysePaperMetadata();
+  };
+
+  const handleRefreshQuestionMap = () => {
+    if (!paperMetadata.refresh?.eligible) {
+      flash(paperMetadata.refresh?.reason || 'This Question Map is already complete enough to keep.');
+      return;
+    }
+    if (!user) {
+      flash('Sign in to refresh and improve this shared Question Map');
+      return;
+    }
+    setIsQuestionMapOpen(false);
+    handleAnalysePaperMetadata({ refresh: true });
   };
 
   const handleRecommendChallenge = () => {
@@ -699,9 +719,23 @@ export default function PracticeRoom({
                 Topics, skills, command verbs, marks, and pages are cached once for every student.
               </p>
             </div>
-            <button type="button" className="btn btn-secondary btn-icon" onClick={() => setIsQuestionMapOpen(false)} aria-label="Close question map" title="Close">
-              <X size={14} />
-            </button>
+            <div className="reader-question-map-actions">
+              {paperMetadata.refresh?.needsRefresh && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleRefreshQuestionMap}
+                  disabled={isRequestingMetadata || !paperMetadata.refresh?.eligible}
+                  title={paperMetadata.refresh.reason || 'Refresh this incomplete shared Question Map'}
+                >
+                  <RotateCcw size={13} />
+                  {paperMetadata.refresh?.eligible ? 'Refresh map' : 'Refresh later'}
+                </button>
+              )}
+              <button type="button" className="btn btn-secondary btn-icon" onClick={() => setIsQuestionMapOpen(false)} aria-label="Close question map" title="Close">
+                <X size={14} />
+              </button>
+            </div>
           </div>
           <div className="reader-question-map-list">
             {paperMetadata.questions.map((question) => {

@@ -141,6 +141,37 @@ export async function invalidateIncompletePaperAnalysis({ paperKey, sourceFinger
   return mapPaperMetadata(rows[0]);
 }
 
+/**
+ * A student-triggered refresh is deliberately narrower than a general invalidation:
+ * it can only release an old ready entry once its server-enforced cooldown elapsed.
+ * Eligibility is calculated from the stored map by the API before this mutation runs.
+ */
+export async function invalidateRefreshablePaperAnalysis({ paperKey, sourceFingerprint, cooldownMs }) {
+  const sql = getSupabaseSql();
+  const earliestAllowedExtractedAt = new Date(Date.now() - Number(cooldownMs));
+  const rows = await sql`
+    update public.paper_metadata
+    set status = 'missing',
+        analysis_started_at_millis = null,
+        question_count = null,
+        total_marks = null,
+        questions = '[]'::jsonb,
+        confidence = null,
+        notes = null,
+        pages_analysed = null,
+        total_pages = null,
+        error_message = null,
+        extracted_at = null,
+        updated_at = now()
+    where paper_key = ${String(paperKey)}
+      and source_fingerprint = ${String(sourceFingerprint)}
+      and status = 'ready'
+      and extracted_at <= ${earliestAllowedExtractedAt}
+    returning ${sql.unsafe(PAPER_COLUMNS)}
+  `;
+  return mapPaperMetadata(rows[0]);
+}
+
 export async function completePaperAnalysis({ paperKey, sourceFingerprint, analysis, paper, pagesAnalysed, totalPages }) {
   const sql = getSupabaseSql();
   const rows = await sql`
