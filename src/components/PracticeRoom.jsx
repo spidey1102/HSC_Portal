@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   BookOpen,
   Check,
+  ChevronDown,
   ClipboardCheck,
   Feather,
   ListChecks,
@@ -130,6 +131,7 @@ export default function PracticeRoom({
   useEffect(() => {
     setAnnotations(loadAnnotations(paper));
     setSelectedId(null);
+    setExpandedQuestionIds(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paperKey]);
 
@@ -204,6 +206,7 @@ export default function PracticeRoom({
   const [isRequestingMetadata, setIsRequestingMetadata] = useState(false);
   const [isChallengeOpen, setIsChallengeOpen] = useState(false);
   const [isQuestionMapOpen, setIsQuestionMapOpen] = useState(false);
+  const [expandedQuestionIds, setExpandedQuestionIds] = useState(() => new Set());
   const [openChallengeWhenReady, setOpenChallengeWhenReady] = useState(false);
   const [challengePage, setChallengePage] = useState(null);
   const [actionMessage, setActionMessage] = useState('');
@@ -437,6 +440,15 @@ export default function PracticeRoom({
       return;
     }
     handleAnalysePaperMetadata();
+  };
+
+  const toggleQuestionSubparts = (questionId) => {
+    setExpandedQuestionIds((current) => {
+      const next = new Set(current);
+      if (next.has(questionId)) next.delete(questionId);
+      else next.add(questionId);
+      return next;
+    });
   };
 
   const handleOpenQuestion = (question, subpart = null) => {
@@ -742,6 +754,8 @@ export default function PracticeRoom({
               const page = Number(question?.page);
               const hasPage = Number.isInteger(page) && page >= 1;
               const subparts = Array.isArray(question?.subparts) ? question.subparts : [];
+              const areSubpartsExpanded = expandedQuestionIds.has(question.id);
+              const subpartsPanelId = `question-subparts-${String(question.id).replace(/[^a-z0-9_-]/gi, '-')}`;
               const detail = [
                 question.commandVerb ? `${question.commandVerb[0].toUpperCase()}${question.commandVerb.slice(1)}` : '',
                 question.skill,
@@ -770,7 +784,19 @@ export default function PracticeRoom({
                   </button>
 
                   {subparts.length > 0 && (
-                    <div className="question-map-subparts" aria-label={`Parts of Question ${question.id}`}>
+                    <div className="question-map-subparts-wrap">
+                      <button
+                        type="button"
+                        className="question-map-subparts-toggle"
+                        onClick={() => toggleQuestionSubparts(question.id)}
+                        aria-expanded={areSubpartsExpanded}
+                        aria-controls={subpartsPanelId}
+                      >
+                        <span>{areSubpartsExpanded ? 'Hide parts' : `Show ${subparts.length} ${subparts.length === 1 ? 'part' : 'parts'}`}</span>
+                        <ChevronDown size={14} className={areSubpartsExpanded ? 'is-open' : ''} aria-hidden="true" />
+                      </button>
+                      {areSubpartsExpanded && (
+                    <div id={subpartsPanelId} className="question-map-subparts" aria-label={`Parts of Question ${question.id}`}>
                       <span className="question-map-subparts-label">Parts</span>
                       {subparts.map((subpart) => {
                         const subpartPage = Number(subpart?.page ?? page);
@@ -804,6 +830,8 @@ export default function PracticeRoom({
                           </button>
                         );
                       })}
+                    </div>
+                      )}
                     </div>
                   )}
                 </article>

@@ -137,6 +137,18 @@
   font: 10.5px var(--font-num);
 }
 .question-map-skill { font-size: 12px; line-height: 1.32; color: color-mix(in srgb, var(--color-text) 72%, transparent); }
+.question-map-subparts-wrap { display: grid; gap: 7px; }
+.question-map-subparts-toggle {
+  display: inline-flex; align-items: center; justify-content: space-between; gap: 7px;
+  width: 100%; padding: 6px 7px; color: var(--color-accent-800);
+  background: color-mix(in srgb, var(--color-accent-100) 32%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--color-accent) 42%, var(--color-divider));
+  border-radius: var(--radius-sm); cursor: pointer; font: 10.5px var(--font-num); text-align: left;
+}
+.question-map-subparts-toggle:hover { background: color-mix(in srgb, var(--color-accent-100) 58%, transparent); }
+.question-map-subparts-toggle:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.question-map-subparts-toggle svg { transition: transform 0.16s ease; }
+.question-map-subparts-toggle svg.is-open { transform: rotate(180deg); }
 .question-map-subparts {
   display: grid; gap: 5px; padding-top: 8px;
   border-top: 1px solid color-mix(in srgb, var(--color-divider) 76%, transparent);
@@ -171,7 +183,8 @@
 .question-map-subpart em { color: var(--color-accent-800); font: 10.5px var(--font-num); font-style: normal; white-space: nowrap; }
 
 @media (prefers-reduced-motion: reduce) {
-  .reader-challenge-card { transition: none; }
+  .reader-challenge-card,
+  .question-map-subparts-toggle svg { transition: none; }
 }
 
 /* ── Panes ────────────────────────────────────────────────────────────── */
