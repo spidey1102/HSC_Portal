@@ -4,6 +4,7 @@ import {
   claimPaperAnalysis,
   completePaperAnalysis,
   getPaperMetadata,
+  invalidateIncompletePaperAnalysis,
   recordPaperAnalysisFailure,
 } from '../server/portalStorage.js';
 import {
@@ -229,7 +230,54 @@ function parseJsonAnswer(answer) {
   throw new Error('The analysis response was not valid JSON.');
 }
 
-function normaliseAnalysis(answer, sourceFingerprint) {
+const SUBSTANTIVE_PAPER_CATEGORIES = new Set(['H', 'T']);
+const MIN_SUBSTANTIVE_QUESTION_RANGE = 4;
+
+function questionRangeFromPaperText(paperText) {
+  const questionIds = new Set();
+  const text = String(paperText || '');
+  const rangePattern = /\b(?:attempt|answer|complete)\s+(?:all\s+)?questions?\s+(\d{1,3})\s*(?:-|–|to)\s*(\d{1,3})\b/gi;
+
+  for (const match of text.matchAll(rangePattern)) {
+    const first = Number(match[1]);
+    const last = Number(match[2]);
+    if (!Number.isInteger(first) || !Number.isInteger(last) || first < 1 || last < first || last - first > 100) continue;
+    for (let question = first; question <= last; question += 1) questionIds.add(question);
+  }
+
+  return [...questionIds].sort((left, right) => left - right);
+}
+
+function questionNumberFromId(id) {
+  const match = String(id || '').match(/^\s*(\d+)/);
+  return match ? Number(match[1]) : null;
+}
+
+function incompleteQuestionCoverage({ paper, paperText, questions }) {
+  const expectedQuestionIds = questionRangeFromPaperText(paperText);
+  if (!SUBSTANTIVE_PAPER_CATEGORIES.has(paper?.c) || expectedQuestionIds.length < MIN_SUBSTANTIVE_QUESTION_RANGE) {
+    return null;
+  }
+
+  const analysedQuestionIds = new Set(questions
+    .map((question) => questionNumberFromId(question.id))
+    .filter(Number.isInteger));
+  const covered = expectedQuestionIds.filter((questionId) => analysedQuestionIds.has(questionId)).length;
+  const requiredCoverage = expectedQuestionIds.length;
+
+  if (covered === requiredCoverage && questions.length >= requiredCoverage) return null;
+  return { expectedQuestionIds, covered, requiredCoverage };
+}
+
+class IncompletePaperAnalysisError extends Error {
+  constructor(coverage) {
+    super(`The AI response covered only ${coverage.covered} of ${coverage.expectedQuestionIds.length} explicitly listed questions.`);
+    this.name = 'IncompletePaperAnalysisError';
+    this.coverage = coverage;
+  }
+}
+
+function normaliseAnalysis(answer, sourceFingerprint, { paper = null, paperText = '' } = {}) {
   const parsed = parseJsonAnswer(answer);
   const questions = (Array.isArray(parsed?.questions) ? parsed.questions : [])
     .map(normaliseQuestion)
@@ -241,6 +289,9 @@ function normaliseAnalysis(answer, sourceFingerprint) {
   if (questions.length === 0) {
     throw new Error('No numbered questions could be identified in this paper.');
   }
+
+  const incompleteCoverage = incompleteQuestionCoverage({ paper, paperText, questions });
+  if (incompleteCoverage) throw new IncompletePaperAnalysisError(incompleteCoverage);
 
   const marksFromQuestions = questions.reduce((sum, question) => sum + (question.marks ?? 0), 0);
   const suppliedTotal = normaliseNumber(parsed?.totalMarks);
@@ -261,9 +312,15 @@ function normaliseAnalysis(answer, sourceFingerprint) {
 const PAPER_CATEGORY_LABELS = { H: 'official HSC paper', T: 'school trial paper', A: 'assessment task', O: 'resource' };
 
 function buildAnalysisPrompt(paper, paperText) {
+  const expectedQuestionIds = questionRangeFromPaperText(paperText);
+  const coverageInstruction = expectedQuestionIds.length >= MIN_SUBSTANTIVE_QUESTION_RANGE
+    ? `Completeness requirement: the paper instructions explicitly list top-level Questions ${expectedQuestionIds.join(', ')}. Return one item for every one of those question numbers, including Section I multiple-choice questions. Do not stop after Question 1 or omit a section.`
+    : 'Completeness requirement: continue through every top-level numbered question visible in the question paper before returning JSON.';
+
   return [
     'You extract the structure of NSW HSC past papers. Return JSON only, with no markdown or commentary.',
     'Identify each top-level numbered question exactly once. For each, extract its printed marks where reliably stated, its PDF page number, direct subparts only where their labels and marks are explicit, and a compact challenge classification.',
+    coverageInstruction,
     'Classify the question itself, not the student. Use challenge.level "routine" for ordinary single-step practice, "challenging" when careful application or more than one step is required, and "stretch" only when the question is unusually difficult, non-routine, or deliberately unfamiliar for this course.',
     'For every substantive HSC-style paper, identify at least one strongest question as "challenging" or "stretch". Choose the question with the most demanding reasoning, application, or marks; do not mark every substantive question routine merely because the paper is broadly accessible.',
     'For question topics, provide zero to three concise syllabus-aligned labels using the course language students would search for. Examples include Equilibrium, Acid–Base Reactions, Organic Chemistry, Complex Numbers, Calculus, Texts and Human Experiences, and Module B. Do not use generic labels such as Question 5, Section II, Diagram, or Extended Response as a topic. skill is one short phrase stating the main assessed skill, such as Apply Le Chatelier’s Principle or Analyse Language Techniques; use an empty string only when no meaningful skill can be identified. commandVerb is the printed command verb in lowercase when clear, otherwise an empty string.',
@@ -396,27 +453,41 @@ function publicMetadata(data, { cached = true } = {}) {
   };
 }
 
-function isCurrentCacheEntry(data, sourceFingerprint) {
+function isObviouslyIncompleteCachedAnalysis(data, paper) {
+  if (data?.status !== 'ready' || !SUBSTANTIVE_PAPER_CATEGORIES.has(paper?.c)) return false;
+  const questionCount = Number(data.questionCount) || 0;
+  const totalMarks = normaliseNumber(data.totalMarks) || 0;
+  const pageCount = Math.max(Number(data.pagesAnalysed) || 0, Number(data.totalPages) || 0);
+  return questionCount <= 1 && (totalMarks >= 20 || pageCount >= 4);
+}
+
+function isCurrentCacheEntry(data, sourceFingerprint, paper) {
   return data?.sourceFingerprint === sourceFingerprint
-    && data?.extractionVersion === EXTRACTION_VERSION;
+    && data?.extractionVersion === EXTRACTION_VERSION
+    && !isObviouslyIncompleteCachedAnalysis(data, paper);
 }
 
 async function readMetadata({ paper, sourceFingerprint }) {
   const data = await getPaperMetadata(metadataDocumentId(paper));
-  if (!data) return { data: null, failure: null };
-  if (!isCurrentCacheEntry(data, sourceFingerprint)) return { data: null, failure: null };
-  if (data.status === 'ready') return { data, failure: null };
+  if (!data) return { data: null, failure: null, incompleteReadyEntry: false };
+  if (data.sourceFingerprint !== sourceFingerprint || data.extractionVersion !== EXTRACTION_VERSION) {
+    return { data: null, failure: null, incompleteReadyEntry: false };
+  }
+  if (isObviouslyIncompleteCachedAnalysis(data, paper)) {
+    return { data: null, failure: null, incompleteReadyEntry: true };
+  }
+  if (data.status === 'ready') return { data, failure: null, incompleteReadyEntry: false };
   if (data.status === 'analysing') {
     const startedAtMillis = Number(data.analysisStartedAtMillis) || 0;
     if (startedAtMillis && Date.now() - startedAtMillis < ANALYSIS_LOCK_MS) {
-      return { data, failure: null };
+      return { data, failure: null, incompleteReadyEntry: false };
     }
-    return { data: null, failure: null };
+    return { data: null, failure: null, incompleteReadyEntry: false };
   }
   // A recorded failure is reported so the reader can show why, rather than looking
   // like a paper that has simply never been analysed.
-  if (data.status === 'error') return { data: null, failure: data };
-  return { data: null, failure: null };
+  if (data.status === 'error') return { data: null, failure: data, incompleteReadyEntry: false };
+  return { data: null, failure: null, incompleteReadyEntry: false };
 }
 
 async function recordAnalysisFailure({ paperKey, sourceFingerprint, error }) {
@@ -461,7 +532,24 @@ export async function runPaperAnalysisWorker({ paper, sourceFingerprint, request
       buildAnalysisPrompt(paper, extracted.text),
       { timeoutMs: providerTimeoutMs },
     );
-    const analysis = normaliseAnalysis(answer, sourceFingerprint);
+    let analysis;
+    try {
+      analysis = normaliseAnalysis(answer, sourceFingerprint, { paper, paperText: extracted.text });
+    } catch (error) {
+      if (!(error instanceof IncompletePaperAnalysisError)) throw error;
+
+      const retryTimeoutMs = remainingBudgetMs(requestStartedAt);
+      if (retryTimeoutMs < MIN_PROVIDER_TIMEOUT_MS) throw error;
+      console.warn('[paper-metadata] incomplete analysis response; retrying once', {
+        paperId: String(paper.v),
+        message: error.message,
+      });
+      const retryAnswer = await callPaperAnalysis(
+        `${buildAnalysisPrompt(paper, extracted.text)}\n\nThe preceding response was rejected because it did not cover the stated question range. Re-read the complete text and return the full required JSON now.`,
+        { timeoutMs: retryTimeoutMs },
+      );
+      analysis = normaliseAnalysis(retryAnswer, sourceFingerprint, { paper, paperText: extracted.text });
+    }
     await completePaperAnalysis({
       paperKey: metadataDocumentId(paper),
       sourceFingerprint,
@@ -557,6 +645,14 @@ export default async function handler(req, res) {
       return;
     }
 
+    if (initial.incompleteReadyEntry) {
+      logPhase('invalidating incomplete ready cache');
+      await invalidateIncompletePaperAnalysis({
+        paperKey: metadataDocumentId(paper),
+        sourceFingerprint,
+      });
+    }
+
     const now = Date.now();
     logPhase('claiming analysis job');
     const claimedData = await claimPaperAnalysis({
@@ -573,7 +669,7 @@ export default async function handler(req, res) {
       throw new Error('The shared paper analysis could not be claimed. Please retry.');
     }
 
-    const claimState = claimedData.status === 'ready' && isCurrentCacheEntry(claimedData, sourceFingerprint)
+    const claimState = claimedData.status === 'ready' && isCurrentCacheEntry(claimedData, sourceFingerprint, paper)
       ? 'ready'
       : claimedData.status === 'analysing'
         && Number(claimedData.analysisStartedAtMillis) !== now
