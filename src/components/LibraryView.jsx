@@ -11,6 +11,14 @@ const INDEX_COLUMNS = '52px minmax(0, 1fr) 132px 74px 60px 108px 44px';
 const PAGE_SIZE = 40;
 const SORT_STORAGE_KEY = 'hsc_library_sort';
 
+function englishTrialPaperPart(paper, subjectName) {
+  if (paper?.c !== 'T' || !/^English\b/i.test(String(subjectName || ''))) return '';
+
+  const source = [paper?.n, paper?.cf].filter(Boolean).join(' ');
+  const match = source.match(/(?:\bpaper\s*|\bp\s*)([12])\b/i);
+  return match ? `Paper ${match[1]}` : '';
+}
+
 const ONLY_FILTERS = [
   { id: 'all', label: 'Everything' },
   { id: 'solutions', label: 'With solutions' },
@@ -39,6 +47,7 @@ function QuickStart({
   if (!presence.mounted || !shown) return null;
 
   const timing = describeSubjectTiming(subjects[shown.s]);
+  const paperPart = englishTrialPaperPart(shown, subjects[shown.s]);
 
   return (
     <div className={`quickstart is-${presence.stage} ${docked ? 'is-docked' : ''}`}>
@@ -46,7 +55,7 @@ function QuickStart({
         <div style={{ fontFamily: 'var(--font-heading)', fontSize: '17px' }}>
           {schools[shown.h] || shown.n} {shown.y}{' '}
           <span className="num dim" style={{ fontFamily: 'var(--font-body)', fontSize: '12.5px' }}>
-            · {subjects[shown.s]}{shown.w === 1 ? ' · solutions' : ''} · {timing.label}
+            · {subjects[shown.s]}{paperPart ? ` · ${paperPart}` : ''}{shown.w === 1 ? ' · solutions' : ''} · {timing.label}
           </span>
         </div>
         <div className="dim" style={{ fontSize: '12px', marginTop: '2px' }}>
@@ -415,6 +424,7 @@ export default function LibraryView({
                 const isSaved = bookmarks.has(`${paper.v}_${paper.n}`);
                 const isSat = satPaperIds.has(identity);
                 const timing = describeSubjectTiming(subjects[paper.s]);
+                const paperPart = englishTrialPaperPart(paper, subjects[paper.s]);
 
                 return (
                   <div
@@ -461,6 +471,7 @@ export default function LibraryView({
 
                     <span className="paper-card-title">{schools[paper.h] || paper.n}</span>
                     <span className="num dim paper-card-year">{paper.y} · {subjects[paper.s]}</span>
+                    {paperPart && <span className="paper-card-subsection">{paperPart}</span>}
 
                     <span className="paper-card-time num dim" title={timing.detail}>
                       <Clock size={12} />
@@ -509,8 +520,8 @@ export default function LibraryView({
             const isActive = identity === activeIdentity;
             const isSaved = bookmarks.has(`${paper.v}_${paper.n}`);
             const isSat = satPaperIds.has(identity);
-            const timing = describeSubjectTiming(subjects[paper.s]);
-
+                        const timing = describeSubjectTiming(subjects[paper.s]);
+            const paperPart = englishTrialPaperPart(paper, subjects[paper.s]);
             return (
               <div key={identity}>
                 <div
@@ -533,7 +544,7 @@ export default function LibraryView({
                   <span className="num dim" style={{ fontSize: '12px' }}>{position + 1}</span>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     <span className="idxrow-title">{schools[paper.h] || paper.n}</span>{' '}
-                    <span className="num dim">{paper.y}</span>
+                    <span className="num dim">{paper.y}</span>{paperPart && <span className="idxrow-paper-part"> · {paperPart}</span>}
                   </span>
                   <span className="dim hide-narrow" style={{ fontSize: '12.5px' }}>{PAPER_TYPES[paper.c] || '—'}</span>
                   <span className="num dim hide-narrow" style={{ fontSize: '12.5px' }} title={timing.detail}>{timing.label}</span>
