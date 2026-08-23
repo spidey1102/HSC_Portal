@@ -775,6 +775,10 @@ export default function PracticeRoom({
                       {subparts.map((subpart) => {
                         const subpartPage = Number(subpart?.page ?? page);
                         const subpartHasPage = Number.isInteger(subpartPage) && subpartPage >= 1;
+                        const subpartDetail = [
+                          subpart.commandVerb ? `${subpart.commandVerb[0].toUpperCase()}${subpart.commandVerb.slice(1)}` : '',
+                          subpart.skill,
+                        ].filter(Boolean).join(' · ');
                         return (
                           <button
                             key={`${question.id}-${subpart.id}`}
@@ -784,8 +788,18 @@ export default function PracticeRoom({
                             onClick={() => handleOpenQuestion(question, { ...subpart, page: subpartPage })}
                             title={subpartHasPage ? `Go to Question ${question.id}(${subpart.id}) on page ${subpartPage}` : `Question ${question.id}(${subpart.id}) does not have a reliable page number`}
                           >
-                            <strong>{question.id}({subpart.id})</strong>
-                            <span>{subpart.marks !== null && subpart.marks !== undefined ? `${subpart.marks} marks` : 'Marks not stated'}{subpartHasPage ? ` · Page ${subpartPage}` : ''}</span>
+                            <span className="question-map-subpart-main">
+                              <span className="question-map-subpart-heading">
+                                <strong>{question.id}({subpart.id})</strong>
+                                <span className="question-map-subpart-meta">{subpart.marks !== null && subpart.marks !== undefined ? `${subpart.marks} marks` : 'Marks not stated'}{subpartHasPage ? ` · Page ${subpartPage}` : ''}</span>
+                              </span>
+                              {subpart.topics.length > 0 && (
+                                <span className="question-subpart-topic-tags">
+                                  {subpart.topics.map((topic) => <span key={topic}>{topic}</span>)}
+                                </span>
+                              )}
+                              {subpartDetail && <span className="question-map-subpart-skill">{subpartDetail}</span>}
+                            </span>
                             {subpartHasPage && <em>Take me there →</em>}
                           </button>
                         );

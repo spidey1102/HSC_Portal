@@ -51,6 +51,9 @@ function normaliseSubparts(value) {
       id: normaliseSubpartId(subpart?.id || subpart?.label),
       marks: isKnownMark(subpart?.marks) ? Number(subpart.marks) : null,
       page: Number.isInteger(Number(subpart?.page)) && Number(subpart.page) > 0 ? Number(subpart.page) : null,
+      topics: normaliseTopics(subpart?.topics),
+      skill: String(subpart?.skill || '').trim().replace(/\s+/g, ' ').slice(0, MAX_SKILL_LABEL_LENGTH),
+      commandVerb: normaliseCommandVerb(subpart?.commandVerb),
     }))
     .filter((subpart, index, all) => subpart.id && all.findIndex((candidate) => candidate.id === subpart.id) === index)
     .slice(0, 40);

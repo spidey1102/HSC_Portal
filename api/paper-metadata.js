@@ -142,6 +142,9 @@ function normaliseQuestion(rawQuestion, index) {
         id,
         marks: normaliseNumber(subpart?.marks),
         page: normaliseNumber(subpart?.page),
+        topics: normaliseTopics(subpart?.topics),
+        skill: String(subpart?.skill || '').trim().replace(/\s+/g, ' ').slice(0, MAX_SKILL_LABEL_LENGTH),
+        commandVerb: normaliseCommandVerb(subpart?.commandVerb),
       };
     })
     .filter(Boolean);
@@ -323,7 +326,7 @@ function buildAnalysisPrompt(paper, paperText) {
 
   return [
     'You extract the structure of NSW HSC past papers. Return JSON only, with no markdown or commentary.',
-    'Identify each top-level numbered question exactly once. For each, extract its printed marks where reliably stated, its PDF page number, every explicit direct subpart (such as a, b, c or i, ii) in printed order, each subpart’s own marks and page where reliably stated, and a compact challenge classification. Preserve a subpart even when its marks are not printed, provided its label is explicit.',
+    'Identify each top-level numbered question exactly once. For each, extract its printed marks where reliably stated, its PDF page number, every explicit direct subpart (such as a, b, c or i, ii) in printed order, each subpart’s own marks and page where reliably stated, and a compact challenge classification. For every extracted direct subpart, provide its own zero to three concise syllabus-aligned topics, short assessed skill, and printed commandVerb where clear; these must describe that exact part rather than copying the parent question’s broad labels. Preserve a subpart even when its marks are not printed, provided its label is explicit.',
     coverageInstruction,
     'Classify the question itself, not the student. Use challenge.level "routine" for ordinary single-step practice, "challenging" when careful application or more than one step is required, and "stretch" only when the question is unusually difficult, non-routine, or deliberately unfamiliar for this course.',
     'For every substantive HSC-style paper, identify at least one strongest question as "challenging" or "stretch". Choose the question with the most demanding reasoning, application, or marks; do not mark every substantive question routine merely because the paper is broadly accessible.',
@@ -332,7 +335,7 @@ function buildAnalysisPrompt(paper, paperText) {
     'Do not invent marks. Use null when a mark cannot be established. Do not treat instructions, multiple-choice option labels, tables, source labels, or section headings as questions.',
     'For a question with subparts, preserve the top-level question as one item; only use subparts for a, b, i, ii style labels. When a challenge is chiefly about one direct subpart, set challenge.subpartId to that exact extracted label. For Mathematics Extension 1 and Mathematics Extension 2 papers, every challenging or stretch recommendation with explicit lettered or roman subparts must identify the specific relevant subpart whenever one can be established. Use null only when the challenge genuinely concerns the entire top-level question or no exact direct subpart can be determined.',
     'totalMarks should be the printed paper total if stated, otherwise the sum of reliable top-level marks, otherwise null.',
-    'Use this exact shape: {"totalMarks":number|null,"confidence":"high"|"medium"|"low","notes":"short caveat or empty string","questions":[{"id":"1","marks":number|null,"page":number|null,"subparts":[{"id":"a","marks":number|null,"page":number|null}],"topics":["Equilibrium"],"skill":"Apply Le Chatelier’s Principle","commandVerb":"explain","challenge":{"level":"routine"|"challenging"|"stretch","reasons":["unfamiliar-context"],"note":"short explanation or empty string","subpartId":"a"|null}}]}.',
+    'Use this exact shape: {"totalMarks":number|null,"confidence":"high"|"medium"|"low","notes":"short caveat or empty string","questions":[{"id":"1","marks":number|null,"page":number|null,"subparts":[{"id":"a","marks":number|null,"page":number|null,"topics":["Equilibrium"],"skill":"Apply Le Chatelier’s Principle","commandVerb":"explain"}],"topics":["Equilibrium"],"skill":"Apply Le Chatelier’s Principle","commandVerb":"explain","challenge":{"level":"routine"|"challenging"|"stretch","reasons":["unfamiliar-context"],"note":"short explanation or empty string","subpartId":"a"|null}}]}.',
     '',
     `Paper: ${paper.n}`,
     `Source category: ${PAPER_CATEGORY_LABELS[paper.c] || 'unknown'}`,
@@ -439,19 +442,33 @@ export async function callPaperAnalysis(prompt, { timeoutMs = ANALYSIS_PROVIDER_
   }
 }
 
-function hasNoDetectedSubparts(data, paper) {
+function substantialMapForRefresh(data, paper) {
   if (data?.status !== 'ready' || !SUBSTANTIVE_PAPER_CATEGORIES.has(paper?.c)) return false;
   const questions = Array.isArray(data.questions) ? data.questions : [];
-  const hasSubparts = questions.some((question) => Array.isArray(question?.subparts) && question.subparts.length > 0);
   const totalMarks = normaliseNumber(data.totalMarks) || 0;
   const pageCount = Math.max(Number(data.pagesAnalysed) || 0, Number(data.totalPages) || 0);
-  return !hasSubparts && questions.length >= MIN_SUBSTANTIVE_QUESTION_RANGE
+  return questions.length >= MIN_SUBSTANTIVE_QUESTION_RANGE
     && (totalMarks >= MIN_REFRESHABLE_TOTAL_MARKS || pageCount >= MIN_REFRESHABLE_PAGES);
+}
+
+function refreshNeed(data, paper) {
+  if (!substantialMapForRefresh(data, paper)) return '';
+  const questions = Array.isArray(data.questions) ? data.questions : [];
+  const subparts = questions.flatMap((question) => Array.isArray(question?.subparts) ? question.subparts : []);
+  if (!subparts.length) return 'missing-subparts';
+
+  const hasAnyPartLabel = subparts.some((subpart) => (
+    (Array.isArray(subpart?.topics) && subpart.topics.length > 0)
+    || String(subpart?.skill || '').trim()
+    || String(subpart?.commandVerb || '').trim()
+  ));
+  return hasAnyPartLabel ? '' : 'missing-subpart-labels';
 }
 
 function refreshEligibility(data, paper) {
   if (data?.status !== 'ready') return { eligible: false, needsRefresh: false, reason: '' };
-  if (!hasNoDetectedSubparts(data, paper)) return { eligible: false, needsRefresh: false, reason: '' };
+  const need = refreshNeed(data, paper);
+  if (!need) return { eligible: false, needsRefresh: false, reason: '' };
 
   const extractedAtMillis = Date.parse(data?.extractedAt || '');
   const availableAtMillis = Number.isFinite(extractedAtMillis)
@@ -470,7 +487,9 @@ function refreshEligibility(data, paper) {
   return {
     eligible: true,
     needsRefresh: true,
-    reason: 'This full-paper map has no detected subparts. Refresh it to capture the printed parts.',
+    reason: need === 'missing-subpart-labels'
+      ? 'This Question Map has subparts but no labels for them. Refresh it to capture per-subquestion topics.'
+      : 'This full-paper map has no detected subparts. Refresh it to capture the printed parts.',
     retryAfterSeconds: null,
   };
 }
