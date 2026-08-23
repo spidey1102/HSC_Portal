@@ -319,7 +319,7 @@ function buildAnalysisPrompt(paper, paperText) {
 
   return [
     'You extract the structure of NSW HSC past papers. Return JSON only, with no markdown or commentary.',
-    'Identify each top-level numbered question exactly once. For each, extract its printed marks where reliably stated, its PDF page number, direct subparts only where their labels and marks are explicit, and a compact challenge classification.',
+    'Identify each top-level numbered question exactly once. For each, extract its printed marks where reliably stated, its PDF page number, every explicit direct subpart (such as a, b, c or i, ii) in printed order, each subpart’s own marks and page where reliably stated, and a compact challenge classification. Preserve a subpart even when its marks are not printed, provided its label is explicit.',
     coverageInstruction,
     'Classify the question itself, not the student. Use challenge.level "routine" for ordinary single-step practice, "challenging" when careful application or more than one step is required, and "stretch" only when the question is unusually difficult, non-routine, or deliberately unfamiliar for this course.',
     'For every substantive HSC-style paper, identify at least one strongest question as "challenging" or "stretch". Choose the question with the most demanding reasoning, application, or marks; do not mark every substantive question routine merely because the paper is broadly accessible.',

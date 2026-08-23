@@ -419,13 +419,16 @@ export default function PracticeRoom({
     handleAnalysePaperMetadata();
   };
 
-  const handleOpenQuestion = (question) => {
-    const page = Number(question?.targetPage ?? question?.page);
+  const handleOpenQuestion = (question, subpart = null) => {
+    const page = Number(subpart?.page ?? question?.targetPage ?? question?.page);
     if (!Number.isInteger(page) || page < 1) {
       flash('This recommendation does not have a page number yet');
       return;
     }
-    const label = challengeQuestionLabel(question);
+    const subpartId = String(subpart?.id || '').trim();
+    const label = subpartId
+      ? `Question ${String(question?.id || '').trim()}(${subpartId})`
+      : challengeQuestionLabel(question);
     setChallengePage(page);
     setIsChallengeOpen(false);
     setIsQuestionMapOpen(false);
@@ -704,32 +707,58 @@ export default function PracticeRoom({
             {paperMetadata.questions.map((question) => {
               const page = Number(question?.page);
               const hasPage = Number.isInteger(page) && page >= 1;
+              const subparts = Array.isArray(question?.subparts) ? question.subparts : [];
               const detail = [
                 question.commandVerb ? `${question.commandVerb[0].toUpperCase()}${question.commandVerb.slice(1)}` : '',
                 question.skill,
               ].filter(Boolean).join(' · ');
 
               return (
-                <button
-                  key={question.id}
-                  type="button"
-                  className="reader-question-map-card"
-                  disabled={!hasPage}
-                  onClick={() => handleOpenQuestion(question)}
-                  title={hasPage ? `Go to page ${page}` : 'This question does not have a reliable page number'}
-                >
-                  <span className="question-map-title">
-                    <strong>{challengeQuestionLabel(question)}</strong>
-                    <span className="num dim">{question.marks !== null && question.marks !== undefined ? `${question.marks} marks` : 'Marks not stated'}{hasPage ? ` · Page ${page}` : ''}</span>
-                  </span>
-                  {question.topics.length > 0 && (
-                    <span className="question-topic-tags">
-                      {question.topics.map((topic) => <span key={topic}>{topic}</span>)}
+                <article key={question.id} className="reader-question-map-card">
+                  <button
+                    type="button"
+                    className="question-map-primary"
+                    disabled={!hasPage}
+                    onClick={() => handleOpenQuestion(question)}
+                    title={hasPage ? `Go to Question ${question.id} on page ${page}` : 'This question does not have a reliable page number'}
+                  >
+                    <span className="question-map-title">
+                      <strong>{challengeQuestionLabel(question)}</strong>
+                      <span className="num dim">{question.marks !== null && question.marks !== undefined ? `${question.marks} marks` : 'Marks not stated'}{hasPage ? ` · Page ${page}` : ''}</span>
                     </span>
+                    {question.topics.length > 0 && (
+                      <span className="question-topic-tags">
+                        {question.topics.map((topic) => <span key={topic}>{topic}</span>)}
+                      </span>
+                    )}
+                    {detail && <span className="question-map-skill">{detail}</span>}
+                    {hasPage && <span className="challenge-go">Open full question →</span>}
+                  </button>
+
+                  {subparts.length > 0 && (
+                    <div className="question-map-subparts" aria-label={`Parts of Question ${question.id}`}>
+                      <span className="question-map-subparts-label">Parts</span>
+                      {subparts.map((subpart) => {
+                        const subpartPage = Number(subpart?.page ?? page);
+                        const subpartHasPage = Number.isInteger(subpartPage) && subpartPage >= 1;
+                        return (
+                          <button
+                            key={`${question.id}-${subpart.id}`}
+                            type="button"
+                            className="question-map-subpart"
+                            disabled={!subpartHasPage}
+                            onClick={() => handleOpenQuestion(question, { ...subpart, page: subpartPage })}
+                            title={subpartHasPage ? `Go to Question ${question.id}(${subpart.id}) on page ${subpartPage}` : `Question ${question.id}(${subpart.id}) does not have a reliable page number`}
+                          >
+                            <strong>{question.id}({subpart.id})</strong>
+                            <span>{subpart.marks !== null && subpart.marks !== undefined ? `${subpart.marks} marks` : 'Marks not stated'}{subpartHasPage ? ` · Page ${subpartPage}` : ''}</span>
+                            {subpartHasPage && <em>Take me there →</em>}
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
-                  {detail && <span className="question-map-skill">{detail}</span>}
-                  {hasPage && <span className="challenge-go">Take me there →</span>}
-                </button>
+                </article>
               );
             })}
           </div>

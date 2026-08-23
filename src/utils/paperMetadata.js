@@ -38,6 +38,23 @@ function normaliseCommandVerb(value) {
   return COMMAND_VERBS.has(verb) ? verb : '';
 }
 
+function normaliseSubpartId(value) {
+  const id = String(value || '').trim().replace(/\s+/g, ' ');
+  const match = id.match(/^\(?\s*([a-z]|\d+|[ivxlcdm]+)\s*\)?[.:]?$/i);
+  return match ? match[1].toLowerCase() : id;
+}
+
+function normaliseSubparts(value) {
+  return (Array.isArray(value) ? value : [])
+    .map((subpart) => ({
+      id: normaliseSubpartId(subpart?.id || subpart?.label),
+      marks: isKnownMark(subpart?.marks) ? Number(subpart.marks) : null,
+      page: Number.isInteger(Number(subpart?.page)) && Number(subpart.page) > 0 ? Number(subpart.page) : null,
+    }))
+    .filter((subpart, index, all) => subpart.id && all.findIndex((candidate) => candidate.id === subpart.id) === index)
+    .slice(0, 40);
+}
+
 const CHALLENGE_LEVELS = new Set(['routine', 'challenging', 'stretch']);
 const CHALLENGE_REASONS = new Set([
   'unfamiliar-context',
@@ -53,6 +70,7 @@ function normaliseQuestion(question) {
   const rawChallenge = question?.challenge || {};
   return {
     ...question,
+    subparts: normaliseSubparts(question?.subparts),
     topics: normaliseTopics(question?.topics),
     skill: String(question?.skill || '').trim().replace(/\s+/g, ' ').slice(0, MAX_SKILL_LABEL_LENGTH),
     commandVerb: normaliseCommandVerb(question?.commandVerb),
