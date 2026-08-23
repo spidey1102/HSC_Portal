@@ -98,18 +98,21 @@
 
 /* ── Question topic map ────────────────────────────────────────────────── */
 .reader-question-map {
-  flex: none;
-  padding: 10px var(--gutter) 12px;
-  background: color-mix(in srgb, var(--color-text) 3%, var(--color-bg));
-  border-bottom: 1px solid var(--color-divider);
+  position: fixed; inset: 0; z-index: 1600; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 12px;
+  padding: clamp(14px, 2.5vw, 28px); overflow: hidden;
+  background: color-mix(in srgb, var(--color-bg) 97%, transparent);
+  backdrop-filter: blur(9px);
 }
-.reader-question-map .reader-challenge-head { margin-bottom: 9px; }
+.reader-question-map .reader-challenge-head {
+  width: min(1180px, 100%); margin: 0 auto; padding: 0 2px;
+}
 .reader-question-map-actions { display: flex; align-items: center; gap: 7px; flex: none; }
 .reader-question-map-actions .btn { white-space: nowrap; }
 .reader-question-map .kick { display: flex; align-items: center; gap: 5px; color: var(--color-accent-800); }
 .reader-question-map-list {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px;
-  max-width: 1180px; margin: 0 auto;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-content: start; gap: 8px;
+  width: min(1180px, 100%); min-height: 0; margin: 0 auto; padding: 2px 8px 18px 2px; overflow-y: auto;
+  overscroll-behavior: contain; scrollbar-gutter: stable;
 }
 .reader-question-map-card {
   min-width: 0; display: flex; flex-direction: column; align-items: stretch; gap: 8px;
@@ -208,6 +211,8 @@
 @keyframes question-map-focus-in { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
 @media (max-width: 620px) {
+  .reader-question-map { padding: 12px; gap: 10px; }
+  .reader-question-map-list { grid-template-columns: 1fr; padding-right: 4px; }
   .question-map-focus { padding: 12px; }
   .question-map-focus-card { max-height: calc(100dvh - 24px); padding: 16px; }
   .question-map-focus-subparts { max-height: 50dvh; }
