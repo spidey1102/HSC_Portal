@@ -17,7 +17,7 @@ import FirebaseResetNotice from './components/FirebaseResetNotice';
 import { InstallDialog, SignInDialog } from './components/SyncInstallDialogs';
 import OnboardingWizard, { hasCompletedOnboarding } from './components/OnboardingWizard';
 
-import { findPaperByIdentifier, getPaperRouteId } from './utils/paperIdentity';
+import { findPaperByIdentifier, getPaperIdentity, getPaperRouteId } from './utils/paperIdentity';
 import { loadMySubjects, saveMySubjects } from './utils/mySubjects';
 import {
   COMPLETED_PAPERS_STORAGE_KEY,
@@ -62,6 +62,7 @@ const TIMER_STORAGE_KEY = 'hsc_timer_duration_secs';
 const TIMER_CEILING_SECONDS = 4 * 60 * 60;
 /** NSW written papers run three hours plus reading time; used to size the clock. */
 const DEFAULT_PAPER_MINUTES = 180;
+const CACHED_QUESTION_TARGET_STORAGE_KEY = 'hsc_cached_question_target';
 
 function slugify(value) {
   if (!value) return '';
@@ -512,6 +513,26 @@ export default function NewPortal({ onPortalLayoutChange }) {
     openPaper(paper);
   }, [openPaper]);
 
+  const openCachedQuestion = useCallback((result) => {
+    const page = Number(result?.question?.page);
+    const paper = papers.find((candidate) => (
+      getPaperIdentity(candidate) === String(result?.paperIdentity || '')
+    ));
+    if (!paper || !Number.isInteger(page) || page < 1) return false;
+
+    try {
+      sessionStorage.setItem(CACHED_QUESTION_TARGET_STORAGE_KEY, JSON.stringify({
+        paperIdentity: getPaperIdentity(paper),
+        page,
+        label: `Question ${String(result.question.id || '').trim()}`,
+      }));
+    } catch {
+      // The paper still opens even if a private browser blocks session storage.
+    }
+    openPaper(paper);
+    return true;
+  }, [openPaper, papers]);
+
   const toggleBookmark = useCallback((viewno) => {
     setBookmarks((prev) => {
       const next = new Set(prev);
@@ -661,11 +682,12 @@ export default function NewPortal({ onPortalLayoutChange }) {
     satPaperIds,
     weakSpots: buildWeakSpots(mistakes, 6),
     beginSitting,
+    openCachedQuestion,
     goToSection: setSection,
   }), [
     papers, subjects, schools, bookmarks, toggleBookmark, addCalendarEvent,
     selectedLevel, openRouterSettings, mySubjects, ladder, reviews, mistakes,
-    schedule.myExams, satPaperIds, beginSitting,
+    schedule.myExams, satPaperIds, beginSitting, openCachedQuestion,
   ]);
 
   const firebaseResetNotice = (

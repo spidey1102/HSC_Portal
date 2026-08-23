@@ -51,6 +51,7 @@ const TIMER_STORAGE_KEY = 'hsc_timer_duration_secs';
 const SCALE_STEP = 1.2;
 const METADATA_POLL_ATTEMPTS = 80;
 const METADATA_POLL_MIN_SECONDS = 4;
+const CACHED_QUESTION_TARGET_STORAGE_KEY = 'hsc_cached_question_target';
 
 function formatAnalysisElapsed(seconds) {
   const safeSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
@@ -86,6 +87,8 @@ export default function PracticeRoom({
   schoolName,
   onClose,
   onSharePaper,
+  allPapers = [],
+  onSelectPaper,
   agentContext = {},
 }) {
   const paperKey = getPaperIdentity(paper);
@@ -428,6 +431,52 @@ export default function PracticeRoom({
     setIsQuestionMapOpen(false);
     flash(`${label} — page ${page}`);
   };
+
+  const handleOpenCachedQuestion = (result) => {
+    const page = Number(result?.question?.page);
+    const targetPaper = allPapers.find((candidate) => (
+      getPaperIdentity(candidate) === String(result?.paperIdentity || '')
+    ));
+    if (!targetPaper || !Number.isInteger(page) || page < 1) {
+      flash('This cached question can no longer be opened');
+      return;
+    }
+
+    const label = `Question ${String(result.question.id || '').trim()}`;
+    if (getPaperIdentity(targetPaper) === paperKey) {
+      handleOpenQuestion({ ...result.question, id: result.question.id });
+      return;
+    }
+    if (typeof onSelectPaper !== 'function') {
+      flash('Paper navigation is not available here');
+      return;
+    }
+
+    try {
+      sessionStorage.setItem(CACHED_QUESTION_TARGET_STORAGE_KEY, JSON.stringify({
+        paperIdentity: getPaperIdentity(targetPaper),
+        page,
+        label,
+      }));
+    } catch {
+      // The destination still opens if browser storage is unavailable.
+    }
+    onSelectPaper(targetPaper);
+  };
+
+  useEffect(() => {
+    try {
+      const target = JSON.parse(sessionStorage.getItem(CACHED_QUESTION_TARGET_STORAGE_KEY) || 'null');
+      if (!target || target.paperIdentity !== paperKey) return;
+      sessionStorage.removeItem(CACHED_QUESTION_TARGET_STORAGE_KEY);
+      const page = Number(target.page);
+      if (!Number.isInteger(page) || page < 1) return;
+      setChallengePage(page);
+      flash(`${target.label || 'Question'} — page ${page}`);
+    } catch {
+      // A malformed or unavailable stored target must not block opening a paper.
+    }
+  }, [paperKey, flash]);
 
   // Record that this paper was opened.
   useEffect(() => {
@@ -881,6 +930,7 @@ export default function PracticeRoom({
         appContext={marginContext}
         quotedText={pendingQuestion}
         onQuoteConsumed={() => setPendingQuestion('')}
+        onOpenCachedQuestion={handleOpenCachedQuestion}
       />
 
       {isReviewOpen && (

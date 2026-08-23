@@ -11,11 +11,37 @@ import { findAgenticPaperMatches } from './agenticPaperSearch.js';
 import { getOpenRouterRequestHeaders } from './openRouterKeySettings.js';
 import { buildWeakSpots, chooseNextSubject, findAllowance, getAllowanceForRung } from './practiceLadder.js';
 import { saveMistake } from './practiceRecords.js';
-import { buildConversationContext } from './agentConversation.js';
+import { buildConversationContext, getCachedQuestionResultKeys } from './agentConversation.js';
 
 // ─── Tool Definitions (OpenAI function-calling schema) ────────────────────────
 
 export const AGENT_TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'search_cached_questions',
+      description: 'Find exactly five distinct, page-addressable questions from completed shared Question Maps. Use this when a student asks to find questions on a topic, skill, or difficulty across papers. On follow-up requests such as "do it again", call it again to return five different questions; earlier result keys are excluded automatically.',
+      parameters: {
+        type: 'object',
+        properties: {
+          topic: {
+            type: 'string',
+            description: 'The syllabus topic or assessed skill to match, for example "projectile motion", "buffers", or "complex numbers".',
+          },
+          subject: {
+            type: 'string',
+            description: 'Optional course name to restrict results, for example "Maths Ext 1" or "Chemistry".',
+          },
+          difficulty: {
+            type: 'string',
+            enum: ['any', 'challenging', 'stretch'],
+            description: 'Optional difficulty filter. Use any unless the student specifically requests a hard or stretch question.',
+          },
+        },
+        required: ['topic'],
+      },
+    },
+  },
   {
     type: 'function',
     function: {
@@ -271,6 +297,7 @@ export async function executeTool(toolName, args, appContext) {
     satPaperIds = new Set(),
     beginSitting,
     goToSection,
+    openCachedQuestion,
   } = appContext;
 
   /** Resolves the `v_n` id the search tools hand back to a real paper. */
@@ -283,6 +310,25 @@ export async function executeTool(toolName, args, appContext) {
   };
 
   switch (toolName) {
+    case 'search_cached_questions': {
+      const response = await fetch('/api/agent-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'search_cached_questions',
+          search: {
+            topic: args.topic,
+            subject: args.subject,
+            difficulty: args.difficulty,
+            excludeQuestionKeys: getCachedQuestionResultKeys(appContext?.conversationHistory || []),
+          },
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) return { error: payload?.error || 'The cached question search could not be completed.' };
+      return payload;
+    }
+
     case 'search_papers': {
       const limit = typeof args.limit === 'number' ? Math.min(args.limit, 30) : 10;
       const result = findAgenticPaperMatches(
@@ -653,6 +699,7 @@ function buildActivePaperContext(appContext) {
  */
 export async function runAgent(userMessage, appContext, { onStep, signal, history = [] } = {}) {
   const steps = [];
+  const discoveredQuestionResults = [];
 
   const emit = (step) => {
     steps.push(step);
@@ -734,9 +781,16 @@ export async function runAgent(userMessage, appContext, { onStep, signal, histor
 
         let toolResult;
         try {
-          toolResult = await executeTool(toolName, toolArgs, appContext);
+          toolResult = await executeTool(toolName, toolArgs, {
+            ...appContext,
+            conversationHistory: history,
+          });
         } catch (err) {
           toolResult = { error: err.message };
+        }
+
+        if (toolName === 'search_cached_questions' && Array.isArray(toolResult?.questions)) {
+          discoveredQuestionResults.push(...toolResult.questions);
         }
 
         emit({
@@ -763,7 +817,7 @@ export async function runAgent(userMessage, appContext, { onStep, signal, histor
     const answer = message.content?.trim();
     if (answer) {
       emit({ type: 'answer', label: answer });
-      return { answer, steps };
+      return { answer, questionResults: discoveredQuestionResults.slice(-5), steps };
     }
 
     // Edge case: empty content and no tool calls
@@ -777,6 +831,8 @@ export async function runAgent(userMessage, appContext, { onStep, signal, histor
 
 function formatToolLabel(toolName, args) {
   switch (toolName) {
+    case 'search_cached_questions':
+      return `Searching the cached Question Maps for ${args.topic || 'matching questions'}…`;
     case 'search_papers':
       return `Searching for "${args.query}"…`;
     case 'get_bookmarks':
@@ -810,6 +866,9 @@ function formatToolLabel(toolName, args) {
 
 function formatToolResultLabel(toolName, result) {
   switch (toolName) {
+    case 'search_cached_questions':
+      if (result.returned === 0) return 'No unused cached questions matched that request.';
+      return `Found ${result.returned} new cached question${result.returned === 1 ? '' : 's'}.`;
     case 'search_papers':
       if (result.found === 0) return 'No matching papers found.';
       return `Found ${result.found} paper${result.found === 1 ? '' : 's'} — showing top ${result.returned}.`;

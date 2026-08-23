@@ -16,6 +16,7 @@ import {
   saveConversation,
 } from '../../utils/agentConversation';
 import { usePresence } from '../../utils/usePresence';
+import CachedQuestionResults from '../CachedQuestionResults';
 
 // AI answers may use either LaTeX delimiters (\\(...\\), \\[...\\]) or the
 // dollar delimiters understood by remark-math. Normalise the former before the
@@ -69,6 +70,7 @@ export default function PaperMargin({
   appContext,
   quotedText = '',
   onQuoteConsumed,
+  onOpenCachedQuestion,
 }) {
   const conversationScope = useMemo(
     () => getPaperMarginConversationScope(getPaperIdentity(paper)),
@@ -158,7 +160,11 @@ export default function PaperMargin({
           }
         },
       });
-      setConversation((current) => [...current, { role: 'assistant', content: result.answer }]);
+      setConversation((current) => [...current, {
+        role: 'assistant',
+        content: result.answer,
+        questionResults: result.questionResults || [],
+      }]);
       setStatus('idle');
     } catch (error) {
       if (error.name !== 'AbortError') {
@@ -213,11 +219,17 @@ export default function PaperMargin({
           <div key={`${message.role}-${index}`} style={{ marginBottom: message.role === 'assistant' ? '18px' : '10px' }}>
             <div className="margin-said">{message.role === 'user' ? 'You asked' : 'AI response'}</div>
             {message.role === 'assistant' ? (
-              <div className="margin-prose agent-markdown">
-                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-                  {normaliseMathDelimiters(message.content)}
-                </ReactMarkdown>
-              </div>
+              <>
+                <div className="margin-prose agent-markdown">
+                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                    {normaliseMathDelimiters(message.content)}
+                  </ReactMarkdown>
+                </div>
+                <CachedQuestionResults
+                  results={message.questionResults}
+                  onOpenQuestion={onOpenCachedQuestion}
+                />
+              </>
             ) : (
               <p style={{ fontSize: '14px', margin: '4px 0 0' }}>{message.content}</p>
             )}

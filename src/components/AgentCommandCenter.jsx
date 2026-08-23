@@ -14,6 +14,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import CachedQuestionResults from './CachedQuestionResults';
 
 // ─── Icons (inline SVG to avoid extra dependencies) ───────────────────────────
 
@@ -241,7 +242,11 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
         },
       });
 
-      setConversation((prev) => [...prev, { role: 'assistant', content: result.answer }]);
+      setConversation((prev) => [...prev, {
+        role: 'assistant',
+        content: result.answer,
+        questionResults: result.questionResults || [],
+      }]);
       setSteps([]);
     } catch (err) {
       if (err.name !== 'AbortError') {
@@ -417,7 +422,13 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
                     </div>
                     <div className="agent-message-bubble">
                       {message.role === 'assistant'
-                        ? <FormattedAssistantAnswer content={message.content} />
+                        ? <>
+                          <FormattedAssistantAnswer content={message.content} />
+                          <CachedQuestionResults
+                            results={message.questionResults}
+                            onOpenQuestion={appContext?.openCachedQuestion}
+                          />
+                        </>
                         : message.content}
                     </div>
                   </div>

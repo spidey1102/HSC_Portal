@@ -1,5 +1,6 @@
 import { resolveOpenRouterKey } from './openRouterKeyResolver.js';
 import { SHARED_OPENROUTER_MODEL, getCompletionRoute, userSafeProviderError } from './openRouterRouting.js';
+import { searchCachedQuestions } from './server/cachedQuestionDiscovery.js';
 
 const AGENT_SYSTEM_PROMPT = [
   'You are a smart, efficient HSC study assistant operating inside the HSC Portal.',
@@ -10,6 +11,7 @@ const AGENT_SYSTEM_PROMPT = [
   'Keep your final responses concise — one or two sentences at most.',
   'Never use markdown headers or excessive formatting in your final response.',
   'When selected-paper context is supplied, use it to give paper-aware guidance. The supplied PDF text contains every selectable-text page in the selected paper; you may discuss any included page or question, but never invent text that is not present in the supplied paper.',
+  'When a student asks for questions on a topic, use search_cached_questions. It returns only shared cached questions, and the interface renders its five result cards with their own Take me there buttons. On a follow-up such as "do it again", call the tool again; it automatically receives prior result keys and must return different questions. Do not invent question matches or links.',
 ].join(' ');
 
 /**
@@ -44,6 +46,20 @@ export async function handleAgentChatRequest(req, res, apiKey) {
     res.statusCode = 400;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ error: 'Invalid JSON body.' }));
+    return;
+  }
+
+  if (parsed.action === 'search_cached_questions') {
+    try {
+      const result = await searchCachedQuestions(parsed.search || {});
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify(result));
+    } catch (error) {
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: error?.message || 'The cached question search could not be completed.' }));
+    }
     return;
   }
 
