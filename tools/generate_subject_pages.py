@@ -30,6 +30,8 @@ def load_papers(path='public/papers.json'):
             return data, v
     raise SystemExit('Could not parse papers.json')
 
+PRODUCTION_BASE_URL = 'https://hscportal.vercel.app'
+
 HTML_TEMPLATE = '''<!doctype html>
 <html lang="en">
 <head>
@@ -43,12 +45,31 @@ HTML_TEMPLATE = '''<!doctype html>
   <meta property="og:url" content="{og_url}" />
   <link rel="canonical" href="{canonical}" />
   <meta name="robots" content="index,follow" />
+  <style>
+    :root {{ color-scheme: light; font-family: Arial, sans-serif; }}
+    body {{ margin: 0; color: #201f1d; background: #f7f5f0; }}
+    main {{ box-sizing: border-box; width: min(760px, 100%); margin: 0 auto; padding: 64px 24px; }}
+    .eyebrow {{ margin: 0 0 12px; color: #8a6116; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: .82rem; }}
+    h1 {{ margin: 0 0 18px; font: 700 clamp(2rem, 6vw, 3.3rem)/1.08 Georgia, serif; }}
+    p {{ max-width: 66ch; font-size: 1.08rem; line-height: 1.65; }}
+    .card {{ margin: 32px 0; padding: 24px; border: 1px solid #d9d2c5; border-radius: 12px; background: #fff; }}
+    h2 {{ margin-top: 0; font-size: 1.25rem; }}
+    .cta {{ display: inline-block; padding: 12px 16px; border-radius: 8px; color: #fff; background: #201f1d; font-weight: 700; text-decoration: none; }}
+    .home {{ color: #635f58; }}
+  </style>
 </head>
 <body>
-  <script>
-    // Redirect to SPA root with subject query (client-side filtering)
-    location.replace('/?subject={slug}');
-  </script>
+  <main>
+    <p class="eyebrow">HSC Portal · NSW HSC study resources</p>
+    <h1>{title}</h1>
+    <p>{description}</p>
+    <section class="card" aria-labelledby="practice-heading">
+      <h2 id="practice-heading">Browse {subject} past papers</h2>
+      <p>Use HSC Portal to find past HSC exams and trial papers, then open a paper for timed practice, annotations, worked solutions, and Question Map support.</p>
+      <a class="cta" href="/?subject={slug}">Browse {subject} papers</a>
+    </section>
+    <p class="home"><a href="/">Explore all HSC subjects on HSC Portal</a></p>
+  </main>
 </body>
 </html>
 '''
@@ -73,7 +94,7 @@ def main():
         subj_counts[subj_name] = subj_counts.get(subj_name, 0) + 1
 
     parser = argparse.ArgumentParser(description='Generate per-subject pages and sitemap')
-    parser.add_argument('--base-url', default='', help='Base URL to prefix sitemap and og:url (e.g. https://example.com)')
+    parser.add_argument('--base-url', default=PRODUCTION_BASE_URL, help='Base URL to prefix sitemap and og:url (e.g. https://example.com)')
     args = parser.parse_args()
 
     base = args.base_url.rstrip('/')
@@ -96,10 +117,12 @@ def main():
         page_dir.mkdir(parents=True, exist_ok=True)
         title = f"{subj} — HSC Past Papers"
         desc = f"Browse {count} past HSC papers for {subj}. Download PDFs, view marking guidelines, and practice exam questions."
-        og_path = f"/{slug}/"
+        # Vercel is configured with trailingSlash: false, so this slashless form
+        # is the final 200 URL and must be used in sitemap and canonical tags.
+        og_path = f"/{slug}"
         og_url = (base + og_path) if base else og_path
         canonical = og_url
-        html = HTML_TEMPLATE.format(title=title, description=desc, og_title=title, og_description=desc, og_url=og_url, canonical=canonical, slug=slug)
+        html = HTML_TEMPLATE.format(title=title, description=desc, og_title=title, og_description=desc, og_url=og_url, canonical=canonical, slug=slug, subject=subj)
         (page_dir / 'index.html').write_text(html, encoding='utf-8')
         urls.append((og_url, date.today().isoformat()))
 
