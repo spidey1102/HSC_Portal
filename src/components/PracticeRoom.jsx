@@ -4,8 +4,8 @@ import {
   BookOpen,
   Check,
   ClipboardCheck,
-  Download,
   Feather,
+  Printer,
   ListChecks,
   PanelBottomOpen,
   Share2,
@@ -73,16 +73,6 @@ function getFormulaSheet(subject) {
       : '/sheets/mathematics-reference.pdf';
   }
   return null;
-}
-
-function paperDownloadName({ paper, subjectName, schoolName }) {
-  const safePart = (value) => String(value || '')
-    .replace(/[\\/:*?"<>|]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const parts = [safePart(subjectName), safePart(schoolName || paper?.n), safePart(paper?.y)].filter(Boolean);
-  const name = parts.join(' — ').slice(0, 160) || 'HSC Portal paper';
-  return `${name}.pdf`;
 }
 
 /**
@@ -224,7 +214,6 @@ export default function PracticeRoom({
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [isMarginOpen, setIsMarginOpen] = useState(false);
   const [showFormula, setShowFormula] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [mobileTab, setMobileTab] = useState('paper');
   const actionTimerRef = useRef(null);
 
@@ -597,45 +586,23 @@ export default function PracticeRoom({
   const pdfUrl = paper?.cf ? `https://hscportal.pages.dev/${encodeURI(paper.cf)}` : null;
   const legacyUrl = `https://thsconline.github.io/s/viewer.html?field=${encodeURIComponent(paper?.n ?? '')}&base=${paper?.v ?? ''}`;
 
-  const handleDownloadPaper = useCallback(async () => {
-    if (!pdfUrl || isDownloading) return;
+  const handlePrintOrDownload = useCallback(() => {
+    if (!pdfUrl) return;
 
-    setIsDownloading(true);
-    flash('Preparing your paper download…', 12000);
-    try {
-      const response = await fetch(pdfUrl);
-      if (!response.ok) throw new Error(`The PDF server returned ${response.status}.`);
-
-      const file = await response.blob();
-      if (!file.size) throw new Error('The PDF was empty.');
-
-      const objectUrl = URL.createObjectURL(file);
-      const link = document.createElement('a');
-      link.href = objectUrl;
-      link.download = paperDownloadName({ paper, subjectName, schoolName });
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-      flash('Download started. Check your device downloads.', 3500);
-    } catch (error) {
-      // A few browser/privacy configurations do not permit an in-page blob
-      // download from the paper host. Keep the student moving with the original
-      // PDF in a new tab rather than failing silently.
-      const link = document.createElement('a');
-      link.href = pdfUrl;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      flash('Could not save automatically — the original PDF opened in a new tab.', 5000);
-    } finally {
-      setIsDownloading(false);
-    }
-  }, [flash, isDownloading, paper, pdfUrl, schoolName, subjectName]);
+    // The native PDF viewer is the reliable cross-browser place for both
+    // printing and saving. It preserves the original document rather than
+    // printing the in-page canvas representation. A user-triggered anchor click
+    // avoids false pop-up-blocker results produced by `noopener` window handles.
+    const link = document.createElement('a');
+    link.href = pdfUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    flash('Paper opened in a new tab — use its Print or Download controls.', 5000);
+  }, [flash, pdfUrl]);
 
   const paperCategory = paper.c === 'H' ? 'Official HSC'
     : paper.c === 'T' ? 'School trial'
@@ -690,13 +657,11 @@ export default function PracticeRoom({
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={handleDownloadPaper}
-              disabled={isDownloading}
-              aria-busy={isDownloading}
-              title="Download this paper as a PDF"
+              onClick={handlePrintOrDownload}
+              title="Open this PDF's Print and Download controls"
             >
-              <Download size={14} />
-              {isDownloading ? 'Preparing download…' : 'Download'}
+              <Printer size={14} />
+              Print or download
             </button>
           )}
 
