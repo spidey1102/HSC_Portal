@@ -48,3 +48,4 @@ pip-delete-this-directory.txt
 
 # Electron desktop build artifacts
 /release
+/build/icon_*.png

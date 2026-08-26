@@ -79,6 +79,18 @@ The command writes two 64-bit `.exe` files into `release/`:
 
 For desktop development, run `npm run dev` in one terminal, then set `ELECTRON_START_URL=http://localhost:3000` and run `npm run desktop:start` in another. Production builds open `https://www.hscportal.app` by default.
 
+## macOS and Linux Desktop Packages
+
+The same Electron shell can be packaged for macOS and Linux:
+
+| Platform | Build command | Output |
+| --- | --- | --- |
+| Linux (x64) | `npm run desktop:linux` | `release/HSC Portal-<version>-x86_64.AppImage` |
+| macOS Intel | `npm run desktop:mac` | `release/HSC Portal-<version>-x64.dmg` |
+| macOS Apple Silicon | `npm run desktop:mac` | `release/HSC Portal-<version>-arm64.dmg` |
+
+Build the DMGs on a macOS machine or macOS CI runner because Apple’s disk-image tooling is required. The packages are not code signed or notarized; until Apple signing credentials are configured, macOS may require students to use **Control-click → Open** on the first launch.
+
 ---
 
 ## Usage

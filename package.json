@@ -1,6 +1,7 @@
 {
   "name": "hsc-portal",
   "productName": "HSC Portal",
+  "desktopName": "hscportal",
   "private": true,
   "version": "1.0.0",
   "description": "HSC Portal desktop app for past-paper practice and study planning.",
@@ -14,6 +15,8 @@
     "preview": "vite preview",
     "desktop:start": "electron .",
     "desktop:dist": "electron-builder --win nsis portable",
+    "desktop:linux": "electron-builder --linux AppImage --x64",
+    "desktop:mac": "electron-builder --mac dmg --x64 --arm64",
     "desktop:dir": "electron-builder --dir",
     "desktop:verify": "electron --version && electron-builder --version"
   },
@@ -45,6 +48,38 @@
           ]
         }
       ]
+    },
+    "mac": {
+      "icon": "build/icon.icns",
+      "category": "public.app-category.education",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "dmg": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "syncDesktopName": true,
+      "category": "Education",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "appImage": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "nsis": {
       "artifactName": "${productName}-${version}-${arch}-installer.${ext}",
