@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
   BookOpen,
@@ -18,6 +18,7 @@ import {
 } from '../utils/practiceLadder';
 import { EMPTY_WEAK_SPOTS, WEAK_SPOT_NOTE, daySeed, pick } from '../utils/copyPool';
 import { getPaperIdentity } from '../utils/paperIdentity';
+import HomeQuestionRecommendations from './HomeQuestionRecommendations';
 
 const LADDER_COLUMNS = '26px minmax(0, 1fr) 128px 96px 116px 78px';
 
@@ -61,6 +62,30 @@ function formatLastSitting(entry) {
  * Chooses the paper the ladder prescribes: a paper in the chosen subject that
  * has not been sat yet, newest first, preferring papers that ship solutions.
  */
+function buildQuestionSearch({ weakSpots, prescription, mySubjects }) {
+  const subjectSet = new Set((mySubjects || []).filter(Boolean));
+  const weakSpot = (weakSpots || []).find((spot) => (
+    spot?.topic && spot?.subject && subjectSet.has(spot.subject)
+  ));
+
+  if (weakSpot) {
+    return {
+      topic: weakSpot.topic,
+      subject: weakSpot.subject,
+      contextLabel: `Based on your logged weak area: ${weakSpot.topic} in ${weakSpot.subject}.`,
+    };
+  }
+
+  const subject = prescription?.subject || (mySubjects || []).find(Boolean) || '';
+  return {
+    topic: '',
+    subject,
+    contextLabel: subject
+      ? `Ready-to-open questions from shared Question Maps for ${subject}.`
+      : 'Choose your subjects to receive ready-to-open questions from shared Question Maps.',
+  };
+}
+
 function choosePrescribedPaper({ papers, subjects, selectedLevel, subjectName, satPaperIds }) {
   if (!subjectName) return null;
   const subjectIndex = subjects.indexOf(subjectName);
@@ -93,6 +118,7 @@ export default function TodayView({
   satPaperIds = new Set(),
   showPrescription = true,
   onBeginSitting,
+  onOpenCachedQuestion,
   onOpenSubject,
   onGoLibrary,
   onGoNotebook,
@@ -104,6 +130,16 @@ export default function TodayView({
   );
   const prescription = useMemo(() => chooseNextSubject(ladder), [ladder]);
   const weakSpots = useMemo(() => buildWeakSpots(mistakes), [mistakes]);
+  const questionSearch = useMemo(() => buildQuestionSearch({
+    weakSpots,
+    prescription,
+    mySubjects,
+  }), [weakSpots, prescription, mySubjects]);
+  const [questionRecommendations, setQuestionRecommendations] = useState([]);
+  const [questionRecommendationContext, setQuestionRecommendationContext] = useState('');
+  const [questionRecommendationError, setQuestionRecommendationError] = useState('');
+  const [questionRecommendationsLoading, setQuestionRecommendationsLoading] = useState(false);
+  const [excludedQuestionKeys, setExcludedQuestionKeys] = useState([]);
 
   const prescribedPaper = useMemo(() => choosePrescribedPaper({
     papers,
@@ -120,6 +156,83 @@ export default function TodayView({
   const activeAllowance = allowanceId || defaultAllowance;
 
   useEffect(() => { setAllowanceId(null); }, [prescription?.subject, defaultAllowance]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const requestCachedQuestions = async (search) => {
+      const response = await fetch('/api/agent-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'search_cached_questions',
+          search: {
+            ...search,
+            level: selectedLevel,
+            difficulty: 'any',
+            excludeQuestionKeys: excludedQuestionKeys.slice(-40),
+          },
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || 'The cached question search could not be completed.');
+      return payload;
+    };
+
+    const loadRecommendations = async () => {
+      if (!questionSearch.subject) {
+        setQuestionRecommendations([]);
+        setQuestionRecommendationContext(questionSearch.contextLabel);
+        setQuestionRecommendationError('');
+        setQuestionRecommendationsLoading(false);
+        return;
+      }
+
+      setQuestionRecommendationsLoading(true);
+      setQuestionRecommendationError('');
+      try {
+        let payload = await requestCachedQuestions({
+          topic: questionSearch.topic,
+          subject: questionSearch.subject,
+        });
+        let questions = Array.isArray(payload?.questions) ? payload.questions : [];
+        let contextLabel = questionSearch.contextLabel;
+
+        // A logged topic may not yet exist in the shared cache. In that case,
+        // retain the subject and level filters but offer other ready questions.
+        if (questions.length === 0 && questionSearch.topic) {
+          payload = await requestCachedQuestions({ topic: '', subject: questionSearch.subject });
+          questions = Array.isArray(payload?.questions) ? payload.questions : [];
+          contextLabel = questions.length > 0
+            ? `No shared Question Map question is tagged ${questionSearch.topic} yet. Here are ready-to-open ${questionSearch.subject} questions instead.`
+            : questionSearch.contextLabel;
+        }
+
+        if (!cancelled) {
+          setQuestionRecommendations(questions.slice(0, 3));
+          setQuestionRecommendationContext(contextLabel);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setQuestionRecommendations([]);
+          setQuestionRecommendationContext(questionSearch.contextLabel);
+          setQuestionRecommendationError(error?.message || 'The cached question search could not be completed.');
+        }
+      } finally {
+        if (!cancelled) setQuestionRecommendationsLoading(false);
+      }
+    };
+
+    void loadRecommendations();
+    return () => { cancelled = true; };
+  }, [questionSearch.contextLabel, questionSearch.topic, questionSearch.subject, selectedLevel, excludedQuestionKeys]);
+
+  const refreshQuestionRecommendations = useCallback(() => {
+    setExcludedQuestionKeys((current) => {
+      const additions = questionRecommendations.map((result) => String(result?.key || '')).filter(Boolean);
+      return [...current, ...additions].slice(-40);
+    });
+  }, [questionRecommendations]);
 
   // Wording is drawn from a pool, seeded by the day, rather than generated.
   const seed = daySeed();
@@ -211,6 +324,15 @@ export default function TodayView({
             </button>
           </div>
         )}
+
+        <HomeQuestionRecommendations
+          contextLabel={questionRecommendationContext || questionSearch.contextLabel}
+          error={questionRecommendationError}
+          loading={questionRecommendationsLoading}
+          onOpenQuestion={onOpenCachedQuestion}
+          onRefresh={refreshQuestionRecommendations}
+          questions={questionRecommendations}
+        />
 
         <div className="sec-head">
           <h4>Your ladder</h4>
