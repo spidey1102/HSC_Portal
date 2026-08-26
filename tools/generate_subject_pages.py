@@ -30,7 +30,7 @@ def load_papers(path='public/papers.json'):
             return data, v
     raise SystemExit('Could not parse papers.json')
 
-PRODUCTION_BASE_URL = 'https://hscportal.vercel.app'
+PRODUCTION_BASE_URL = 'https://www.hscportal.app'
 
 HTML_TEMPLATE = '''<!doctype html>
 <html lang="en">
