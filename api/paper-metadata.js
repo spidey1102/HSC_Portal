@@ -260,6 +260,40 @@ function questionNumberFromId(id) {
   return match ? Number(match[1]) : null;
 }
 
+function questionNumbersFromPaperText(paperText) {
+  const questionIds = new Set();
+  const questionPattern = /\bq(?:uestion)?\s*(\d{1,3})\b/gi;
+  for (const match of String(paperText || '').matchAll(questionPattern)) {
+    const questionId = Number(match[1]);
+    if (Number.isInteger(questionId) && questionId >= 1 && questionId <= 250) questionIds.add(questionId);
+  }
+  return [...questionIds].sort((left, right) => left - right);
+}
+
+function printedTotalMarksFromPaperText(paperText) {
+  // PDF text extraction can split both words ("m arks") and digits ("10 0").
+  // Accept only an explicitly labelled total, rather than arbitrary marks in a section heading.
+  const totalPattern = /\btotal\s+m?\s*arks?\s*:?\s*(\d(?:\s*\d){0,2})\b/gi;
+  for (const match of String(paperText || '').matchAll(totalPattern)) {
+    const total = Number(String(match[1] || '').replace(/\s/g, ''));
+    if (Number.isInteger(total) && total > 0 && total <= 1000) return total;
+  }
+  return null;
+}
+
+function readableSourceProblem({ paper, paperText }) {
+  if (!SUBSTANTIVE_PAPER_CATEGORIES.has(paper?.c)) return '';
+  const expectedQuestionIds = questionRangeFromPaperText(paperText);
+  if (expectedQuestionIds.length >= MIN_SUBSTANTIVE_QUESTION_RANGE) return '';
+
+  const visibleQuestionIds = questionNumbersFromPaperText(paperText);
+  const firstVisibleQuestionId = visibleQuestionIds[0] || null;
+  if (visibleQuestionIds.length >= MIN_SUBSTANTIVE_QUESTION_RANGE && firstVisibleQuestionId && firstVisibleQuestionId > 1) {
+    return `The readable PDF text begins at Question ${firstVisibleQuestionId} and does not expose a full paper question range.`;
+  }
+  return '';
+}
+
 function incompleteQuestionCoverage({ paper, paperText, questions }) {
   const expectedQuestionIds = questionRangeFromPaperText(paperText);
   if (!SUBSTANTIVE_PAPER_CATEGORIES.has(paper?.c) || expectedQuestionIds.length < MIN_SUBSTANTIVE_QUESTION_RANGE) {
@@ -284,6 +318,17 @@ class IncompletePaperAnalysisError extends Error {
   }
 }
 
+class PaperMarkIntegrityError extends Error {
+  constructor({ expectedTotal, mappedTotal, hasUnknownQuestionMarks }) {
+    super(
+      hasUnknownQuestionMarks
+        ? `The Question Map is missing one or more top-level marks for a paper worth ${expectedTotal} marks.`
+        : `The Question Map totals ${mappedTotal} marks, but this paper is worth ${expectedTotal} marks.`,
+    );
+    this.name = 'PaperMarkIntegrityError';
+  }
+}
+
 function normaliseAnalysis(answer, sourceFingerprint, { paper = null, paperText = '' } = {}) {
   const parsed = parseJsonAnswer(answer);
   const questions = (Array.isArray(parsed?.questions) ? parsed.questions : [])
@@ -301,8 +346,21 @@ function normaliseAnalysis(answer, sourceFingerprint, { paper = null, paperText 
   if (incompleteCoverage) throw new IncompletePaperAnalysisError(incompleteCoverage);
 
   const marksFromQuestions = questions.reduce((sum, question) => sum + (question.marks ?? 0), 0);
+  const hasUnknownQuestionMarks = questions.some((question) => question.marks === null);
+  const printedTotalMarks = printedTotalMarksFromPaperText(paperText);
   const suppliedTotal = normaliseNumber(parsed?.totalMarks);
-  const totalMarks = suppliedTotal ?? (marksFromQuestions > 0 ? marksFromQuestions : null);
+  const totalMarks = printedTotalMarks ?? suppliedTotal ?? (marksFromQuestions > 0 ? marksFromQuestions : null);
+
+  // A Question Map is only ready when its own marks reconcile to the specific
+  // paper's printed total. This is deliberately dynamic: Extension papers may
+  // be worth 70, HSC papers 100, and other sources can declare another total.
+  if (printedTotalMarks !== null && (hasUnknownQuestionMarks || marksFromQuestions !== printedTotalMarks)) {
+    throw new PaperMarkIntegrityError({
+      expectedTotal: printedTotalMarks,
+      mappedTotal: marksFromQuestions,
+      hasUnknownQuestionMarks,
+    });
+  }
 
   return {
     status: 'ready',
@@ -332,7 +390,7 @@ function buildAnalysisPrompt(paper, paperText) {
     'For every substantive HSC-style paper, identify at least one strongest question as "challenging" or "stretch". Choose the question with the most demanding reasoning, application, or marks; do not mark every substantive question routine merely because the paper is broadly accessible.',
     'For question topics, provide zero to three concise syllabus-aligned labels using the course language students would search for. Examples include Equilibrium, Acid–Base Reactions, Organic Chemistry, Complex Numbers, Calculus, Texts and Human Experiences, and Module B. Do not use generic labels such as Question 5, Section II, Diagram, or Extended Response as a topic. skill is one short phrase stating the main assessed skill, such as Apply Le Chatelier’s Principle or Analyse Language Techniques; use an empty string only when no meaningful skill can be identified. commandVerb is the printed command verb in lowercase when clear, otherwise an empty string.',
     'For challenge.reasons, select zero to two exact codes only from: unfamiliar-context, multi-step-reasoning, cross-topic-synthesis, data-interpretation, common-misconception, non-routine-method, extended-response. challenge.note must be one plain, factual sentence of no more than 24 words explaining the selection, or an empty string for routine questions.',
-    'Do not invent marks. Use null when a mark cannot be established. Do not treat instructions, multiple-choice option labels, tables, source labels, or section headings as questions.',
+    'Do not invent marks. Use null when a mark cannot be established. However, when a multiple-choice section states both a total mark value and a contiguous question range, assign equal top-level marks only when that division is exact (for example, Questions 1–10 worth 10 marks means one mark each). Do not treat instructions, multiple-choice option labels, tables, source labels, or section headings as questions.',
     'For a question with subparts, preserve the top-level question as one item; only use subparts for a, b, i, ii style labels. When a challenge is chiefly about one direct subpart, set challenge.subpartId to that exact extracted label. For Mathematics Extension 1 and Mathematics Extension 2 papers, every challenging or stretch recommendation with explicit lettered or roman subparts must identify the specific relevant subpart whenever one can be established. Use null only when the challenge genuinely concerns the entire top-level question or no exact direct subpart can be determined.',
     'totalMarks should be the printed paper total if stated, otherwise the sum of reliable top-level marks, otherwise null.',
     'Use this exact shape: {"totalMarks":number|null,"confidence":"high"|"medium"|"low","notes":"short caveat or empty string","questions":[{"id":"1","marks":number|null,"page":number|null,"subparts":[{"id":"a","marks":number|null,"page":number|null,"topics":["Equilibrium"],"skill":"Apply Le Chatelier’s Principle","commandVerb":"explain"}],"topics":["Equilibrium"],"skill":"Apply Le Chatelier’s Principle","commandVerb":"explain","challenge":{"level":"routine"|"challenging"|"stretch","reasons":["unfamiliar-context"],"note":"short explanation or empty string","subpartId":"a"|null}}]}.',
@@ -516,9 +574,21 @@ function publicMetadata(data, { cached = true, paper = null } = {}) {
 
 function isObviouslyIncompleteCachedAnalysis(data, paper) {
   if (data?.status !== 'ready' || !SUBSTANTIVE_PAPER_CATEGORIES.has(paper?.c)) return false;
-  const questionCount = Number(data.questionCount) || 0;
+
+  const questions = Array.isArray(data.questions) ? data.questions : [];
+  const questionCount = Number(data.questionCount) || questions.length;
   const totalMarks = normaliseNumber(data.totalMarks) || 0;
   const pageCount = Math.max(Number(data.pagesAnalysed) || 0, Number(data.totalPages) || 0);
+  const mappedMarks = questions.reduce((sum, question) => sum + (normaliseNumber(question?.marks) ?? 0), 0);
+  const hasUnknownQuestionMarks = questions.some((question) => normaliseNumber(question?.marks) === null);
+  const numberedQuestionIds = questions
+    .map((question) => questionNumberFromId(question?.id))
+    .filter(Number.isInteger)
+    .sort((left, right) => left - right);
+  const firstQuestionId = numberedQuestionIds[0] || null;
+
+  if (totalMarks > 0 && (hasUnknownQuestionMarks || mappedMarks !== totalMarks)) return true;
+  if (firstQuestionId && firstQuestionId > 1 && (questionCount >= MIN_SUBSTANTIVE_QUESTION_RANGE || pageCount >= MIN_REFRESHABLE_PAGES)) return true;
   return questionCount <= 1 && (totalMarks >= 20 || pageCount >= 4);
 }
 
@@ -579,6 +649,11 @@ export async function runPaperAnalysisWorker({ paper, sourceFingerprint, request
       throw new Error(extracted.reason || 'The PDF does not expose readable text for question extraction.');
     }
 
+    const sourceProblem = readableSourceProblem({ paper, paperText: extracted.text });
+    if (sourceProblem) {
+      throw new Error(`This PDF cannot produce a reliable full Question Map: ${sourceProblem}`);
+    }
+
     const providerTimeoutMs = remainingBudgetMs(requestStartedAt);
     if (providerTimeoutMs < MIN_PROVIDER_TIMEOUT_MS) {
       throw new Error('The analysis job ran out of time before the AI response was ready. Please retry this paper.');
@@ -597,7 +672,9 @@ export async function runPaperAnalysisWorker({ paper, sourceFingerprint, request
     try {
       analysis = normaliseAnalysis(answer, sourceFingerprint, { paper, paperText: extracted.text });
     } catch (error) {
-      if (!(error instanceof IncompletePaperAnalysisError)) throw error;
+      const isRecoverableIntegrityFailure = error instanceof IncompletePaperAnalysisError
+        || error instanceof PaperMarkIntegrityError;
+      if (!isRecoverableIntegrityFailure) throw error;
 
       const retryTimeoutMs = remainingBudgetMs(requestStartedAt);
       if (retryTimeoutMs < MIN_PROVIDER_TIMEOUT_MS) throw error;
@@ -606,7 +683,7 @@ export async function runPaperAnalysisWorker({ paper, sourceFingerprint, request
         message: error.message,
       });
       const retryAnswer = await callPaperAnalysis(
-        `${buildAnalysisPrompt(paper, extracted.text)}\n\nThe preceding response was rejected because it did not cover the stated question range. Re-read the complete text and return the full required JSON now.`,
+        `${buildAnalysisPrompt(paper, extracted.text)}\n\nThe preceding response was rejected: ${error.message} Re-read the complete text and return a complete Question Map whose top-level marks reconcile exactly to the printed paper total.`,
         { timeoutMs: retryTimeoutMs },
       );
       analysis = normaliseAnalysis(retryAnswer, sourceFingerprint, { paper, paperText: extracted.text });
@@ -789,4 +866,13 @@ export default async function handler(req, res) {
   }
 }
 
-export { metadataDocumentId, normaliseAnalysis, paperIdentity, refreshEligibility };
+export {
+  isObviouslyIncompleteCachedAnalysis,
+  metadataDocumentId,
+  normaliseAnalysis,
+  paperIdentity,
+  printedTotalMarksFromPaperText,
+  questionRangeFromPaperText,
+  readableSourceProblem,
+  refreshEligibility,
+};
