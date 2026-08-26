@@ -59,6 +59,26 @@ or
 npm start
 ```
 
+## Windows Desktop App
+
+HSCPortal can also be distributed as a native Windows application. The Electron shell loads the live portal at [www.hscportal.app](https://www.hscportal.app), so Firebase sign-in, cloud sync, AI assistance, past-paper data, and future website updates continue to work without putting API credentials in the executable.
+
+Create the Windows installer and standalone executable from a Windows development machine:
+
+```bash
+npm ci
+npm run desktop:dist
+```
+
+The command writes two 64-bit `.exe` files into `release/`:
+
+| File | Purpose |
+| --- | --- |
+| `HSC Portal-<version>-x64-installer.exe` | Guided installer with Start Menu and desktop shortcuts. |
+| `HSC Portal-<version>-x64-portable.exe` | Standalone executable that runs without installation. |
+
+For desktop development, run `npm run dev` in one terminal, then set `ELECTRON_START_URL=http://localhost:3000` and run `npm run desktop:start` in another. Production builds open `https://www.hscportal.app` by default.
+
 ---
 
 ## Usage
