@@ -23,10 +23,30 @@ export default function HomeQuestionRecommendations({
   loading = false,
   error = '',
   contextLabel = '',
+  subjects = [],
+  selectedSubject = '',
   onRefresh,
   onOpenQuestion,
+  onSubjectSelect,
 }) {
   const hasQuestions = Array.isArray(questions) && questions.length > 0;
+  const selectedSubjectIndex = Math.max(0, subjects.indexOf(selectedSubject));
+  const selectedTabId = `home-question-recommendations-tab-${selectedSubjectIndex}`;
+
+  const handleTabKeyDown = (event, index) => {
+    if (subjects.length === 0) return;
+    const lastIndex = subjects.length - 1;
+    let nextIndex = index;
+    if (event.key === 'ArrowRight') nextIndex = index === lastIndex ? 0 : index + 1;
+    else if (event.key === 'ArrowLeft') nextIndex = index === 0 ? lastIndex : index - 1;
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = lastIndex;
+    else return;
+
+    event.preventDefault();
+    onSubjectSelect?.(subjects[nextIndex]);
+    document.getElementById(`home-question-recommendations-tab-${nextIndex}`)?.focus();
+  };
 
   return (
     <section className="home-question-recommendations" aria-labelledby="home-question-recommendations-title">
@@ -51,18 +71,49 @@ export default function HomeQuestionRecommendations({
         </button>
       </div>
 
-      {loading ? (
-        <div className="home-question-recommendations-grid" aria-label="Finding cached questions">
-          {[0, 1, 2].map((index) => <div className="home-question-recommendations-skeleton" key={index} />)}
+      {subjects.length > 0 && (
+        <div className="home-question-recommendations-tabs" role="tablist" aria-label="Choose a subject for question recommendations">
+          {subjects.map((subject, index) => {
+            const selected = subject === selectedSubject;
+            return (
+              <button
+                aria-controls="home-question-recommendations-panel"
+                aria-selected={selected}
+                className={`home-question-recommendations-tab${selected ? ' is-active' : ''}`}
+                id={`home-question-recommendations-tab-${index}`}
+                key={subject}
+                onClick={() => onSubjectSelect?.(subject)}
+                onKeyDown={(event) => handleTabKeyDown(event, index)}
+                role="tab"
+                tabIndex={selected ? 0 : -1}
+                type="button"
+              >
+                {subject}
+              </button>
+            );
+          })}
         </div>
-      ) : error ? (
-        <div className="home-question-recommendations-empty">
-          <strong>Recommendations are unavailable right now.</strong>
-          <span>{error}</span>
-        </div>
-      ) : hasQuestions ? (
-        <div className="home-question-recommendations-grid">
-          {questions.map((result) => {
+      )}
+
+      <div
+        aria-labelledby={subjects.length > 0 ? selectedTabId : undefined}
+        className="home-question-recommendations-panel"
+        id="home-question-recommendations-panel"
+        role={subjects.length > 0 ? 'tabpanel' : undefined}
+        tabIndex={subjects.length > 0 ? 0 : undefined}
+      >
+        {loading ? (
+          <div className="home-question-recommendations-grid" aria-label={`Finding cached questions for ${selectedSubject || 'your subjects'}`}>
+            {[0, 1, 2].map((index) => <div className="home-question-recommendations-skeleton" key={index} />)}
+          </div>
+        ) : error ? (
+          <div className="home-question-recommendations-empty">
+            <strong>Recommendations are unavailable right now.</strong>
+            <span>{error}</span>
+          </div>
+        ) : hasQuestions ? (
+          <div className="home-question-recommendations-grid">
+            {questions.map((result) => {
             const question = result.question || {};
             const topics = Array.isArray(question.topics) ? question.topics : [];
             const detail = [question.commandVerb, question.skill].filter(Boolean).join(' · ');
@@ -103,14 +154,17 @@ export default function HomeQuestionRecommendations({
                 )}
               </button>
             );
-          })}
-        </div>
-      ) : (
-        <div className="home-question-recommendations-empty">
-          <strong>No analysed question matches yet.</strong>
-          <span>When shared Question Maps exist for your current subjects and year level, they will appear here.</span>
-        </div>
-      )}
+            })}
+          </div>
+        ) : (
+          <div className="home-question-recommendations-empty">
+            <strong>No analysed question matches yet.</strong>
+            <span>{selectedSubject
+              ? `When shared Question Maps exist for ${selectedSubject} at your current year level, they will appear here.`
+              : 'When shared Question Maps exist for your current subjects and year level, they will appear here.'}</span>
+          </div>
+        )}
+      </div>
     </section>
   );
 }

@@ -62,21 +62,24 @@ function formatLastSitting(entry) {
  * Chooses the paper the ladder prescribes: a paper in the chosen subject that
  * has not been sat yet, newest first, preferring papers that ship solutions.
  */
-function buildQuestionSearch({ weakSpots, prescription, mySubjects }) {
-  const subjectSet = new Set((mySubjects || []).filter(Boolean));
+function getRecommendationSubjects(mySubjects, allSubjects) {
+  const knownSubjects = new Set((allSubjects || []).filter(Boolean));
+  return [...new Set((mySubjects || []).filter((subject) => knownSubjects.has(subject)))];
+}
+
+function buildQuestionSearch({ weakSpots, subject }) {
   const weakSpot = (weakSpots || []).find((spot) => (
-    spot?.topic && spot?.subject && subjectSet.has(spot.subject)
+    spot?.topic && spot?.subject === subject
   ));
 
   if (weakSpot) {
     return {
       topic: weakSpot.topic,
-      subject: weakSpot.subject,
-      contextLabel: `Based on your logged weak area: ${weakSpot.topic} in ${weakSpot.subject}.`,
+      subject,
+      contextLabel: `Based on your logged weak area: ${weakSpot.topic} in ${subject}.`,
     };
   }
 
-  const subject = prescription?.subject || (mySubjects || []).find(Boolean) || '';
   return {
     topic: '',
     subject,
@@ -130,16 +133,35 @@ export default function TodayView({
   );
   const prescription = useMemo(() => chooseNextSubject(ladder), [ladder]);
   const weakSpots = useMemo(() => buildWeakSpots(mistakes), [mistakes]);
-  const questionSearch = useMemo(() => buildQuestionSearch({
-    weakSpots,
-    prescription,
-    mySubjects,
-  }), [weakSpots, prescription, mySubjects]);
+  const recommendationSubjects = useMemo(
+    () => getRecommendationSubjects(mySubjects, subjects),
+    [mySubjects, subjects],
+  );
+  const preferredRecommendationSubject = useMemo(() => {
+    const weakSpotSubject = weakSpots.find((spot) => recommendationSubjects.includes(spot?.subject))?.subject;
+    return weakSpotSubject || prescription?.subject || recommendationSubjects[0] || '';
+  }, [weakSpots, prescription, recommendationSubjects]);
+  const [activeRecommendationSubject, setActiveRecommendationSubject] = useState('');
   const [questionRecommendations, setQuestionRecommendations] = useState([]);
   const [questionRecommendationContext, setQuestionRecommendationContext] = useState('');
   const [questionRecommendationError, setQuestionRecommendationError] = useState('');
   const [questionRecommendationsLoading, setQuestionRecommendationsLoading] = useState(false);
-  const [excludedQuestionKeys, setExcludedQuestionKeys] = useState([]);
+  const [excludedQuestionKeysBySubject, setExcludedQuestionKeysBySubject] = useState({});
+
+  useEffect(() => {
+    setActiveRecommendationSubject((current) => (
+      recommendationSubjects.includes(current) ? current : preferredRecommendationSubject
+    ));
+  }, [preferredRecommendationSubject, recommendationSubjects]);
+
+  const questionSearch = useMemo(() => buildQuestionSearch({
+    weakSpots,
+    subject: activeRecommendationSubject,
+  }), [weakSpots, activeRecommendationSubject]);
+  const excludedQuestionKeys = useMemo(
+    () => excludedQuestionKeysBySubject[activeRecommendationSubject] || [],
+    [activeRecommendationSubject, excludedQuestionKeysBySubject],
+  );
 
   const prescribedPaper = useMemo(() => choosePrescribedPaper({
     papers,
@@ -228,11 +250,15 @@ export default function TodayView({
   }, [questionSearch.contextLabel, questionSearch.topic, questionSearch.subject, selectedLevel, excludedQuestionKeys]);
 
   const refreshQuestionRecommendations = useCallback(() => {
-    setExcludedQuestionKeys((current) => {
+    setExcludedQuestionKeysBySubject((current) => {
       const additions = questionRecommendations.map((result) => String(result?.key || '')).filter(Boolean);
-      return [...current, ...additions].slice(-40);
+      const previous = current[activeRecommendationSubject] || [];
+      return {
+        ...current,
+        [activeRecommendationSubject]: [...previous, ...additions].slice(-40),
+      };
     });
-  }, [questionRecommendations]);
+  }, [activeRecommendationSubject, questionRecommendations]);
 
   // Wording is drawn from a pool, seeded by the day, rather than generated.
   const seed = daySeed();
@@ -331,7 +357,10 @@ export default function TodayView({
           loading={questionRecommendationsLoading}
           onOpenQuestion={onOpenCachedQuestion}
           onRefresh={refreshQuestionRecommendations}
+          onSubjectSelect={setActiveRecommendationSubject}
           questions={questionRecommendations}
+          selectedSubject={activeRecommendationSubject}
+          subjects={recommendationSubjects}
         />
 
         <div className="sec-head">

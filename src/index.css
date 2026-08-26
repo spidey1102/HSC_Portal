@@ -3508,3 +3508,54 @@ textarea:focus,
   .home-question-recommendation-card:active:not(:disabled) { transform: none; }
   .home-question-recommendations-skeleton { animation: none; }
 }
+
+/* Subject tabs for home-page question recommendations */
+.home-question-recommendations-tabs {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding: 1px 1px 4px;
+  scrollbar-width: thin;
+}
+
+.home-question-recommendations-tab {
+  flex: none;
+  padding: 7px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-secondary) 72%, transparent);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 750;
+  line-height: 1.15;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
+  white-space: nowrap;
+}
+
+.home-question-recommendations-tab:hover {
+  border-color: color-mix(in srgb, var(--brand-experiment) 48%, var(--border-subtle));
+  color: var(--text-normal);
+}
+
+.home-question-recommendations-tab.is-active {
+  border-color: var(--brand-experiment);
+  background: color-mix(in srgb, var(--brand-experiment) 16%, var(--bg-primary));
+  color: var(--brand-experiment);
+}
+
+.home-question-recommendations-tab:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand-experiment) 35%, transparent);
+  outline-offset: 2px;
+}
+
+.home-question-recommendations-panel:focus { outline: none; }
+
+@media (max-width: 620px) {
+  .home-question-recommendations-tabs { margin-inline: -2px; }
+  .home-question-recommendations-tab { padding: 7px 9px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-question-recommendations-tab { transition: none; }
+}
