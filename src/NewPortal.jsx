@@ -780,6 +780,7 @@ export default function NewPortal({ onPortalLayoutChange }) {
             satPaperIds={satPaperIds}
             showPrescription={appearance.showRecommendations !== false}
             onBeginSitting={beginSitting}
+            onOpenCachedQuestion={openCachedQuestion}
             onOpenSubject={(subjectName) => {
               setLibraryQuery(subjectName.toLowerCase());
               setSection('library');

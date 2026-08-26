@@ -111,6 +111,7 @@ export async function searchCachedQuestions({
   topic = '',
   subject = '',
   difficulty = 'any',
+  level = null,
   excludeQuestionKeys = [],
 } = {}) {
   const sql = getSupabaseSql();
@@ -119,6 +120,8 @@ export async function searchCachedQuestions({
   const wantedDifficulty = ['any', 'challenging', 'stretch'].includes(String(difficulty || '').toLowerCase())
     ? String(difficulty || 'any').toLowerCase()
     : 'any';
+  const requestedLevel = Number(level);
+  const wantedLevel = [11, 12].includes(requestedLevel) ? requestedLevel : null;
   const excluded = new Set((Array.isArray(excludeQuestionKeys) ? excludeQuestionKeys : [])
     .slice(-MAX_EXCLUDED_KEYS)
     .map((key) => String(key || ''))
@@ -143,6 +146,7 @@ export async function searchCachedQuestions({
     if (wantedSubject && !normalisedSubjectName.includes(wantedSubject) && !wantedSubject.includes(normalisedSubjectName)) {
       continue;
     }
+    if (wantedLevel && paper.l !== wantedLevel) continue;
 
     const questions = Array.isArray(row.questions) ? row.questions : [];
     for (const question of questions) {
@@ -231,6 +235,7 @@ export async function searchCachedQuestions({
     topic: String(topic || '').trim(),
     subject: String(subject || '').trim(),
     difficulty: wantedDifficulty,
+    level: wantedLevel,
     found: candidates.length,
     returned: selected.length,
     questions: selected,
