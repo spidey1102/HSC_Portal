@@ -48,7 +48,7 @@ jobs:
         run: npm ci
 
       - name: Build DMG
-        run: npx electron-builder --mac dmg --${{ matrix.architecture }}
+        run: npx electron-builder --mac dmg --${{ matrix.architecture }} --publish never
 
       - name: Upload DMG to the selected release
         env:
