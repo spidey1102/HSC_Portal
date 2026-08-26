@@ -16,14 +16,14 @@
   },
   "redirects": [
     {
-      "source": "/(?<path>(?!api(?:/|$)).*)",
+      "source": "/:path((?!api(?:/|$)).*)",
       "has": [
         {
           "type": "host",
           "value": "hscportal\\.vercel\\.app"
         }
       ],
-      "destination": "https://www.hscportal.app/$path",
+      "destination": "https://www.hscportal.app/:path*",
       "permanent": true
     }
   ],
