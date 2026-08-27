@@ -364,7 +364,7 @@ export default function PracticeRoom({
   // Build the PDF URL: prefer Cloudflare Pages if paper.cf is present,
   // otherwise fall back to the old THSC Online viewer so unmatched papers still work.
   const directIframeUrl = paper?.cf
-    ? `https://hscportal.pages.dev/${encodeURI(paper.cf)}`
+    ? `https://33e1573d.hscportal-hidden.pages.dev/${encodeURI(paper.cf)}`
     : `https://thsconline.github.io/s/viewer.html?field=${encodeURIComponent(paper?.n ?? '')}&base=${paper?.v ?? ''}`;
   const viewUrl = pdfBlobUrl || directIframeUrl;
   const paperCategory = paper.c === 'H' ? 'Official HSC' : paper.c === 'T' ? 'School trial' : paper.c === 'A' ? 'Assessment task' : 'Resource';

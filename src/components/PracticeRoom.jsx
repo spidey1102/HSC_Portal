@@ -584,7 +584,7 @@ export default function PracticeRoom({
   // Papers with a Cloudflare path are real PDFs and render in the portal's own
   // viewer. Anything else only exists behind the legacy viewer page, which is
   // HTML — it stays in a frame rather than being passed to pdf.js as a PDF.
-  const pdfUrl = paper?.cf ? `https://hscportal.pages.dev/${encodeURI(paper.cf)}` : null;
+  const pdfUrl = paper?.cf ? `https://33e1573d.hscportal-hidden.pages.dev/${encodeURI(paper.cf)}` : null;
   const legacyUrl = `https://thsconline.github.io/s/viewer.html?field=${encodeURIComponent(paper?.n ?? '')}&base=${paper?.v ?? ''}`;
 
   const handlePrintOrDownload = useCallback(() => {
