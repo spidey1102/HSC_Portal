@@ -18,6 +18,7 @@ import {
 } from '../utils/practiceLadder';
 import { EMPTY_WEAK_SPOTS, WEAK_SPOT_NOTE, daySeed, pick } from '../utils/copyPool';
 import { getPaperIdentity } from '../utils/paperIdentity';
+import { authenticatedFetch } from '../utils/authenticatedFetch.js';
 import HomeQuestionRecommendations from './HomeQuestionRecommendations';
 
 const LADDER_COLUMNS = '26px minmax(0, 1fr) 128px 96px 116px 78px';
@@ -183,7 +184,7 @@ export default function TodayView({
     let cancelled = false;
 
     const requestCachedQuestions = async (search) => {
-      const response = await fetch('/api/agent-chat', {
+      const response = await authenticatedFetch('/api/agent-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -9,6 +9,7 @@
 import { getPaperIdentity } from './paperIdentity.js';
 import { findAgenticPaperMatches } from './agenticPaperSearch.js';
 import { getOpenRouterRequestHeaders } from './openRouterKeySettings.js';
+import { authenticatedFetch } from './authenticatedFetch.js';
 import { buildWeakSpots, chooseNextSubject, findAllowance, getAllowanceForRung } from './practiceLadder.js';
 import { saveMistake } from './practiceRecords.js';
 import { buildConversationContext, getCachedQuestionResultKeys } from './agentConversation.js';
@@ -412,7 +413,7 @@ export async function executeTool(toolName, args, appContext) {
   };
 
   const requestCachedQuestions = async ({ topic, subject, difficulty }) => {
-    const response = await fetch('/api/agent-chat', {
+    const response = await authenticatedFetch('/api/agent-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -888,7 +889,7 @@ export async function runAgent(userMessage, appContext, { onStep, signal, histor
 
     let response;
     try {
-      response = await fetch('/api/agent-chat', {
+      response = await authenticatedFetch('/api/agent-chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

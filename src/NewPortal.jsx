@@ -13,9 +13,7 @@ import PaperHistory from './components/PaperHistory';
 import StudyNotebook from './components/StudyNotebook';
 import AgentCommandCenter from './components/AgentCommandCenter';
 import CustomizationMenu from './components/CustomizationMenu';
-import FirebaseResetNotice from './components/FirebaseResetNotice';
-import { InstallDialog, SignInDialog } from './components/SyncInstallDialogs';
-import OnboardingWizard, { hasCompletedOnboarding } from './components/OnboardingWizard';
+import { InstallDialog } from './components/SyncInstallDialogs';
 
 import { findPaperByIdentifier, getPaperIdentity, getPaperRouteId } from './utils/paperIdentity';
 import { loadMySubjects, saveMySubjects } from './utils/mySubjects';
@@ -57,7 +55,6 @@ import './App.css';
 import { useSync } from './components/SyncContext';
 import { useAuth } from './components/AuthContext';
 
-const FIREBASE_RESET_NOTICE_STORAGE_KEY = 'hsc_new_firebase_2026';
 const TIMER_STORAGE_KEY = 'hsc_timer_duration_secs';
 const TIMER_CEILING_SECONDS = 4 * 60 * 60;
 /** NSW written papers run three hours plus reading time; used to size the clock. */
@@ -76,71 +73,9 @@ function slugify(value) {
 
 export default function NewPortal({ onPortalLayoutChange }) {
   const { data, updateRemote, updateRemoteFields } = useSync();
-  const { user, loading: authLoading, signInWithGoogle } = useAuth();
+  const { user } = useAuth();
 
-  const [showSignInPrompt, setShowSignInPrompt] = useState(false);
-  const [showFirebaseResetNotice, setShowFirebaseResetNotice] = useState(false);
   const [showInstallDialog, setShowInstallDialog] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-
-  useEffect(() => {
-    try {
-      setShowFirebaseResetNotice(!localStorage.getItem(FIREBASE_RESET_NOTICE_STORAGE_KEY));
-    } catch (error) {
-      // If storage is unavailable, continue to make the migration notice visible for this visit.
-      setShowFirebaseResetNotice(true);
-    }
-  }, []);
-
-  // First visit opens the questionnaire; the bare sign-in prompt is only used
-  // for returning students who set up before onboarding existed.
-  useEffect(() => {
-    if (authLoading) return;
-    if (!hasCompletedOnboarding()) {
-      setShowOnboarding(true);
-      return;
-    }
-    const hasSeenPrompt = localStorage.getItem('hsc_has_seen_signin_prompt');
-    if (!hasSeenPrompt && !user) setShowSignInPrompt(true);
-  }, [authLoading, user]);
-
-  const handleSignIn = async () => {
-    try {
-      await signInWithGoogle();
-      localStorage.setItem('hsc_has_seen_signin_prompt', 'true');
-      setShowSignInPrompt(false);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const completeOnboarding = useCallback(({ subjects: chosen, level, startStyle }) => {
-    setMySubjects(chosen);
-    setSelectedLevel(level);
-    setSection(startStyle === 'browse' ? 'library' : 'today');
-    setShowOnboarding(false);
-    setShowSignInPrompt(false);
-    try {
-      localStorage.setItem('hsc_has_seen_signin_prompt', 'true');
-    } catch (error) {
-      // The prompt simply reappears next visit if storage is unavailable.
-    }
-    notifyStudySyncUpdate();
-  }, []);
-
-  const handleSkipSignIn = () => {
-    localStorage.setItem('hsc_has_seen_signin_prompt', 'true');
-    setShowSignInPrompt(false);
-  };
-
-  const dismissFirebaseResetNotice = () => {
-    try {
-      localStorage.setItem(FIREBASE_RESET_NOTICE_STORAGE_KEY, 'acknowledged');
-    } catch (error) {
-      // The state update still lets a user continue when browser storage is unavailable.
-    }
-    setShowFirebaseResetNotice(false);
-  };
 
   // Library data
   const [subjects, setSubjects] = useState([]);
@@ -690,10 +625,6 @@ export default function NewPortal({ onPortalLayoutChange }) {
     schedule.myExams, satPaperIds, beginSitting, openCachedQuestion,
   ]);
 
-  const firebaseResetNotice = (
-    <FirebaseResetNotice isOpen={showFirebaseResetNotice} onDismiss={dismissFirebaseResetNotice} />
-  );
-
   // ── The practice room takes over the whole page ─────────────────────────
   if (paperRouteId) {
     if (loading) {
@@ -703,7 +634,6 @@ export default function NewPortal({ onPortalLayoutChange }) {
             <RefreshCw size={26} className="spin" />
             <h3 style={{ marginTop: '12px' }}>Loading paper</h3>
           </div>
-          {firebaseResetNotice}
           <Analytics />
         </div>
       );
@@ -718,7 +648,6 @@ export default function NewPortal({ onPortalLayoutChange }) {
             <p className="card-body">{error || 'This link does not match a paper in the index.'}</p>
             <button type="button" className="btn btn-primary" onClick={closePaper}>Back to the portal</button>
           </div>
-          {firebaseResetNotice}
           <Analytics />
         </div>
       );
@@ -738,7 +667,6 @@ export default function NewPortal({ onPortalLayoutChange }) {
           onSelectPaper={openPaper}
           agentContext={agentContext}
         />
-        {firebaseResetNotice}
       </>
     );
   }
@@ -884,27 +812,8 @@ export default function NewPortal({ onPortalLayoutChange }) {
         appContext={agentContext}
       />
 
-      <OnboardingWizard
-        isOpen={showOnboarding && !showFirebaseResetNotice && !loading}
-        portalSubjects={subjects}
-        initialSubjects={mySubjects}
-        appearance={appearance}
-        onAppearanceChange={updateAppearance}
-        onSignIn={handleSignIn}
-        isSignedIn={Boolean(user)}
-        onComplete={completeOnboarding}
-        onDismiss={() => setShowOnboarding(false)}
-      />
-
-      <SignInDialog
-        isOpen={showSignInPrompt && !showOnboarding && !showFirebaseResetNotice}
-        onSignIn={handleSignIn}
-        onDismiss={handleSkipSignIn}
-      />
-
       <InstallDialog isOpen={showInstallDialog} onClose={() => setShowInstallDialog(false)} />
 
-      {firebaseResetNotice}
       <Analytics />
     </div>
   );

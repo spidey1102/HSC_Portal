@@ -3,6 +3,7 @@ import { runAgent } from '../utils/agentHarness.js';
 import { resolveLocally } from '../utils/localAgent.js';
 import { usePresence } from '../utils/usePresence.js';
 import { useEscapeKey } from '../utils/useEscapeKey.js';
+import { authenticatedFetch } from '../utils/authenticatedFetch.js';
 import {
   AGENT_COMMAND_CONVERSATION_SCOPE,
   clearConversation,
@@ -149,7 +150,7 @@ export default function AgentCommandCenter({ appContext, isOpen, onClose }) {
     handleClear();
 
     try {
-      const response = await fetch(`/api/agent/paper-context?paperId=${encodeURIComponent(paper.v)}&paperName=${encodeURIComponent(paper.n)}`);
+      const response = await authenticatedFetch(`/api/agent/paper-context?paperId=${encodeURIComponent(paper.v)}&paperName=${encodeURIComponent(paper.n)}`);
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.error || 'The selected paper could not be prepared.');
 

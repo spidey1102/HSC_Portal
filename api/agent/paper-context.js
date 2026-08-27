@@ -1,5 +1,6 @@
 import { resolve } from 'path'
 import { getPaperSourceFingerprint, loadPaperRecord } from '../lib/paperSource.js'
+import { requireApiAuth } from '../lib/requireApiAuth.js'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { WorkerMessageHandler } from 'pdfjs-dist/legacy/build/pdf.worker.mjs'
 
@@ -138,6 +139,9 @@ export async function extractFullPaperText(paper, { timeoutMs } = {}) {
 }
 
 export default async function handler(req, res) {
+  const user = await requireApiAuth(req, res)
+  if (!user) return
+
   if (req.method !== 'GET') {
     res.statusCode = 405
     res.setHeader('Content-Type', 'application/json')

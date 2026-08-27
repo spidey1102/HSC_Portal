@@ -3,6 +3,7 @@ import { resolve } from 'path'
 import { generateMockAnswer } from '../../openrouterHandler.js'
 import { resolveOpenRouterKey } from '../../openRouterKeyResolver.js'
 import { SHARED_OPENROUTER_MODEL, getCompletionRoute, userSafeProviderError } from '../../openRouterRouting.js'
+import { requireApiAuth } from '../lib/requireApiAuth.js'
 
 async function readJsonBody(req) {
   let body = ''
@@ -11,6 +12,9 @@ async function readJsonBody(req) {
 }
 
 export default async function handler(req, res) {
+  const user = await requireApiAuth(req, res)
+  if (!user) return
+
   if (req.method !== 'POST') {
     res.statusCode = 405
     res.setHeader('Content-Type', 'application/json')

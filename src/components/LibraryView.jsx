@@ -19,11 +19,34 @@ function englishTrialPaperPart(paper, subjectName) {
   return match ? `Paper ${match[1]}` : '';
 }
 
+// The HSC_DEV_HIDE index keeps source names in each paper title and deliberately
+// uses one generic directory entry. Prefer its descriptive paper title in that
+// case, while retaining the normal school display for the redesigned main index.
+function displayPaperSource(paper, schools) {
+  const school = String(schools?.[paper?.h] || '').trim();
+  return school && !/^unlisted source$/i.test(school) ? school : String(paper?.n || 'Past paper');
+}
+
+function paperYearLabel(paper) {
+  const year = String(paper?.y || '').trim();
+  if (!year) return '';
+  return new RegExp(`(?:^|\\D)${year}(?:\\D|$)`).test(String(paper?.n || '')) ? '' : year;
+}
+
 const ONLY_FILTERS = [
   { id: 'all', label: 'Everything' },
   { id: 'solutions', label: 'With solutions' },
   { id: 'unsat', label: 'Not yet sat' },
   { id: 'saved', label: 'Saved' },
+];
+
+// These source classes are carried across from HSC_DEV_HIDE's paper index.
+// `null` deliberately means every library record, matching the prior default.
+const COLLECTION_FILTERS = [
+  { id: 'all', label: 'All sources', value: null },
+  { id: 'unlisted', label: 'Unlisted', value: 'U' },
+  { id: 'low-quality', label: 'Low quality', value: 'L' },
+  { id: 'external', label: 'External', value: 'E' },
 ];
 
 /**
@@ -53,7 +76,7 @@ function QuickStart({
     <div className={`quickstart is-${presence.stage} ${docked ? 'is-docked' : ''}`}>
       <div style={{ flex: '1 1 240px', minWidth: 0 }}>
         <div style={{ fontFamily: 'var(--font-heading)', fontSize: '17px' }}>
-          {schools[shown.h] || shown.n} {shown.y}{' '}
+          {displayPaperSource(shown, schools)} {paperYearLabel(shown)}{' '}
           <span className="num dim" style={{ fontFamily: 'var(--font-body)', fontSize: '12.5px' }}>
             · {subjects[shown.s]}{paperPart ? ` · ${paperPart}` : ''}{shown.w === 1 ? ' · solutions' : ''} · {timing.label}
           </span>
@@ -112,6 +135,7 @@ export default function LibraryView({
 }) {
   const [schoolFilter, setSchoolFilter] = useState('');
   const [onlyFilter, setOnlyFilter] = useState('all');
+  const [collectionFilter, setCollectionFilter] = useState(null);
   const [limit, setLimit] = useState(PAGE_SIZE);
   const [activeIdentity, setActiveIdentity] = useState(null);
   const [allowanceId, setAllowanceId] = useState(null);
@@ -150,15 +174,17 @@ export default function LibraryView({
     const schoolTerm = schoolFilter.trim().toLowerCase();
 
     const filtered = searched.filter((paper) => {
-      if (schoolTerm && !String(schools[paper.h] || '').toLowerCase().includes(schoolTerm)) return false;
+      const searchableSource = [schools[paper.h], paper.n, paper.cf].filter(Boolean).join(' ').toLowerCase();
+      if (schoolTerm && !searchableSource.includes(schoolTerm)) return false;
       if (onlyFilter === 'solutions' && paper.w !== 1) return false;
       if (onlyFilter === 'unsat' && satPaperIds.has(getPaperIdentity(paper))) return false;
       if (onlyFilter === 'saved' && !bookmarks.has(`${paper.v}_${paper.n}`)) return false;
+      if (collectionFilter && paper.col !== collectionFilter) return false;
       return true;
     });
 
     return sortPapers(filtered, sortMode, { consensus, schools });
-  }, [searched, schoolFilter, onlyFilter, satPaperIds, bookmarks, schools, sortMode, consensus]);
+  }, [searched, schoolFilter, onlyFilter, collectionFilter, satPaperIds, bookmarks, schools, sortMode, consensus]);
 
   // Subject counts are read from the level, not the search, so the facet list
   // stays a stable table of contents rather than collapsing as you type.
@@ -174,7 +200,7 @@ export default function LibraryView({
   const subjectFacet = parsed.facets.find((facet) => facet.type === 'subject');
   const activeSubjectIndex = subjectFacet ? subjectFacet.value : null;
 
-  useEffect(() => { setLimit(PAGE_SIZE); }, [query, selectedLevel, schoolFilter, onlyFilter, sortMode]);
+  useEffect(() => { setLimit(PAGE_SIZE); }, [query, selectedLevel, schoolFilter, onlyFilter, collectionFilter, sortMode]);
 
   useEffect(() => {
     const target = sentinelRef.current;
@@ -325,10 +351,10 @@ export default function LibraryView({
             )}
           </div>
 
-          <div className="kick">School</div>
+          <div className="kick">School or source</div>
           <input
             className="input"
-            placeholder="Filter schools"
+            placeholder="Filter school or source"
             value={schoolFilter}
             onChange={(event) => setSchoolFilter(event.target.value)}
             style={{ margin: '8px 0 20px' }}
@@ -343,6 +369,22 @@ export default function LibraryView({
                   name="library-only"
                   checked={onlyFilter === filter.id}
                   onChange={() => setOnlyFilter(filter.id)}
+                />
+                <span className="dot" />
+                <span>{filter.label}</span>
+              </label>
+            ))}
+          </div>
+
+          <div className="kick" style={{ marginTop: '20px' }}>Paper source</div>
+          <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '7px' }}>
+            {COLLECTION_FILTERS.map((filter) => (
+              <label key={filter.id} className="radio">
+                <input
+                  type="radio"
+                  name="library-source"
+                  checked={collectionFilter === filter.value}
+                  onChange={() => setCollectionFilter(filter.value)}
                 />
                 <span className="dot" />
                 <span>{filter.label}</span>
@@ -401,7 +443,7 @@ export default function LibraryView({
           {layout === 'index' && (
             <div className="idxrow h" style={{ gridTemplateColumns: INDEX_COLUMNS }}>
               <span>№</span>
-              <span>School &amp; year</span>
+              <span>Source &amp; year</span>
               <span className="hide-narrow">Type</span>
               <span className="hide-narrow">Time</span>
               <span className="hide-narrow">Sol.</span>
@@ -432,7 +474,7 @@ export default function LibraryView({
                     className={`paper-card-tile ${isActive ? 'on' : ''} ${isSat ? 'is-sat' : ''}`}
                     role="button"
                     tabIndex={0}
-                    title={consensus.explain(paper, schools[paper.h])}
+                    title={consensus.explain(paper, displayPaperSource(paper, schools))}
                     onClick={() => {
                       setActiveIdentity(isActive ? null : identity);
                       setAllowanceId(null);
@@ -469,8 +511,8 @@ export default function LibraryView({
                       </span>
                     </span>
 
-                    <span className="paper-card-title">{schools[paper.h] || paper.n}</span>
-                    <span className="num dim paper-card-year">{paper.y} · {subjects[paper.s]}</span>
+                    <span className="paper-card-title">{displayPaperSource(paper, schools)}</span>
+                    <span className="num dim paper-card-year">{[paperYearLabel(paper), subjects[paper.s]].filter(Boolean).join(' · ')}</span>
                     {paperPart && <span className="paper-card-subsection">{paperPart}</span>}
 
                     <span className="paper-card-time num dim" title={timing.detail}>
@@ -543,8 +585,8 @@ export default function LibraryView({
                 >
                   <span className="num dim" style={{ fontSize: '12px' }}>{position + 1}</span>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <span className="idxrow-title">{schools[paper.h] || paper.n}</span>{' '}
-                    <span className="num dim">{paper.y}</span>{paperPart && <span className="idxrow-paper-part"> · {paperPart}</span>}
+                    <span className="idxrow-title">{displayPaperSource(paper, schools)}</span>{' '}
+                    {paperYearLabel(paper) && <span className="num dim">{paperYearLabel(paper)}</span>}{paperPart && <span className="idxrow-paper-part"> · {paperPart}</span>}
                   </span>
                   <span className="dim hide-narrow" style={{ fontSize: '12.5px' }}>{PAPER_TYPES[paper.c] || '—'}</span>
                   <span className="num dim hide-narrow" style={{ fontSize: '12.5px' }} title={timing.detail}>{timing.label}</span>

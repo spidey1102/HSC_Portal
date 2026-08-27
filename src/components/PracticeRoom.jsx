@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import { getPaperIdentity } from '../utils/paperIdentity';
+import { authenticatedFetch } from '../utils/authenticatedFetch.js';
 import { useAuth } from './AuthContext';
 import PracticeReviewModal from './PracticeReviewModal';
 import PdfDocument from './pdf/PdfDocument';
@@ -258,7 +259,7 @@ export default function PracticeRoom({
     const controller = new AbortController();
     setPaperContext({ status: 'loading', text: '', pagesExtracted: 0, pageStart: 0, pageEnd: 0, totalPages: 0, reason: '' });
 
-    fetch(`/api/agent/paper-context?paperId=${encodeURIComponent(paper.v)}&paperName=${encodeURIComponent(paper.n)}`, {
+    authenticatedFetch(`/api/agent/paper-context?paperId=${encodeURIComponent(paper.v)}&paperName=${encodeURIComponent(paper.n)}`, {
       signal: controller.signal,
     })
       .then(async (response) => {

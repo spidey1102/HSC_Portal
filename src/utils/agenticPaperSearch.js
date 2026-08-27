@@ -1,3 +1,5 @@
+import { authenticatedFetch } from './authenticatedFetch.js';
+
 const STOP_WORDS = new Set([
   'a',
   'an',
@@ -363,7 +365,7 @@ export async function findAgenticPaperMatchesAsync(query, papers = [], subjects 
 
   // No subject matched locally. Fallback to OpenRouter LLM parsing.
   try {
-    const res = await fetch('/api/agent-search', {
+    const res = await authenticatedFetch('/api/agent-search', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

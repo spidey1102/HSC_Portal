@@ -9,7 +9,6 @@ import PaperSearch from './components/PaperSearch';
 import AdaptiveRecommendations from './components/AdaptiveRecommendations';
 import AgentCommandCenter from './components/AgentCommandCenter';
 import CustomizationMenu from './components/CustomizationMenu';
-import FirebaseResetNotice from './components/FirebaseResetNotice';
 import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock, BotMessageSquare, Palette, BookOpenCheck } from 'lucide-react';
 import PaperHistory from './components/PaperHistory';
 import StudyNotebook from './components/StudyNotebook';
@@ -54,7 +53,6 @@ import { useAuth } from './components/AuthContext';
 import UserButton from './components/UserButton';
 
 const PAPER_PAGE_SIZE = 40;
-const FIREBASE_RESET_NOTICE_STORAGE_KEY = 'hsc_new_firebase_2026';
 const PAPER_SORT_OPTIONS = [
   { value: 'newest', label: 'Newest first' },
   { value: 'oldest', label: 'Oldest first' },
@@ -64,52 +62,7 @@ const PAPER_SORT_OPTIONS = [
 
 export default function App({ onPortalLayoutChange }) {
   const { data, updateRemote, updateRemoteFields } = useSync();
-  const { user, loading: authLoading, signInWithGoogle } = useAuth();
-  
-  const [showSignInPrompt, setShowSignInPrompt] = useState(false);
-  const [showFirebaseResetNotice, setShowFirebaseResetNotice] = useState(false);
-
-  useEffect(() => {
-    try {
-      setShowFirebaseResetNotice(!localStorage.getItem(FIREBASE_RESET_NOTICE_STORAGE_KEY));
-    } catch (error) {
-      // If storage is unavailable, continue to make the migration notice visible for this visit.
-      setShowFirebaseResetNotice(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!authLoading) {
-      const hasSeenPrompt = localStorage.getItem('hsc_has_seen_signin_prompt');
-      if (!hasSeenPrompt && !user) {
-        setShowSignInPrompt(true);
-      }
-    }
-  }, [authLoading, user]);
-
-  const handleSignIn = async () => {
-    try {
-      await signInWithGoogle();
-      localStorage.setItem('hsc_has_seen_signin_prompt', 'true');
-      setShowSignInPrompt(false);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleSkipSignIn = () => {
-    localStorage.setItem('hsc_has_seen_signin_prompt', 'true');
-    setShowSignInPrompt(false);
-  };
-
-  const dismissFirebaseResetNotice = () => {
-    try {
-      localStorage.setItem(FIREBASE_RESET_NOTICE_STORAGE_KEY, 'acknowledged');
-    } catch (error) {
-      // The state update still lets a user continue when browser storage is unavailable.
-    }
-    setShowFirebaseResetNotice(false);
-  };
+  const { user } = useAuth();
 
   // DB States
   const [subjects, setSubjects] = useState([]);
@@ -934,13 +887,6 @@ export default function App({ onPortalLayoutChange }) {
             ? 'Review your practice, capture useful mistakes, and turn them into next steps.'
             : 'Browse official papers, trial exams, and resources without the clutter.';
 
-  const firebaseResetNotice = (
-    <FirebaseResetNotice
-      isOpen={showFirebaseResetNotice}
-      onDismiss={dismissFirebaseResetNotice}
-    />
-  );
-
   if (paperRouteId) {
     if (loading) {
         return (
@@ -949,7 +895,6 @@ export default function App({ onPortalLayoutChange }) {
               <RefreshCw size={28} color="var(--text-muted)" className="spin" />
               <h3 style={{ marginTop: '12px', color: 'var(--header-primary)' }}>Loading paper</h3>
             </div>
-            {firebaseResetNotice}
             <Analytics />
           </div>
         );
@@ -965,7 +910,6 @@ export default function App({ onPortalLayoutChange }) {
                 Back to home
               </button>
             </div>
-            {firebaseResetNotice}
             <Analytics />
           </div>
         );
@@ -981,7 +925,6 @@ export default function App({ onPortalLayoutChange }) {
                 Back to home
               </button>
             </div>
-            {firebaseResetNotice}
             <Analytics />
           </div>
         );
@@ -1010,7 +953,6 @@ export default function App({ onPortalLayoutChange }) {
             openRouterSettings,
           }}
         />
-        {firebaseResetNotice}
       </>
     );
   }
@@ -1365,9 +1307,7 @@ export default function App({ onPortalLayoutChange }) {
         </div>
       </main>
 
-      {firebaseResetNotice}
-
-      {/* Vercel Web Analytics */}
+            {/* Vercel Web Analytics */}
       <Analytics />
 
       {/* AI Agent Command Center */}
@@ -1386,25 +1326,6 @@ export default function App({ onPortalLayoutChange }) {
         }}
       />
 
-      {/* Sign In Prompt Overlay */}
-      {showSignInPrompt && !showFirebaseResetNotice && (
-        <div className="modal-overlay" style={{ zIndex: 9999 }}>
-          <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center', padding: '32px' }}>
-            <h2 style={{ marginTop: 0, marginBottom: '8px' }}>Sign In to Sync</h2>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', lineHeight: 1.5 }}>
-              Sign in with Google to save your bookmarks, assessments, and preferences across devices.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <button className="btn-primary" onClick={handleSignIn} style={{ padding: '12px', justifyContent: 'center' }}>
-                Sign In with Google
-              </button>
-              <button className="btn-secondary" onClick={handleSkipSignIn} style={{ padding: '12px', justifyContent: 'center' }}>
-                Skip for now
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
