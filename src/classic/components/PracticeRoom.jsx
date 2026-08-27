@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, RotateCcw, X, BookOpen, Clock, ChevronDown, ChevronUp, Sparkles, Check, ClipboardCheck, ListChecks } from 'lucide-react';
 import { getPaperIdentity } from '../utils/paperIdentity';
+import { authenticatedFetch } from '../../utils/authenticatedFetch.js';
 import { useAuth } from './AuthContext';
 import AgentCommandCenter from './AgentCommandCenter';
 import PracticeReviewModal from './PracticeReviewModal';
@@ -91,7 +92,7 @@ export default function PracticeRoom({
 
   const requestPaperContext = async (signal) => {
     const requestUrl = `/api/agent/paper-context?paperId=${encodeURIComponent(paper.v)}&paperName=${encodeURIComponent(paper.n)}`;
-    const response = await fetch(requestUrl, { signal });
+    const response = await authenticatedFetch(requestUrl, { signal });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload?.error || 'The complete paper could not be prepared.');
     return payload;

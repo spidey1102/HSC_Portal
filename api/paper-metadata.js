@@ -738,6 +738,9 @@ export default async function handler(req, res) {
   }
 
   try {
+    logPhase('verifying token');
+    await requireAuthenticatedUser(req);
+    logPhase('token verified');
     const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const paperId = requestUrl.searchParams.get('paperId');
     const paperName = requestUrl.searchParams.get('paperName');
@@ -759,14 +762,6 @@ export default async function handler(req, res) {
     }
 
     const sourceFingerprint = getPaperSourceFingerprint(paper);
-    // GET is deliberately public for reusable paper structure. Every POST is an
-    // analysis request and must authenticate before even returning a cache hit.
-    if (req.method === 'POST') {
-      logPhase('verifying token');
-      await requireAuthenticatedUser(req);
-      logPhase('token verified');
-    }
-
     logPhase('reading metadata cache');
     const initial = await readMetadata({ paper, sourceFingerprint });
     logPhase('metadata cache read', { status: initial.data?.status || initial.failure?.status || 'missing' });

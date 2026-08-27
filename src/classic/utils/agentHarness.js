@@ -9,6 +9,7 @@
 import { getPaperIdentity } from './paperIdentity.js';
 import { findAgenticPaperMatches } from './agenticPaperSearch.js';
 import { getOpenRouterRequestHeaders } from './openRouterKeySettings.js';
+import { authenticatedFetch } from '../../utils/authenticatedFetch.js';
 
 // ─── Tool Definitions (OpenAI function-calling schema) ────────────────────────
 
@@ -362,7 +363,7 @@ export async function runAgent(userMessage, appContext, { onStep, signal } = {})
 
     let response;
     try {
-      response = await fetch('/api/agent-chat', {
+      response = await authenticatedFetch('/api/agent-chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

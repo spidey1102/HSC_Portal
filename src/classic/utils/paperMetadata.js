@@ -1,3 +1,5 @@
+import { authenticatedFetch } from '../../utils/authenticatedFetch.js';
+
 export function createEmptyPaperMetadata(status = 'loading') {
   return {
     status,
@@ -40,7 +42,7 @@ function metadataRequestUrl(paper) {
 }
 
 async function readMetadataResponse(paper) {
-  const response = await fetch(metadataRequestUrl(paper));
+  const response = await authenticatedFetch(metadataRequestUrl(paper));
   const payload = await response.json().catch(() => ({}));
 
   if (response.status === 404) return createEmptyPaperMetadata('missing');
