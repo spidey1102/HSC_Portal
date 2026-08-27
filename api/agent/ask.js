@@ -3,7 +3,7 @@ import { resolve } from 'path'
 import { generateMockAnswer } from '../../openrouterHandler.js'
 import { resolveOpenRouterKey } from '../../openRouterKeyResolver.js'
 import { SHARED_OPENROUTER_MODEL, getCompletionRoute, userSafeProviderError } from '../../openRouterRouting.js'
-import { requireApiAuth } from '../lib/requireApiAuth.js'
+import { requireApiAuth } from '../../server/api/requireApiAuth.js'
 
 async function readJsonBody(req) {
   let body = ''

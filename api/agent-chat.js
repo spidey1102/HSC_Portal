@@ -1,5 +1,5 @@
 import { handleAgentChatRequest } from '../agentChatHandler.js';
-import { requireApiAuth } from './lib/requireApiAuth.js';
+import { requireApiAuth } from '../server/api/requireApiAuth.js';
 
 export default async function handler(req, res) {
   const user = await requireApiAuth(req, res);

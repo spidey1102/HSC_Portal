@@ -1,5 +1,5 @@
 import { getDeadline } from '@vercel/functions';
-import { requireAuthenticatedUser } from './lib/firebaseAdmin.js';
+import { requireAuthenticatedUser } from '../server/api/firebaseAdmin.js';
 import {
   claimPaperAnalysis,
   completePaperAnalysis,
@@ -11,7 +11,7 @@ import {
 import {
   getPaperSourceFingerprint,
   loadPaperRecord,
-} from './lib/paperSource.js';
+} from '../server/api/paperSource.js';
 import { getCompletionRoute, isRetryableProviderStatus, userSafeProviderError } from '../openRouterRouting.js';
 
 // This route only claims a shared job and returns immediately. The separate worker
