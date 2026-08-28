@@ -413,7 +413,7 @@ class PaperAnalysisProviderError extends Error {
   }
 }
 
-async function requestPaperAnalysis({ prompt, apiKey, route, timeoutMs }) {
+async function requestPaperAnalysis({ prompt, apiKey, route, timeoutMs, paperUrl = '' }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -422,6 +422,18 @@ async function requestPaperAnalysis({ prompt, apiKey, route, timeoutMs }) {
       route,
       keySelection: { source: 'server' },
     });
+    const userContent = paperUrl
+      ? [
+        { type: 'text', text: prompt },
+        {
+          type: 'file',
+          file: {
+            filename: 'hsc-paper.pdf',
+            file_data: paperUrl,
+          },
+        },
+      ]
+      : prompt;
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -433,9 +445,17 @@ async function requestPaperAnalysis({ prompt, apiKey, route, timeoutMs }) {
       signal: controller.signal,
       body: JSON.stringify({
         ...completionRoute,
+        ...(paperUrl ? {
+          plugins: [
+            {
+              id: 'file-parser',
+              pdf: { engine: 'cloudflare-ai' },
+            },
+          ],
+        } : {}),
         messages: [
           { role: 'system', content: 'Return only strictly valid JSON. Never include markdown fences.' },
-          { role: 'user', content: prompt },
+          { role: 'user', content: userContent },
         ],
         max_tokens: MAX_ANALYSIS_OUTPUT_TOKENS,
         temperature: 0,
@@ -472,7 +492,7 @@ async function requestPaperAnalysis({ prompt, apiKey, route, timeoutMs }) {
   }
 }
 
-export async function callPaperAnalysis(prompt, { timeoutMs = ANALYSIS_PROVIDER_TIMEOUT_MS } = {}) {
+export async function callPaperAnalysis(prompt, { timeoutMs = ANALYSIS_PROVIDER_TIMEOUT_MS, paperUrl = '' } = {}) {
   const apiKey = String(process.env.OPENROUTER_API_KEY || '').trim();
   if (!apiKey) throw new Error('The portal AI key is not configured for paper analysis.');
 
@@ -483,6 +503,7 @@ export async function callPaperAnalysis(prompt, { timeoutMs = ANALYSIS_PROVIDER_
       apiKey,
       route: 'paperMetadataPrimary',
       timeoutMs,
+      paperUrl,
     });
   } catch (error) {
     // The alternate Flash Lite model has a separate model quota. Retrying is only
@@ -496,6 +517,7 @@ export async function callPaperAnalysis(prompt, { timeoutMs = ANALYSIS_PROVIDER_
       apiKey,
       route: 'paperMetadataFallback',
       timeoutMs: remainingMs,
+      paperUrl,
     });
   }
 }
@@ -637,7 +659,7 @@ export async function runPaperAnalysisWorker({ paper, sourceFingerprint, request
     // pdf.js and its worker bundle are loaded only inside the separate, long-running
     // analysis route. The short job-claim route must be able to respond before
     // these expensive modules initialise on a cold invocation.
-    const { extractFullPaperText } = await import('./agent/paper-context.js');
+    const { extractFullPaperText, paperUrl } = await import('./agent/paper-context.js');
     console.info('[paper-metadata] deferred analysis started', { paperId: String(paper.v) });
     const extractionBudgetMs = remainingBudgetMs(requestStartedAt);
     if (extractionBudgetMs < MIN_PROVIDER_TIMEOUT_MS) {
@@ -645,11 +667,14 @@ export async function runPaperAnalysisWorker({ paper, sourceFingerprint, request
     }
 
     const extracted = await extractFullPaperText(paper, { timeoutMs: extractionBudgetMs });
-    if (extracted.status !== 'ready' || !extracted.text) {
+    const isImageOnlyScan = extracted.status !== 'ready'
+      && /does not expose selectable text/i.test(String(extracted.reason || ''));
+    if (!extracted.text && !isImageOnlyScan) {
       throw new Error(extracted.reason || 'The PDF does not expose readable text for question extraction.');
     }
 
-    const sourceProblem = readableSourceProblem({ paper, paperText: extracted.text });
+    const paperText = String(extracted.text || '');
+    const sourceProblem = isImageOnlyScan ? '' : readableSourceProblem({ paper, paperText });
     if (sourceProblem) {
       throw new Error(`This PDF cannot produce a reliable full Question Map: ${sourceProblem}`);
     }
@@ -659,18 +684,29 @@ export async function runPaperAnalysisWorker({ paper, sourceFingerprint, request
       throw new Error('The analysis job ran out of time before the AI response was ready. Please retry this paper.');
     }
 
-    console.info('[paper-metadata] PDF extracted; requesting analysis', {
+    // PDF.js cannot recover text from a scan. For that narrow case, OpenRouter's
+    // free Cloudflare parser reads the same public hidden-host PDF URL before it
+    // reaches the existing Question Map model. No missing or oversized PDF enters
+    // this fallback, and ordinary text PDFs never pay that parsing step.
+    const scannedPdfUrl = isImageOnlyScan ? paperUrl(paper.cf) : '';
+    const analysisPrompt = isImageOnlyScan
+      ? `${buildAnalysisPrompt(paper, '')}\n\nThis PDF is an image-only scan. The complete paper is attached to this request. Use the attached PDF's OCR text to identify every printed question, marks, and direct subparts.`
+      : buildAnalysisPrompt(paper, paperText);
+    const analysisRequest = {
+      timeoutMs: providerTimeoutMs,
+      ...(scannedPdfUrl ? { paperUrl: scannedPdfUrl } : {}),
+    };
+
+    console.info('[paper-metadata] PDF prepared; requesting analysis', {
       paperId: String(paper.v),
-      pages: extracted.pagesExtracted,
+      pages: extracted.pagesExtracted || extracted.totalPages,
+      imageOnlyScan: isImageOnlyScan,
       elapsedMs: Date.now() - requestStartedAt,
     });
-    const answer = await callPaperAnalysis(
-      buildAnalysisPrompt(paper, extracted.text),
-      { timeoutMs: providerTimeoutMs },
-    );
+    const answer = await callPaperAnalysis(analysisPrompt, analysisRequest);
     let analysis;
     try {
-      analysis = normaliseAnalysis(answer, sourceFingerprint, { paper, paperText: extracted.text });
+      analysis = normaliseAnalysis(answer, sourceFingerprint, { paper, paperText });
     } catch (error) {
       const isRecoverableIntegrityFailure = error instanceof IncompletePaperAnalysisError
         || error instanceof PaperMarkIntegrityError;
@@ -683,17 +719,17 @@ export async function runPaperAnalysisWorker({ paper, sourceFingerprint, request
         message: error.message,
       });
       const retryAnswer = await callPaperAnalysis(
-        `${buildAnalysisPrompt(paper, extracted.text)}\n\nThe preceding response was rejected: ${error.message} Re-read the complete text and return a complete Question Map whose top-level marks reconcile exactly to the printed paper total.`,
-        { timeoutMs: retryTimeoutMs },
+        `${analysisPrompt}\n\nThe preceding response was rejected: ${error.message} Re-read the complete paper and return a complete Question Map whose top-level marks reconcile exactly to the printed paper total.`,
+        { ...analysisRequest, timeoutMs: retryTimeoutMs },
       );
-      analysis = normaliseAnalysis(retryAnswer, sourceFingerprint, { paper, paperText: extracted.text });
+      analysis = normaliseAnalysis(retryAnswer, sourceFingerprint, { paper, paperText });
     }
     await completePaperAnalysis({
       paperKey: metadataDocumentId(paper),
       sourceFingerprint,
       analysis,
       paper,
-      pagesAnalysed: extracted.pagesExtracted,
+      pagesAnalysed: extracted.pagesExtracted || extracted.totalPages,
       totalPages: extracted.totalPages,
     });
     console.info('[paper-metadata] deferred analysis completed', {

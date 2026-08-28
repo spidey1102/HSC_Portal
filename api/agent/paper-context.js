@@ -27,7 +27,7 @@ const MIN_PDF_FETCH_TIMEOUT_MS = 5 * 1000
 const contextCache = new Map()
 const pdfByteCache = new Map()
 
-function paperUrl(filePath) {
+export function paperUrl(filePath) {
   const safePath = String(filePath || '')
     .split('/')
     .map((part) => encodeURIComponent(part))
