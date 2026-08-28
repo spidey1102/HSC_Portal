@@ -449,7 +449,7 @@ async function requestPaperAnalysis({ prompt, apiKey, route, timeoutMs, paperUrl
           plugins: [
             {
               id: 'file-parser',
-              pdf: { engine: 'cloudflare-ai' },
+              pdf: { engine: 'native' },
             },
           ],
         } : {}),
@@ -684,10 +684,10 @@ export async function runPaperAnalysisWorker({ paper, sourceFingerprint, request
       throw new Error('The analysis job ran out of time before the AI response was ready. Please retry this paper.');
     }
 
-    // PDF.js cannot recover text from a scan. For that narrow case, OpenRouter's
-    // free Cloudflare parser reads the same public hidden-host PDF URL before it
-    // reaches the existing Question Map model. No missing or oversized PDF enters
-    // this fallback, and ordinary text PDFs never pay that parsing step.
+    // PDF.js cannot recover text from a scan. For that narrow case, the existing
+    // Gemini analysis model receives the same public hidden-host PDF through its
+    // native PDF input. No missing or oversized PDF enters this fallback, and
+    // ordinary text PDFs keep the existing direct text-extraction path.
     const scannedPdfUrl = isImageOnlyScan ? paperUrl(paper.cf) : '';
     const analysisPrompt = isImageOnlyScan
       ? `${buildAnalysisPrompt(paper, '')}\n\nThis PDF is an image-only scan. The complete paper is attached to this request. Use the attached PDF's OCR text to identify every printed question, marks, and direct subparts.`
