@@ -529,10 +529,10 @@ export async function callPaperAnalysis(prompt, { timeoutMs = ANALYSIS_PROVIDER_
       paperUrl,
     });
   } catch (error) {
-    // Keep this strictly on the existing BYOK Gemini route. A 429 from Google AI
-    // Studio is temporary even when the free-tier dashboard remains below its
-    // hourly limits, so wait briefly once instead of substituting an unavailable
-    // model or silently using shared OpenRouter capacity.
+    // Keep recovery strictly on the configured Google AI Studio BYOK provider.
+    // A 429 can be temporary even when the primary model remains below its
+    // displayed tier limits, so wait briefly and then use the compatible stable
+    // Gemini fallback instead of silently using shared OpenRouter capacity.
     if (!isRetryableProviderStatus(error?.status)) throw error;
 
     const requestedDelayMs = error?.status === 429
@@ -549,7 +549,7 @@ export async function callPaperAnalysis(prompt, { timeoutMs = ANALYSIS_PROVIDER_
     return requestPaperAnalysis({
       prompt,
       apiKey,
-      route: 'paperMetadataPrimary',
+      route: 'paperMetadataFallback',
       timeoutMs: retryTimeoutMs,
       paperUrl,
     });

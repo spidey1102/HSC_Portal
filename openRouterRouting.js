@@ -45,6 +45,16 @@ export const PORTAL_AI_ROUTES = Object.freeze({
       allow_fallbacks: false,
     }),
   }),
+  // The stable 2.5 Flash route uses the same configured Google AI Studio key
+  // but has independent model capacity. It accepts native PDF files and the
+  // JSON response format used by HSC Hide Question Maps.
+  paperMetadataFallback: Object.freeze({
+    model: 'google/gemini-2.5-flash',
+    provider: Object.freeze({
+      only: Object.freeze(['google-ai-studio']),
+      allow_fallbacks: false,
+    }),
+  }),
 });
 
 function cleanModel(value, fallback) {
