@@ -13,6 +13,7 @@ import {
   loadPaperRecord,
 } from '../server/api/paperSource.js';
 import { getCompletionRoute, isRetryableProviderStatus, userSafeProviderError } from '../openRouterRouting.js';
+import { analyseScannedPdfWithGemini } from '../server/api/geminiPdf.js';
 
 // This route only claims a shared job and returns immediately. The separate worker
 // route owns the five-minute analysis allowance.
@@ -516,6 +517,20 @@ async function requestPaperAnalysis({ prompt, apiKey, route, timeoutMs, paperUrl
 }
 
 export async function callPaperAnalysis(prompt, { timeoutMs = ANALYSIS_PROVIDER_TIMEOUT_MS, paperUrl = '' } = {}) {
+  // HSC Hide Preview sets this credential only on its dedicated branch. It is
+  // deliberately considered only for PDF.js-confirmed image scans (paperUrl),
+  // so all selectable-text PDFs retain the existing OpenRouter pathway.
+  const directGeminiKey = String(process.env.HSC_HIDE_GEMINI_API_KEY || '').trim();
+  if (paperUrl && directGeminiKey) {
+    return analyseScannedPdfWithGemini({
+      apiKey: directGeminiKey,
+      paperUrl,
+      prompt,
+      timeoutMs,
+      maxOutputTokens: MAX_ANALYSIS_OUTPUT_TOKENS,
+    });
+  }
+
   const apiKey = String(process.env.OPENROUTER_API_KEY || '').trim();
   if (!apiKey) throw new Error('The portal AI key is not configured for paper analysis.');
 
@@ -718,10 +733,10 @@ export async function runPaperAnalysisWorker({ paper, sourceFingerprint, request
       throw new Error('The analysis job ran out of time before the AI response was ready. Please retry this paper.');
     }
 
-    // PDF.js cannot recover text from a scan. For that narrow case, the existing
-    // Gemini analysis model receives the same public hidden-host PDF through its
-    // native PDF input. No missing or oversized PDF enters this fallback, and
-    // ordinary text PDFs keep the existing direct text-extraction path.
+    // PDF.js cannot recover text from a scan. For that narrow case, HSC Hide
+    // Preview can use its own server-only Gemini Files API key to upload the
+    // hidden-host PDF and apply native document vision. No missing or oversized
+    // PDF enters this fallback, and ordinary text PDFs keep direct extraction.
     const scannedPdfUrl = isImageOnlyScan ? paperUrl(paper.cf) : '';
     const analysisPrompt = isImageOnlyScan
       ? `${buildAnalysisPrompt(paper, '')}\n\nThis PDF is an image-only scan. The complete paper is attached to this request. Use the attached PDF's OCR text to identify every printed question, marks, and direct subparts.`
