@@ -13,7 +13,7 @@ if (!globalThis.pdfjsWorker) {
 
 export const maxDuration = 60;
 
-const PAPER_HOST = 'https://hscportal.pages.dev/'
+const PAPER_HOST = 'https://33e1573d.hscportal-hidden.pages.dev/'
 // Some PDFs reference unembedded standard fonts. In Node/Vercel, pdf.js passes
 // this base directly to fs.readFile, so it must be a filesystem directory path.
 const STANDARD_FONT_DATA_URL = `${resolve(process.cwd(), 'node_modules', 'pdfjs-dist', 'standard_fonts')}/`
