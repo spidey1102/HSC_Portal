@@ -34,6 +34,8 @@ const FALLBACK_FUNCTION_BUDGET_MS = 294 * 1000;
 const RESPONSE_RESERVE_MS = 4 * 1000;
 const MIN_PROVIDER_TIMEOUT_MS = 8 * 1000;
 const ANALYSIS_PROVIDER_TIMEOUT_MS = 240 * 1000;
+const PROVIDER_RETRY_DELAY_MS = 2 * 1000;
+const MAX_PROVIDER_RETRY_DELAY_MS = 12 * 1000;
 const MAX_JSON_REPAIR_STEPS = 400;
 
 function remainingBudgetMs(startedAt) {
@@ -42,6 +44,25 @@ function remainingBudgetMs(startedAt) {
     return deadline.getTime() - Date.now() - RESPONSE_RESERVE_MS;
   }
   return FALLBACK_FUNCTION_BUDGET_MS - RESPONSE_RESERVE_MS - (Date.now() - startedAt);
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function retryAfterMs(response) {
+  const value = String(response.headers.get('retry-after') || '').trim();
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds > 0) {
+    return Math.min(Math.round(seconds * 1000), MAX_PROVIDER_RETRY_DELAY_MS);
+  }
+
+  const timestamp = Date.parse(value);
+  if (Number.isFinite(timestamp)) {
+    return Math.min(Math.max(0, timestamp - Date.now()), MAX_PROVIDER_RETRY_DELAY_MS);
+  }
+
+  return 0;
 }
 
 function sendJson(res, status, payload) {
@@ -406,10 +427,11 @@ function buildAnalysisPrompt(paper, paperText) {
 }
 
 class PaperAnalysisProviderError extends Error {
-  constructor(status, message) {
+  constructor(status, message, retryAfter = 0) {
     super(message);
     this.name = 'PaperAnalysisProviderError';
     this.status = Number(status) || 500;
+    this.retryAfterMs = Math.max(0, Number(retryAfter) || 0);
   }
 }
 
@@ -476,6 +498,7 @@ async function requestPaperAnalysis({ prompt, apiKey, route, timeoutMs, paperUrl
       throw new PaperAnalysisProviderError(
         response.status,
         userSafeProviderError(response.status, providerMessage),
+        retryAfterMs(response),
       );
     }
 
@@ -506,17 +529,28 @@ export async function callPaperAnalysis(prompt, { timeoutMs = ANALYSIS_PROVIDER_
       paperUrl,
     });
   } catch (error) {
-    // The alternate Flash Lite model has a separate model quota. Retrying is only
-    // appropriate when OpenRouter reports an immediate quota or provider failure;
-    // a timeout or malformed answer should be reported as-is.
+    // Keep this strictly on the existing BYOK Gemini route. A 429 from Google AI
+    // Studio is temporary even when the free-tier dashboard remains below its
+    // hourly limits, so wait briefly once instead of substituting an unavailable
+    // model or silently using shared OpenRouter capacity.
+    if (!isRetryableProviderStatus(error?.status)) throw error;
+
+    const requestedDelayMs = error?.status === 429
+      ? Math.max(PROVIDER_RETRY_DELAY_MS, error.retryAfterMs || 0)
+      : 0;
+    const delayMs = Math.min(requestedDelayMs, MAX_PROVIDER_RETRY_DELAY_MS);
     const remainingMs = deadline - Date.now();
-    if (!isRetryableProviderStatus(error?.status) || remainingMs < MIN_PROVIDER_TIMEOUT_MS) throw error;
+    if (remainingMs < delayMs + MIN_PROVIDER_TIMEOUT_MS) throw error;
+
+    if (delayMs) await wait(delayMs);
+    const retryTimeoutMs = deadline - Date.now();
+    if (retryTimeoutMs < MIN_PROVIDER_TIMEOUT_MS) throw error;
 
     return requestPaperAnalysis({
       prompt,
       apiKey,
-      route: 'paperMetadataFallback',
-      timeoutMs: remainingMs,
+      route: 'paperMetadataPrimary',
+      timeoutMs: retryTimeoutMs,
       paperUrl,
     });
   }
