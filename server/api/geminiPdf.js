@@ -154,7 +154,7 @@ export async function analyseScannedPdfWithGemini({ apiKey, paperUrl, prompt, ti
 
     requireTime(deadline, 8_000, 'The analysis job ran out of time before Gemini could read the scanned PDF. Please retry this paper.');
     const analysisResponse = await fetch(
-      `${GEMINI_API_ROOT}/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+      `${GEMINI_API_ROOT}/v1beta/models/gemini-flash-lite-latest:generateContent?key=${encodeURIComponent(apiKey)}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
