@@ -45,8 +45,12 @@ export const PORTAL_AI_ROUTES = Object.freeze({
       allow_fallbacks: false,
     }),
   }),
+  // A distinct Flash Lite model gives a Question Map request a separate
+  // Google AI Studio model quota when the primary route is temporarily full.
+  // It supports native PDF input and JSON response formatting, including the
+  // scanned-paper path used exclusively by HSC Hide.
   paperMetadataFallback: Object.freeze({
-    model: 'google/gemini-3.5-flash-lite',
+    model: 'google/gemini-2.5-flash-lite',
     provider: Object.freeze({
       only: Object.freeze(['google-ai-studio']),
       allow_fallbacks: false,
