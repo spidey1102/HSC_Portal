@@ -3,6 +3,8 @@ import {
   ArrowLeft,
   BookOpen,
   Check,
+  ChevronLeft,
+  ChevronRight,
   ClipboardCheck,
   Feather,
   Printer,
@@ -23,6 +25,13 @@ import AnnotationToolbar from './pdf/AnnotationToolbar';
 import ExamTimerBar from './pdf/ExamTimerBar';
 import PaperMargin from './pdf/PaperMargin';
 import { analysePaperMetadata, createEmptyPaperMetadata, getPaperMetadata } from '../utils/paperMetadata';
+import {
+  loadTopicQuestionQueue,
+  updateTopicQueueIndex,
+  clearTopicQuestionQueue,
+  formatQuestionLabel,
+  CACHED_QUESTION_TARGET_STORAGE_KEY,
+} from '../utils/topicQuestionQueue';
 import {
   DEFAULT_ANNOTATION_COLOR,
   HIGHLIGHT_DEFAULT_COLOR,
@@ -53,7 +62,6 @@ const TIMER_STORAGE_KEY = 'hsc_timer_duration_secs';
 const SCALE_STEP = 1.2;
 const METADATA_POLL_ATTEMPTS = 80;
 const METADATA_POLL_MIN_SECONDS = 4;
-const CACHED_QUESTION_TARGET_STORAGE_KEY = 'hsc_cached_question_target';
 
 function formatAnalysisElapsed(seconds) {
   const safeSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
@@ -215,7 +223,17 @@ export default function PracticeRoom({
   const [isMarginOpen, setIsMarginOpen] = useState(false);
   const [showFormula, setShowFormula] = useState(false);
   const [mobileTab, setMobileTab] = useState('paper');
+  const [topicQueue, setTopicQueue] = useState(() => loadTopicQuestionQueue());
   const actionTimerRef = useRef(null);
+
+  // Sync topic queue across events / storage
+  useEffect(() => {
+    const handleTopicQueueUpdated = (event) => {
+      setTopicQueue(event.detail || loadTopicQuestionQueue());
+    };
+    window.addEventListener('hsc:topic-queue-updated', handleTopicQueueUpdated);
+    return () => window.removeEventListener('hsc:topic-queue-updated', handleTopicQueueUpdated);
+  }, []);
 
   const sheetUrl = getFormulaSheet(subjectName);
 
@@ -459,7 +477,7 @@ export default function PracticeRoom({
     flash(`${label} — page ${page}`);
   };
 
-  const handleOpenCachedQuestion = (result) => {
+  const handleOpenCachedQuestion = (result, allResults = null, clickedIndex = 0) => {
     const page = Number(result?.question?.page);
     const targetPaper = allPapers.find((candidate) => (
       getPaperIdentity(candidate) === String(result?.paperIdentity || '')
@@ -467,6 +485,16 @@ export default function PracticeRoom({
     if (!targetPaper || !Number.isInteger(page) || page < 1) {
       flash('This cached question can no longer be opened');
       return;
+    }
+
+    if (Array.isArray(allResults) && allResults.length > 0) {
+      const queueData = {
+        questions: allResults,
+        currentIndex: clickedIndex,
+        topicTitle: allResults[0]?.question?.topics?.[0] || allResults[0]?.subject || 'Topic Practice',
+      };
+      sessionStorage.setItem('hsc_topic_question_queue', JSON.stringify(queueData));
+      window.dispatchEvent(new CustomEvent('hsc:topic-queue-updated', { detail: queueData }));
     }
 
     const label = `Question ${String(result.question.id || '').trim()}`;
@@ -490,6 +518,18 @@ export default function PracticeRoom({
     }
     onSelectPaper(targetPaper);
   };
+
+  const handleNavigateTopicQueue = useCallback((direction) => {
+    if (!topicQueue || !Array.isArray(topicQueue.questions) || topicQueue.questions.length === 0) return;
+    const nextIndex = topicQueue.currentIndex + direction;
+    if (nextIndex < 0 || nextIndex >= topicQueue.questions.length) return;
+
+    const targetItem = topicQueue.questions[nextIndex];
+    if (!targetItem) return;
+
+    updateTopicQueueIndex(nextIndex);
+    handleOpenCachedQuestion(targetItem);
+  }, [topicQueue, handleOpenCachedQuestion]);
 
   useEffect(() => {
     try {
@@ -742,6 +782,77 @@ export default function PracticeRoom({
           )}
         </div>
       </header>
+
+      {/* Topic Practice Session Queue Bar */}
+      {topicQueue && Array.isArray(topicQueue.questions) && topicQueue.questions.length > 0 && (() => {
+        const currentIndex = Math.max(0, Math.min(topicQueue.currentIndex ?? 0, topicQueue.questions.length - 1));
+        const currentItem = topicQueue.questions[currentIndex];
+        const hasPrev = currentIndex > 0;
+        const hasNext = currentIndex < topicQueue.questions.length - 1;
+        const currentQ = currentItem?.question;
+        const currentLabel = currentQ ? formatQuestionLabel(currentQ) : 'Current Question';
+        const page = currentQ?.page;
+
+        return (
+          <div className="topic-queue-bar" role="region" aria-label="Topic practice navigation">
+            <div className="topic-queue-info">
+              <span className="topic-queue-badge">
+                <Sparkles size={13} />
+                Topic Practice
+              </span>
+              <span className="topic-queue-title">
+                {topicQueue.topicTitle || 'Similar Questions'}
+              </span>
+              <span className="topic-queue-subtitle">
+                — {currentItem?.paperName || 'Paper'} · {currentLabel}{page ? ` · Page ${page}` : ''}
+              </span>
+            </div>
+
+            <div className="topic-queue-nav">
+              <button
+                type="button"
+                className="topic-queue-btn"
+                disabled={!hasPrev}
+                onClick={() => handleNavigateTopicQueue(-1)}
+                title={hasPrev ? 'Go to previous question on this topic' : 'No previous question'}
+                aria-label="Previous question"
+              >
+                <ChevronLeft size={16} />
+                <span>Prev Question</span>
+              </button>
+
+              <span className="topic-queue-count" title="Current position in topic session">
+                {currentIndex + 1} of {topicQueue.questions.length}
+              </span>
+
+              <button
+                type="button"
+                className="topic-queue-btn"
+                disabled={!hasNext}
+                onClick={() => handleNavigateTopicQueue(1)}
+                title={hasNext ? 'Go to next question on this topic' : 'No more questions on this topic'}
+                aria-label="Next question"
+              >
+                <span>Next Question</span>
+                <ChevronRight size={16} />
+              </button>
+
+              <button
+                type="button"
+                className="topic-queue-close"
+                onClick={() => {
+                  clearTopicQuestionQueue();
+                  setTopicQueue(null);
+                }}
+                title="Dismiss topic queue"
+                aria-label="Dismiss topic queue"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {actionMessage && <div className="reader-notice">{actionMessage}</div>}
 
