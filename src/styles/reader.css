@@ -801,6 +801,19 @@
   cursor: not-allowed;
 }
 
+.topic-queue-spinner {
+  animation: topicQueueSpin 1s linear infinite;
+}
+
+@keyframes topicQueueSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .topic-queue-count {
   font-family: var(--font-num);
   font-size: 12.5px;

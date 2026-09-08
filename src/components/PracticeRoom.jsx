@@ -7,6 +7,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   Feather,
+  Loader2,
   Printer,
   ListChecks,
   PanelBottomOpen,
@@ -30,6 +31,7 @@ import {
   updateTopicQueueIndex,
   clearTopicQuestionQueue,
   formatQuestionLabel,
+  fetchMoreTopicQuestions,
   CACHED_QUESTION_TARGET_STORAGE_KEY,
 } from '../utils/topicQuestionQueue';
 import {
@@ -224,6 +226,7 @@ export default function PracticeRoom({
   const [showFormula, setShowFormula] = useState(false);
   const [mobileTab, setMobileTab] = useState('paper');
   const [topicQueue, setTopicQueue] = useState(() => loadTopicQuestionQueue());
+  const [isLoadingMoreQuestions, setIsLoadingMoreQuestions] = useState(false);
   const actionTimerRef = useRef(null);
 
   // Sync topic queue across events / storage
@@ -519,17 +522,45 @@ export default function PracticeRoom({
     onSelectPaper(targetPaper);
   };
 
-  const handleNavigateTopicQueue = useCallback((direction) => {
+  const handleNavigateTopicQueue = useCallback(async (direction) => {
     if (!topicQueue || !Array.isArray(topicQueue.questions) || topicQueue.questions.length === 0) return;
-    const nextIndex = topicQueue.currentIndex + direction;
-    if (nextIndex < 0 || nextIndex >= topicQueue.questions.length) return;
+    const currentIndex = topicQueue.currentIndex ?? 0;
+    const nextIndex = currentIndex + direction;
+
+    if (nextIndex < 0) return;
+
+    // If moving forward and reaching or approaching the end of current list (e.g. 5th question)
+    if (nextIndex >= topicQueue.questions.length) {
+      if (topicQueue.hasMore !== false && !isLoadingMoreQuestions) {
+        setIsLoadingMoreQuestions(true);
+        try {
+          const res = await fetchMoreTopicQuestions(topicQueue);
+          if (res.success && res.count > 0 && res.queue?.questions?.[nextIndex]) {
+            const nextItem = res.queue.questions[nextIndex];
+            updateTopicQueueIndex(nextIndex);
+            handleOpenCachedQuestion(nextItem);
+            return;
+          } else {
+            flash('No more questions found on this topic');
+          }
+        } finally {
+          setIsLoadingMoreQuestions(false);
+        }
+      }
+      return;
+    }
 
     const targetItem = topicQueue.questions[nextIndex];
     if (!targetItem) return;
 
+    // Trigger pre-fetching in background when moving into the last 2 questions
+    if (nextIndex >= topicQueue.questions.length - 2 && topicQueue.hasMore !== false && !isLoadingMoreQuestions) {
+      fetchMoreTopicQuestions(topicQueue).catch(() => {});
+    }
+
     updateTopicQueueIndex(nextIndex);
     handleOpenCachedQuestion(targetItem);
-  }, [topicQueue, handleOpenCachedQuestion]);
+  }, [topicQueue, handleOpenCachedQuestion, isLoadingMoreQuestions]);
 
   useEffect(() => {
     try {
@@ -828,13 +859,22 @@ export default function PracticeRoom({
               <button
                 type="button"
                 className="topic-queue-btn"
-                disabled={!hasNext}
+                disabled={!hasNext && topicQueue.hasMore === false}
                 onClick={() => handleNavigateTopicQueue(1)}
-                title={hasNext ? 'Go to next question on this topic' : 'No more questions on this topic'}
+                title={hasNext || topicQueue.hasMore !== false ? 'Go to next question on this topic' : 'No more questions on this topic'}
                 aria-label="Next question"
               >
-                <span>Next Question</span>
-                <ChevronRight size={16} />
+                {isLoadingMoreQuestions ? (
+                  <>
+                    <span>Finding more...</span>
+                    <Loader2 size={15} className="topic-queue-spinner" />
+                  </>
+                ) : (
+                  <>
+                    <span>Next Question</span>
+                    <ChevronRight size={16} />
+                  </>
+                )}
               </button>
 
               <button

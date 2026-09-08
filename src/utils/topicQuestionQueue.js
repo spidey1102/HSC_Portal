@@ -13,12 +13,21 @@ export function formatQuestionLabel(question) {
 }
 
 /**
+ * Extract an array of all excluded keys from an array of question results
+ */
+export function extractQuestionKeys(questions = []) {
+  if (!Array.isArray(questions)) return [];
+  return questions.map((q) => q.key || `${q.paperIdentity}::${q.question?.id}`).filter(Boolean);
+}
+
+/**
  * Save an active topic question session queue to sessionStorage
  * @param {Array} questions - list of question result objects
  * @param {number} currentIndex - index of active question
  * @param {string} topicTitle - optional topic or category name
+ * @param {object} searchParams - parameters needed to fetch more questions (topic, subject, difficulty, level)
  */
-export function saveTopicQuestionQueue(questions, currentIndex = 0, topicTitle = '') {
+export function saveTopicQuestionQueue(questions, currentIndex = 0, topicTitle = '', searchParams = null) {
   if (!Array.isArray(questions) || questions.length === 0) {
     clearTopicQuestionQueue();
     return;
@@ -28,6 +37,11 @@ export function saveTopicQuestionQueue(questions, currentIndex = 0, topicTitle =
       questions,
       currentIndex: Math.max(0, Math.min(currentIndex, questions.length - 1)),
       topicTitle: topicTitle || questions[0]?.question?.topics?.[0] || questions[0]?.subject || 'Topic Practice',
+      searchParams: searchParams || {
+        topic: topicTitle || questions[0]?.question?.topics?.[0] || '',
+        subject: questions[0]?.subject || '',
+      },
+      hasMore: true,
       updatedAt: Date.now(),
     };
     sessionStorage.setItem(TOPIC_QUESTION_QUEUE_STORAGE_KEY, JSON.stringify(queueData));
@@ -70,18 +84,21 @@ export function updateTopicQueueIndex(nextIndex) {
 }
 
 /**
- * Append more questions to the active topic queue (for infinite / more questions)
+ * Append more questions to the active topic queue (for continuous / extended topic practice)
  */
-export function appendToTopicQuestionQueue(newQuestions) {
+export function appendToTopicQuestionQueue(newQuestions, hasMore = true) {
   const queue = loadTopicQuestionQueue();
   if (!queue) {
     saveTopicQuestionQueue(newQuestions);
     return;
   }
-  const existingKeys = new Set(queue.questions.map((q) => q.key || `${q.paperIdentity}_${q.question?.id}`));
-  const filteredNew = (newQuestions || []).filter((q) => !existingKeys.has(q.key || `${q.paperIdentity}_${q.question?.id}`));
-  if (filteredNew.length === 0) return queue;
+  const existingKeys = new Set(queue.questions.map((q) => q.key || `${q.paperIdentity}::${q.question?.id}`));
+  const filteredNew = (newQuestions || []).filter((q) => !existingKeys.has(q.key || `${q.paperIdentity}::${q.question?.id}`));
+  
   queue.questions = [...queue.questions, ...filteredNew];
+  queue.hasMore = hasMore && filteredNew.length > 0;
+  queue.updatedAt = Date.now();
+  
   try {
     sessionStorage.setItem(TOPIC_QUESTION_QUEUE_STORAGE_KEY, JSON.stringify(queue));
     window.dispatchEvent(new CustomEvent('hsc:topic-queue-updated', { detail: queue }));
@@ -89,6 +106,57 @@ export function appendToTopicQuestionQueue(newQuestions) {
     console.warn('Failed to append to topic question queue:', err);
   }
   return queue;
+}
+
+/**
+ * Fetches the next batch of cached questions for the current topic queue
+ */
+export async function fetchMoreTopicQuestions(queue) {
+  if (!queue || !Array.isArray(queue.questions)) return { success: false, questions: [] };
+
+  const existingKeys = extractQuestionKeys(queue.questions);
+  const searchParams = queue.searchParams || {
+    topic: queue.topicTitle || queue.questions[0]?.question?.topics?.[0] || '',
+    subject: queue.questions[0]?.subject || '',
+  };
+
+  try {
+    const response = await fetch('/api/agent-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'search_cached_questions',
+        search: {
+          topic: searchParams.topic || '',
+          subject: searchParams.subject || '',
+          difficulty: searchParams.difficulty || 'any',
+          level: searchParams.level || null,
+          excludeQuestionKeys: existingKeys,
+        },
+      }),
+    });
+
+    if (!response.ok) return { success: false, questions: [] };
+    const payload = await response.json();
+    const newQuestions = Array.isArray(payload.questions) ? payload.questions : [];
+    
+    if (newQuestions.length > 0) {
+      const updatedQueue = appendToTopicQuestionQueue(newQuestions, newQuestions.length >= 5);
+      return { success: true, count: newQuestions.length, queue: updatedQueue };
+    } else {
+      // Mark hasMore as false
+      const current = loadTopicQuestionQueue();
+      if (current) {
+        current.hasMore = false;
+        sessionStorage.setItem(TOPIC_QUESTION_QUEUE_STORAGE_KEY, JSON.stringify(current));
+        window.dispatchEvent(new CustomEvent('hsc:topic-queue-updated', { detail: current }));
+      }
+      return { success: true, count: 0, queue: current };
+    }
+  } catch (err) {
+    console.error('Failed to fetch more topic questions:', err);
+    return { success: false, questions: [] };
+  }
 }
 
 /**
