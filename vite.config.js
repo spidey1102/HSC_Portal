@@ -7,6 +7,9 @@ import extractAgentHandler from './api/agent/extract.js'
 import askAgentHandler from './api/agent/ask.js'
 import paperContextHandler from './api/agent/paper-context.js'
 import { handleAgentChatRequest } from './agentChatHandler.js'
+import paperMetadataHandler from './api/paper-metadata.js'
+import paperMetadataWorkerHandler from './api/paper-metadata/worker.js'
+import userDataHandler from './api/user-data.js'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -97,6 +100,18 @@ export default defineConfig(({ mode }) => {
               res,
               env.OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY
             )
+          })
+
+          server.middlewares.use('/api/paper-metadata/worker', async (req, res) => {
+            await paperMetadataWorkerHandler(req, res)
+          })
+
+          server.middlewares.use('/api/paper-metadata', async (req, res) => {
+            await paperMetadataHandler(req, res)
+          })
+
+          server.middlewares.use('/api/user-data', async (req, res) => {
+            await userDataHandler(req, res)
           })
         },
       },

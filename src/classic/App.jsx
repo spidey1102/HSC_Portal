@@ -1039,6 +1039,17 @@ export default function App({ onPortalLayoutChange }) {
               <BotMessageSquare size={16} />
               <span>AI Agent</span>
             </button>
+            {onPortalLayoutChange && (
+              <button
+                type="button"
+                onClick={() => onPortalLayoutChange('simplified')}
+                className="btn-secondary"
+                style={{ padding: '10px 12px' }}
+                title="Switch to Tree Layout directory"
+              >
+                <span>Tree Layout</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => updateAppearance({ mode: theme === 'dark' ? 'light' : 'dark' })}

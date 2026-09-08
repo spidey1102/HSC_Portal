@@ -680,6 +680,7 @@ export default function NewPortal({ onPortalLayoutChange }) {
         runhead={runhead}
         onOpenPalette={() => setIsPaletteOpen(true)}
         onOpenCustomise={() => setIsCustomizationOpen(true)}
+        onPortalLayoutChange={onPortalLayoutChange}
       />
 
       <div className="portal-body">
