@@ -279,43 +279,31 @@
   flex-wrap: wrap;
 }
 
-/* Two-column Explorer Layout */
-.tree-explorer-split {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 1fr);
-  gap: 24px;
-  align-items: start;
-}
-
-@media (max-width: 960px) {
-  .tree-explorer-split {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Tree Structure Box */
-.tree-panel {
+/* Full-Width Tree Container */
+.tree-panel,
+.tree-panel-full {
+  width: 100%;
   background: var(--color-surface);
   border: 1px solid var(--color-divider);
   border-radius: var(--radius-md);
-  padding: 16px;
+  padding: 20px 24px;
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .tree-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 10px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--color-divider);
 }
 
 .tree-panel-title {
   font-family: var(--font-heading);
-  font-size: 16px;
+  font-size: 17px;
   font-weight: var(--font-heading-weight);
   color: var(--color-text);
   display: flex;
@@ -327,31 +315,31 @@
 .tree-branch-container {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+  width: 100%;
 }
 
 .tree-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 7px 10px;
+  gap: 10px;
+  padding: 8px 12px;
   border-radius: var(--radius-md);
   cursor: pointer;
   user-select: none;
   transition: background-color 0.12s ease, color 0.12s ease;
   color: var(--color-text);
   border: 1px solid transparent;
+  width: 100%;
 }
 
 .tree-row:hover {
-  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
 }
 
-.tree-row.selected {
-  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
-  border-color: var(--color-accent);
-  color: var(--color-accent-700);
+.tree-row.expanded {
+  background: color-mix(in srgb, var(--color-accent) 6%, transparent);
 }
 
 .tree-row-main {
@@ -363,8 +351,8 @@
 }
 
 .tree-toggle-btn {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -415,50 +403,55 @@
 
 .tree-badge-count {
   font-family: var(--font-num);
-  font-size: 11px;
-  padding: 2px 7px;
+  font-size: 11.5px;
+  padding: 2px 8px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-text) 8%, transparent);
   color: color-mix(in srgb, var(--color-text) 70%, transparent);
 }
 
 .tree-sub-branches {
-  margin-left: 20px;
-  padding-left: 8px;
-  border-left: 1px solid var(--color-divider);
+  margin-left: 26px;
+  padding-left: 12px;
+  border-left: 1.5px solid var(--color-divider);
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin-top: 2px;
-  margin-bottom: 4px;
+  gap: 4px;
+  margin-top: 3px;
+  margin-bottom: 5px;
 }
 
-/* File Node inside Tree */
+@media (max-width: 640px) {
+  .tree-sub-branches {
+    margin-left: 14px;
+    padding-left: 8px;
+  }
+}
+
+/* File Node inside Tree (Leaf paper) */
 .tree-file-node {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 6px 10px;
+  gap: 16px;
+  padding: 8px 14px;
   border-radius: var(--radius-md);
-  font-size: 13px;
-  transition: background-color 0.12s ease;
-  border: 1px solid transparent;
+  font-size: 13.5px;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+  border: 1px solid color-mix(in srgb, var(--color-divider) 60%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
+  width: 100%;
 }
 
 .tree-file-node:hover {
-  background: color-mix(in srgb, var(--color-text) 5%, transparent);
-}
-
-.tree-file-node.selected {
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
 .tree-file-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
   flex: 1;
 }
@@ -467,135 +460,15 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 500;
+  color: var(--color-text);
 }
 
 .tree-file-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-shrink: 0;
-}
-
-/* Detail Card (Right Column) */
-.tree-detail-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  position: sticky;
-  top: 80px;
-}
-
-.tree-detail-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-divider);
-  border-radius: var(--radius-md);
-  padding: 20px;
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.tree-detail-kicker {
-  font-size: 10.5px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--color-accent-700);
-}
-
-.tree-detail-title {
-  font-family: var(--font-heading);
-  font-size: 24px;
-  font-weight: var(--font-heading-weight);
-  margin: 0;
-  line-height: 1.2;
-  color: var(--color-text);
-}
-
-.tree-detail-desc {
-  font-size: 13.5px;
-  color: color-mix(in srgb, var(--color-text) 70%, transparent);
-  margin: 0;
-}
-
-.tree-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  padding: 12px 0;
-  border-top: 1px solid var(--color-divider);
-  border-bottom: 1px solid var(--color-divider);
-}
-
-.tree-stat-box {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.tree-stat-val {
-  font-family: var(--font-heading);
-  font-size: 24px;
-  color: var(--color-accent);
-  line-height: 1;
-}
-
-.tree-stat-lbl {
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
-}
-
-/* Paper Shelf Items */
-.tree-shelf-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 480px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-
-.tree-shelf-item {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-divider);
-  border-radius: var(--radius-md);
-  transition: all 0.14s ease;
-}
-
-.tree-shelf-item:hover {
-  border-color: color-mix(in srgb, var(--color-text) 45%, transparent);
-  transform: translateY(-1px);
-}
-
-.tree-shelf-item-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.tree-shelf-item-title {
-  font-family: var(--font-heading);
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0;
-  line-height: 1.2;
-}
-
-.tree-shelf-item-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 4px;
-  padding-top: 6px;
-  border-top: 1px solid color-mix(in srgb, var(--color-divider) 50%, transparent);
 }
 
 /* Level Select Pills */

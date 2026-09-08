@@ -15,7 +15,7 @@ export const APPEARANCE_DEFAULTS = {
   accent: 'gold',
   density: 'book',
   layout: 'standard',
-  portalLayout: 'simplified',
+  portalLayout: 'new',
   showRecommendations: true,
 };
 
