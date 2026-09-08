@@ -67,14 +67,6 @@ export default function SimplifiedPortal({ onPortalLayoutChange }) {
   // Keys: "lvl:12", "lvl:12|subj:4", "lvl:12|subj:4|cat:T", "lvl:12|subj:4|cat:T|sch:44"
   const [expandedKeys, setExpandedKeys] = useState(() => new Set(['lvl:12']));
 
-  // Selected node in the tree (for the detail/shelf panel)
-  const [selectedNode, setSelectedNode] = useState({
-    type: 'level',
-    level: 12,
-    title: 'Year 12 - HSC Examination Archive',
-    key: 'lvl:12',
-  });
-
   // Filter & Search
   const [searchQuery, setSearchQuery] = useState('');
   const [levelFilter, setLevelFilter] = useState('all'); // 'all', '12', '11'
@@ -320,31 +312,6 @@ export default function SimplifiedPortal({ onPortalLayoutChange }) {
     }
   }, [searchQuery, treeData]);
 
-  // Papers corresponding to the currently selected node
-  const activeShelfPapers = useMemo(() => {
-    if (!selectedNode) return [];
-    if (selectedNode.type === 'paper') {
-      return [selectedNode.paper];
-    }
-    return selectedNode.papers || [];
-  }, [selectedNode]);
-
-  // Statistics for selected node
-  const nodeStats = useMemo(() => {
-    const list = activeShelfPapers;
-    const withSol = list.filter((p) => p.w === 1).length;
-    const distinctSchools = new Set(list.map((p) => p.h)).size;
-    const yearRange = list.length
-      ? `${Math.min(...list.map((p) => p.y))} – ${Math.max(...list.map((p) => p.y))}`
-      : '—';
-    return {
-      total: list.length,
-      withSol,
-      distinctSchools,
-      yearRange,
-    };
-  }, [activeShelfPapers]);
-
   // If Practice Room is open
   if (activePracticePaper) {
     return (
@@ -547,68 +514,6 @@ export default function SimplifiedPortal({ onPortalLayoutChange }) {
           </div>
         </section>
 
-        {/* Breadcrumb Bar */}
-        <section className="tree-breadcrumb-bar">
-          <div className="tree-breadcrumbs">
-            <button
-              type="button"
-              className="tree-breadcrumb-link"
-              onClick={() => {
-                setSelectedNode({
-                  type: 'root',
-                  title: 'NSW HSC Examination Archive',
-                  papers: filteredPapers,
-                  key: 'root',
-                });
-              }}
-            >
-              <Folder size={14} />
-              archive
-            </button>
-
-            {selectedNode.level && (
-              <>
-                <ChevronRight size={13} className="dim" />
-                <button
-                  type="button"
-                  className="tree-breadcrumb-link"
-                  onClick={() => {
-                    const node = treeData.find((l) => l.level === selectedNode.level);
-                    if (node) setSelectedNode(node);
-                  }}
-                >
-                  Year {selectedNode.level}
-                </button>
-              </>
-            )}
-
-            {selectedNode.subjectName && (
-              <>
-                <ChevronRight size={13} className="dim" />
-                <span className="tree-breadcrumb-link">{selectedNode.subjectName}</span>
-              </>
-            )}
-
-            {selectedNode.categoryName && (
-              <>
-                <ChevronRight size={13} className="dim" />
-                <span className="tree-breadcrumb-link">{selectedNode.categoryName}</span>
-              </>
-            )}
-
-            {selectedNode.name && selectedNode.type === 'school' && (
-              <>
-                <ChevronRight size={13} className="dim" />
-                <span className="tree-breadcrumb-current">{selectedNode.name}</span>
-              </>
-            )}
-          </div>
-
-          <span className="num dim" style={{ fontSize: '12.5px' }}>
-            Showing {activeShelfPapers.length} paper{activeShelfPapers.length === 1 ? '' : 's'} in selected branch
-          </span>
-        </section>
-
         {/* Loading / Error States */}
         {loading && (
           <div className="card" style={{ padding: '40px', textAlign: 'center' }}>
@@ -623,425 +528,241 @@ export default function SimplifiedPortal({ onPortalLayoutChange }) {
           </div>
         )}
 
-        {/* The Two-Column Explorer Layout */}
+        {/* Full-Width Tree Explorer */}
         {!loading && !error && (
-          <div className="tree-explorer-split">
-            {/* Column 1: Tree View Directory */}
-            <div className="tree-panel">
-              <div className="tree-panel-header">
-                <div className="tree-panel-title">
-                  <FolderTree size={16} style={{ color: 'var(--color-accent)' }} />
-                  Directory Hierarchy
-                </div>
-                <span className="tree-badge-count">
-                  {filteredPapers.length.toLocaleString()} files
-                </span>
+          <div className="tree-panel tree-panel-full">
+            <div className="tree-panel-header">
+              <div className="tree-panel-title">
+                <FolderTree size={16} style={{ color: 'var(--color-accent)' }} />
+                NSW HSC Examination Archive
               </div>
-
-              {filteredPapers.length === 0 ? (
-                <div style={{ padding: '30px 10px', textAlign: 'center' }} className="dim">
-                  No examination papers match your current query "{searchQuery}".
-                </div>
-              ) : (
-                <div className="tree-branch-container" role="tree">
-                  {treeData.map((lvlNode) => {
-                    const isLvlExpanded = expandedKeys.has(lvlNode.key);
-                    const isLvlSelected = selectedNode?.key === lvlNode.key;
-
-                    return (
-                      <div key={lvlNode.key} className="tree-branch">
-                        {/* Level Root Node */}
-                        <div
-                          className={`tree-row ${isLvlSelected ? 'selected' : ''}`}
-                          onClick={() => setSelectedNode(lvlNode)}
-                          role="treeitem"
-                          aria-expanded={isLvlExpanded}
-                        >
-                          <div className="tree-row-main">
-                            <button
-                              type="button"
-                              className="tree-toggle-btn"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleNode(lvlNode.key);
-                              }}
-                              aria-label="Toggle folder"
-                            >
-                              {isLvlExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                            </button>
-                            <span className="tree-node-icon">
-                              {isLvlExpanded ? <FolderOpen size={16} /> : <Folder size={16} />}
-                            </span>
-                            <span className="tree-node-name is-root">
-                              {lvlNode.name}
-                            </span>
-                          </div>
-                          <div className="tree-node-meta">
-                            <span className="tree-badge-count">{lvlNode.count} files</span>
-                          </div>
-                        </div>
-
-                        {/* Subject Children */}
-                        {isLvlExpanded && (
-                          <div className="tree-sub-branches">
-                            {lvlNode.subjects.map((subjNode) => {
-                              const isSubjExpanded = expandedKeys.has(subjNode.key);
-                              const isSubjSelected = selectedNode?.key === subjNode.key;
-
-                              return (
-                                <div key={subjNode.key} className="tree-branch">
-                                  {/* Subject Row */}
-                                  <div
-                                    className={`tree-row ${isSubjSelected ? 'selected' : ''}`}
-                                    onClick={() => setSelectedNode(subjNode)}
-                                    role="treeitem"
-                                    aria-expanded={isSubjExpanded}
-                                  >
-                                    <div className="tree-row-main">
-                                      <button
-                                        type="button"
-                                        className="tree-toggle-btn"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          toggleNode(subjNode.key);
-                                        }}
-                                      >
-                                        {isSubjExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                                      </button>
-                                      <span className="tree-node-icon">
-                                        {isSubjExpanded ? <FolderOpen size={15} /> : <Folder size={15} />}
-                                      </span>
-                                      <span className="tree-node-name is-subject">
-                                        {subjNode.name}
-                                      </span>
-                                    </div>
-                                    <div className="tree-node-meta">
-                                      <span className="tree-badge-count">{subjNode.count}</span>
-                                    </div>
-                                  </div>
-
-                                  {/* Category Children */}
-                                  {isSubjExpanded && (
-                                    <div className="tree-sub-branches">
-                                      {subjNode.categories.map((catNode) => {
-                                        const isCatExpanded = expandedKeys.has(catNode.key);
-                                        const isCatSelected = selectedNode?.key === catNode.key;
-
-                                        return (
-                                          <div key={catNode.key} className="tree-branch">
-                                            {/* Category Row */}
-                                            <div
-                                              className={`tree-row ${isCatSelected ? 'selected' : ''}`}
-                                              onClick={() => setSelectedNode(catNode)}
-                                              role="treeitem"
-                                              aria-expanded={isCatExpanded}
-                                            >
-                                              <div className="tree-row-main">
-                                                <button
-                                                  type="button"
-                                                  className="tree-toggle-btn"
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    toggleNode(catNode.key);
-                                                  }}
-                                                >
-                                                  {isCatExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                                                </button>
-                                                <span className="tree-node-icon">
-                                                  {isCatExpanded ? <FolderOpen size={14} /> : <Folder size={14} />}
-                                                </span>
-                                                <span className="tree-node-name">
-                                                  {catNode.name}
-                                                </span>
-                                              </div>
-                                              <div className="tree-node-meta">
-                                                <span className="tree-badge-count">{catNode.count}</span>
-                                              </div>
-                                            </div>
-
-                                            {/* School Children */}
-                                            {isCatExpanded && (
-                                              <div className="tree-sub-branches">
-                                                {catNode.schools.map((schNode) => {
-                                                  const isSchExpanded = expandedKeys.has(schNode.key);
-                                                  const isSchSelected = selectedNode?.key === schNode.key;
-
-                                                  return (
-                                                    <div key={schNode.key} className="tree-branch">
-                                                      {/* School Row */}
-                                                      <div
-                                                        className={`tree-row ${isSchSelected ? 'selected' : ''}`}
-                                                        onClick={() => setSelectedNode(schNode)}
-                                                        role="treeitem"
-                                                        aria-expanded={isSchExpanded}
-                                                      >
-                                                        <div className="tree-row-main">
-                                                          <button
-                                                            type="button"
-                                                            className="tree-toggle-btn"
-                                                            onClick={(e) => {
-                                                              e.stopPropagation();
-                                                              toggleNode(schNode.key);
-                                                            }}
-                                                          >
-                                                            {isSchExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-                                                          </button>
-                                                          <span className="tree-node-icon">
-                                                            {isSchExpanded ? <FolderOpen size={13} /> : <Folder size={13} />}
-                                                          </span>
-                                                          <span className="tree-node-name">
-                                                            {schNode.name}
-                                                          </span>
-                                                        </div>
-                                                        <div className="tree-node-meta">
-                                                          <span className="tree-badge-count">{schNode.count}</span>
-                                                        </div>
-                                                      </div>
-
-                                                      {/* Papers (Leaf nodes) */}
-                                                      {isSchExpanded && (
-                                                        <div className="tree-sub-branches">
-                                                          {schNode.papers.map((p) => {
-                                                            const isPaperSelected = selectedNode?.paper?.cf === p.cf;
-                                                            return (
-                                                              <div
-                                                                key={p.cf || p.n}
-                                                                className={`tree-file-node ${isPaperSelected ? 'selected' : ''}`}
-                                                                onClick={() =>
-                                                                  setSelectedNode({
-                                                                    type: 'paper',
-                                                                    paper: p,
-                                                                    title: p.n,
-                                                                    level: p.l,
-                                                                    subjectName: subjNode.name,
-                                                                    categoryName: catNode.name,
-                                                                    name: schNode.name,
-                                                                    key: p.cf || p.n,
-                                                                  })
-                                                                }
-                                                              >
-                                                                <div className="tree-file-info">
-                                                                  <FileText size={13} style={{ color: 'var(--color-accent-700)', flexShrink: 0 }} />
-                                                                  <span className="tree-file-name">{p.n}</span>
-                                                                  {p.w === 1 && (
-                                                                    <span className="tag tag-accent" style={{ fontSize: '10px', padding: '1px 5px' }}>
-                                                                      sol
-                                                                    </span>
-                                                                  )}
-                                                                </div>
-
-                                                                <div className="tree-file-actions">
-                                                                  <button
-                                                                    type="button"
-                                                                    className="btn btn-secondary"
-                                                                    style={{ fontSize: '11px', padding: '3px 7px' }}
-                                                                    onClick={(e) => {
-                                                                      e.stopPropagation();
-                                                                      handleLaunchPractice(p);
-                                                                    }}
-                                                                    title="Open in Practice Room"
-                                                                  >
-                                                                    <BookOpen size={11} />
-                                                                    Practice
-                                                                  </button>
-                                                                  <button
-                                                                    type="button"
-                                                                    className="btn btn-secondary"
-                                                                    style={{ fontSize: '11px', padding: '3px 6px' }}
-                                                                    onClick={(e) => {
-                                                                      e.stopPropagation();
-                                                                      handleOpenPdf(p);
-                                                                    }}
-                                                                    title="Open Raw PDF"
-                                                                  >
-                                                                    <ExternalLink size={11} />
-                                                                  </button>
-                                                                </div>
-                                                              </div>
-                                                            );
-                                                          })}
-                                                        </div>
-                                                      )}
-                                                    </div>
-                                                  );
-                                                })}
-                                              </div>
-                                            )}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <span className="tree-badge-count">
+                {filteredPapers.length.toLocaleString()} papers indexed
+              </span>
             </div>
 
-            {/* Column 2: Selected Folder / Paper Shelf Detail Card */}
-            <div className="tree-detail-panel">
-              <div className="tree-detail-card">
-                <div>
-                  <span className="tree-detail-kicker">
-                    {selectedNode.type === 'paper'
-                      ? 'Selected Examination Document'
-                      : selectedNode.type === 'school'
-                      ? 'School Collection'
-                      : selectedNode.type === 'category'
-                      ? 'Category Branch'
-                      : selectedNode.type === 'subject'
-                      ? 'Subject Branch'
-                      : 'Directory Level'}
-                  </span>
-                  <h3 className="tree-detail-title">
-                    {selectedNode.title || selectedNode.name || 'HSC Examination Collection'}
-                  </h3>
-                  <p className="tree-detail-desc">
-                    {selectedNode.subtitle ||
-                      (selectedNode.type === 'school'
-                        ? `All examination files and past trial tests sat at ${selectedNode.name}.`
-                        : selectedNode.type === 'category'
-                        ? `Past examination papers archived under ${selectedNode.name} in ${selectedNode.subjectName}.`
-                        : selectedNode.type === 'subject'
-                        ? `Comprehensive folder of trial exams, internal assessments, and official NESA HSC papers for ${selectedNode.name}.`
-                        : 'Explore individual examination files below with direct access to practice sessions and authentic PDFs.')}
-                  </p>
-                </div>
+            {filteredPapers.length === 0 ? (
+              <div style={{ padding: '40px 20px', textAlign: 'center' }} className="dim">
+                No examination papers match your current query "{searchQuery}".
+              </div>
+            ) : (
+              <div className="tree-branch-container" role="tree">
+                {treeData.map((lvlNode) => {
+                  const isLvlExpanded = expandedKeys.has(lvlNode.key);
 
-                {/* Stat Grid */}
-                <div className="tree-stats-grid">
-                  <div className="tree-stat-box">
-                    <span className="tree-stat-val">{nodeStats.total}</span>
-                    <span className="tree-stat-lbl">Papers in Branch</span>
-                  </div>
-                  <div className="tree-stat-box">
-                    <span className="tree-stat-val">{nodeStats.withSol}</span>
-                    <span className="tree-stat-lbl">With Solutions</span>
-                  </div>
-                  <div className="tree-stat-box">
-                    <span className="tree-stat-val">{nodeStats.distinctSchools}</span>
-                    <span className="tree-stat-lbl">Schools Included</span>
-                  </div>
-                  <div className="tree-stat-box">
-                    <span className="tree-stat-val">{nodeStats.yearRange}</span>
-                    <span className="tree-stat-lbl">Sitting Years</span>
-                  </div>
-                </div>
-
-                {/* If a single paper is clicked */}
-                {selectedNode.type === 'paper' && selectedNode.paper && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px',
-                      padding: '14px',
-                      background: 'var(--color-bg)',
-                      borderRadius: 'var(--radius-md)',
-                      border: '1px solid var(--color-divider)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span className="tag tag-accent">
-                        {selectedNode.paper.c === 'H' ? 'Official HSC' : selectedNode.paper.c === 'A' ? 'Assessment' : 'Trial Exam'}
-                      </span>
-                      <span className="num dim" style={{ fontSize: '13px' }}>
-                        Sitting Year: {selectedNode.paper.y}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        style={{ flex: 1 }}
-                        onClick={() => handleLaunchPractice(selectedNode.paper)}
+                  return (
+                    <div key={lvlNode.key} className="tree-branch">
+                      {/* Level Root Node */}
+                      <div
+                        className={`tree-row ${isLvlExpanded ? 'expanded' : ''}`}
+                        onClick={() => toggleNode(lvlNode.key)}
+                        role="treeitem"
+                        aria-expanded={isLvlExpanded}
                       >
-                        <BookOpen size={15} />
-                        Open in Practice Room
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => handleOpenPdf(selectedNode.paper)}
-                      >
-                        <ExternalLink size={15} />
-                        View PDF
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Paper Shelf list for selected folder */}
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-accent-700)', fontWeight: 600 }}>
-                      File Shelf ({activeShelfPapers.length})
-                    </span>
-                    <span className="num dim" style={{ fontSize: '11px' }}>
-                      Click Practice to begin sitting
-                    </span>
-                  </div>
-
-                  <div className="tree-shelf-list">
-                    {activeShelfPapers.slice(0, 40).map((paper) => (
-                      <div key={paper.cf || paper.n} className="tree-shelf-item">
-                        <div className="tree-shelf-item-head">
-                          <h4 className="tree-shelf-item-title">{paper.n}</h4>
-                          {paper.w === 1 && (
-                            <span className="tag tag-accent" style={{ fontSize: '10px' }}>
-                              Worked sol
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="num dim" style={{ fontSize: '12px' }}>
-                          {schools[paper.h] || 'School'} · Year {paper.y} · {paper.c === 'H' ? 'HSC' : paper.c === 'A' ? 'Assessment' : 'Trial'}
-                        </div>
-
-                        <div className="tree-shelf-item-foot">
-                          <span className="tag tag-neutral" style={{ fontSize: '10.5px' }}>
-                            {subjects[paper.s]}
+                        <div className="tree-row-main">
+                          <button
+                            type="button"
+                            className="tree-toggle-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleNode(lvlNode.key);
+                            }}
+                            aria-label="Toggle folder"
+                          >
+                            {isLvlExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                          </button>
+                          <span className="tree-node-icon">
+                            {isLvlExpanded ? <FolderOpen size={16} /> : <Folder size={16} />}
                           </span>
-                          <div style={{ display: 'flex', gap: '6px' }}>
-                            <button
-                              type="button"
-                              className="btn btn-primary"
-                              style={{ fontSize: '11.5px', padding: '4px 10px' }}
-                              onClick={() => handleLaunchPractice(paper)}
-                            >
-                              <BookOpen size={12} />
-                              Practice
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-secondary"
-                              style={{ fontSize: '11.5px', padding: '4px 8px' }}
-                              onClick={() => handleOpenPdf(paper)}
-                              title="Direct PDF"
-                            >
-                              <ExternalLink size={12} />
-                            </button>
-                          </div>
+                          <span className="tree-node-name is-root">
+                            {lvlNode.name}
+                          </span>
+                        </div>
+                        <div className="tree-node-meta">
+                          <span className="tree-badge-count">{lvlNode.count} papers</span>
                         </div>
                       </div>
-                    ))}
 
-                    {activeShelfPapers.length > 40 && (
-                      <div style={{ textAlign: 'center', padding: '12px 0', fontSize: '12.5px' }} className="dim">
-                        Showing first 40 of {activeShelfPapers.length} papers. Use the tree hierarchy or search to narrow your selection.
-                      </div>
-                    )}
-                  </div>
-                </div>
+                      {/* Subject Children */}
+                      {isLvlExpanded && (
+                        <div className="tree-sub-branches">
+                          {lvlNode.subjects.map((subjNode) => {
+                            const isSubjExpanded = expandedKeys.has(subjNode.key);
+
+                            return (
+                              <div key={subjNode.key} className="tree-branch">
+                                {/* Subject Row */}
+                                <div
+                                  className={`tree-row ${isSubjExpanded ? 'expanded' : ''}`}
+                                  onClick={() => toggleNode(subjNode.key)}
+                                  role="treeitem"
+                                  aria-expanded={isSubjExpanded}
+                                >
+                                  <div className="tree-row-main">
+                                    <button
+                                      type="button"
+                                      className="tree-toggle-btn"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleNode(subjNode.key);
+                                      }}
+                                    >
+                                      {isSubjExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                                    </button>
+                                    <span className="tree-node-icon">
+                                      {isSubjExpanded ? <FolderOpen size={15} /> : <Folder size={15} />}
+                                    </span>
+                                    <span className="tree-node-name is-subject">
+                                      {subjNode.name}
+                                    </span>
+                                  </div>
+                                  <div className="tree-node-meta">
+                                    <span className="tree-badge-count">{subjNode.count}</span>
+                                  </div>
+                                </div>
+
+                                {/* Category Children */}
+                                {isSubjExpanded && (
+                                  <div className="tree-sub-branches">
+                                    {subjNode.categories.map((catNode) => {
+                                      const isCatExpanded = expandedKeys.has(catNode.key);
+
+                                      return (
+                                        <div key={catNode.key} className="tree-branch">
+                                          {/* Category Row */}
+                                          <div
+                                            className={`tree-row ${isCatExpanded ? 'expanded' : ''}`}
+                                            onClick={() => toggleNode(catNode.key)}
+                                            role="treeitem"
+                                            aria-expanded={isCatExpanded}
+                                          >
+                                            <div className="tree-row-main">
+                                              <button
+                                                type="button"
+                                                className="tree-toggle-btn"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  toggleNode(catNode.key);
+                                                }}
+                                              >
+                                                {isCatExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                              </button>
+                                              <span className="tree-node-icon">
+                                                {isCatExpanded ? <FolderOpen size={14} /> : <Folder size={14} />}
+                                              </span>
+                                              <span className="tree-node-name">
+                                                {catNode.name}
+                                              </span>
+                                            </div>
+                                            <div className="tree-node-meta">
+                                              <span className="tree-badge-count">{catNode.count}</span>
+                                            </div>
+                                          </div>
+
+                                          {/* School Children */}
+                                          {isCatExpanded && (
+                                            <div className="tree-sub-branches">
+                                              {catNode.schools.map((schNode) => {
+                                                const isSchExpanded = expandedKeys.has(schNode.key);
+
+                                                return (
+                                                  <div key={schNode.key} className="tree-branch">
+                                                    {/* School Row */}
+                                                    <div
+                                                      className={`tree-row ${isSchExpanded ? 'expanded' : ''}`}
+                                                      onClick={() => toggleNode(schNode.key)}
+                                                      role="treeitem"
+                                                      aria-expanded={isSchExpanded}
+                                                    >
+                                                      <div className="tree-row-main">
+                                                        <button
+                                                          type="button"
+                                                          className="tree-toggle-btn"
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            toggleNode(schNode.key);
+                                                          }}
+                                                        >
+                                                          {isSchExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                                                        </button>
+                                                        <span className="tree-node-icon">
+                                                          {isSchExpanded ? <FolderOpen size={13} /> : <Folder size={13} />}
+                                                        </span>
+                                                        <span className="tree-node-name">
+                                                          {schNode.name}
+                                                        </span>
+                                                      </div>
+                                                      <div className="tree-node-meta">
+                                                        <span className="tree-badge-count">{schNode.count}</span>
+                                                      </div>
+                                                    </div>
+
+                                                    {/* Papers (Leaf nodes) */}
+                                                    {isSchExpanded && (
+                                                      <div className="tree-sub-branches">
+                                                        {schNode.papers.map((p) => (
+                                                          <div
+                                                            key={p.cf || p.n}
+                                                            className="tree-file-node"
+                                                          >
+                                                            <div className="tree-file-info">
+                                                              <FileText size={14} style={{ color: 'var(--color-accent-700)', flexShrink: 0 }} />
+                                                              <span className="tree-file-name">{p.n}</span>
+                                                              <span className="tag tag-neutral" style={{ fontSize: '11px', padding: '1px 6px', flexShrink: 0 }}>
+                                                                {p.y}
+                                                              </span>
+                                                              {p.w === 1 && (
+                                                                <span className="tag tag-accent" style={{ fontSize: '10.5px', padding: '1px 6px', flexShrink: 0 }}>
+                                                                  Worked sol
+                                                                </span>
+                                                              )}
+                                                            </div>
+
+                                                            <div className="tree-file-actions">
+                                                              <button
+                                                                type="button"
+                                                                className="btn btn-primary"
+                                                                style={{ fontSize: '12px', padding: '4px 12px' }}
+                                                                onClick={() => handleLaunchPractice(p)}
+                                                                title="Open in Practice Room"
+                                                              >
+                                                                <BookOpen size={13} />
+                                                                Practice
+                                                              </button>
+                                                              <button
+                                                                type="button"
+                                                                className="btn btn-secondary"
+                                                                style={{ fontSize: '12px', padding: '4px 8px' }}
+                                                                onClick={() => handleOpenPdf(p)}
+                                                                title="Open Raw PDF"
+                                                              >
+                                                                <ExternalLink size={13} />
+                                                              </button>
+                                                            </div>
+                                                          </div>
+                                                        ))}
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+            )}
           </div>
         )}
       </main>

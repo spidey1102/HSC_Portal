@@ -22,12 +22,12 @@ export default function App() {
     } catch {
       // URLSearchParams error fallback
     }
-    return loadAppearanceSettings().portalLayout || 'simplified';
+    return loadAppearanceSettings().portalLayout || 'new';
   });
 
   const handlePortalLayoutChange = useCallback((nextLayout) => {
     const normalized = nextLayout === 'tree' ? 'simplified' : nextLayout;
-    const validLayout = ['classic', 'simplified', 'new'].includes(normalized) ? normalized : 'simplified';
+    const validLayout = ['classic', 'simplified', 'new'].includes(normalized) ? normalized : 'new';
     try {
       const currentAppearance = loadAppearanceSettings();
       window.localStorage.setItem(
