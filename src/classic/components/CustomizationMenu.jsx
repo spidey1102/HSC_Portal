@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, X, Monitor, Moon, Palette, Sun, KeyRound, Server, UserRound, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { Check, X, Monitor, Moon, Palette, Sun, KeyRound, Server, UserRound, Eye, EyeOff, Trash2, FolderTree } from 'lucide-react';
 import {
   APPEARANCE_PRESETS,
   ACCENT_OPTIONS,
@@ -219,6 +219,13 @@ export default function CustomizationMenu({
                   description="The new editorial study workspace."
                   icon={Monitor}
                   onClick={() => onChange({ portalLayout: 'new' })}
+                />
+                <OptionButton
+                  active={settings.portalLayout === 'simplified'}
+                  label="Tree layout"
+                  description="Hierarchical file tree directory for quick browsing."
+                  icon={FolderTree}
+                  onClick={() => onChange({ portalLayout: 'simplified' })}
                 />
               </div>
             </section>

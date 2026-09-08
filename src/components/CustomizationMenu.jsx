@@ -196,6 +196,15 @@ export default function CustomizationMenu({
                 />
                 <span>Classic portal</span>
               </label>
+              <label className="seg-opt" title="Minimalist hierarchical file tree directory">
+                <input
+                  type="radio"
+                  name="customisation-portal-layout"
+                  checked={settings.portalLayout === 'simplified'}
+                  onChange={() => onChange({ portalLayout: 'simplified' })}
+                />
+                <span>Tree layout</span>
+              </label>
             </div>
             <p className="dim" style={{ fontSize: '11.5px', margin: '8px 0 0' }}>
               Switches the home workspace only. Your papers, synced setup, AI tools, and Practice Room stay the same.

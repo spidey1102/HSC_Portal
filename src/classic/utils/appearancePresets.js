@@ -268,7 +268,7 @@ export function loadAppearanceSettings() {
     const layout = LAYOUT_OPTIONS.some((option) => option.value === parsed?.layout)
       ? parsed.layout
       : APPEARANCE_DEFAULTS.layout;
-    const portalLayout = ['new', 'classic'].includes(parsed?.portalLayout)
+    const portalLayout = ['new', 'classic', 'simplified'].includes(parsed?.portalLayout)
       ? parsed.portalLayout
       : APPEARANCE_DEFAULTS.portalLayout;
     const showRecommendations = parsed?.showRecommendations !== false;
