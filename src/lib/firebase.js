@@ -24,11 +24,15 @@ export const signInWithGoogle = async () => {
       try {
         return await signInWithRedirect(auth, googleProvider);
       } catch (redirectError) {
-        console.error("signInWithRedirect error:", redirectError);
+        console.warn("signInWithRedirect warning:", redirectError);
         throw redirectError;
       }
     }
-    console.error("signInWithGoogle error:", error);
+    if (error.code === 'auth/unauthorized-domain' || error.code === 'auth/popup-closed-by-user') {
+      console.warn("signInWithGoogle warning:", error.message || error.code);
+    } else {
+      console.error("signInWithGoogle error:", error);
+    }
     throw error;
   }
 };

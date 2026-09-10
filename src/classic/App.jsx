@@ -10,9 +10,10 @@ import AdaptiveRecommendations from './components/AdaptiveRecommendations';
 import AgentCommandCenter from './components/AgentCommandCenter';
 import CustomizationMenu from './components/CustomizationMenu';
 import FirebaseResetNotice from './components/FirebaseResetNotice';
-import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock, BotMessageSquare, Palette, BookOpenCheck } from 'lucide-react';
+import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock, BotMessageSquare, Palette, BookOpenCheck, Users } from 'lucide-react';
 import PaperHistory from './components/PaperHistory';
 import StudyNotebook from './components/StudyNotebook';
+import CohortChallengesView from '../components/CohortChallengesView';
 import { Analytics } from '@vercel/analytics/react';
 import { findPaperByIdentifier, getPaperRouteId } from './utils/paperIdentity';
 import { loadMySubjects } from './utils/mySubjects';
@@ -89,11 +90,13 @@ export default function App({ onPortalLayoutChange }) {
 
   const handleSignIn = async () => {
     try {
-      await signInWithGoogle();
-      localStorage.setItem('hsc_has_seen_signin_prompt', 'true');
-      setShowSignInPrompt(false);
+      const res = await signInWithGoogle();
+      if (res && !res.error) {
+        localStorage.setItem('hsc_has_seen_signin_prompt', 'true');
+        setShowSignInPrompt(false);
+      }
     } catch (e) {
-      console.error(e);
+      console.warn('Sign-in handled:', e?.message || e);
     }
   };
 
@@ -324,6 +327,7 @@ export default function App({ onPortalLayoutChange }) {
 
   // Calendar State
   const [viewCalendar, setViewCalendar] = useState(false);
+  const [viewChallenges, setViewChallenges] = useState(false);
 
   // active Paper for practice room
   const [activePaperId, setActivePaperId] = useState(() => {
@@ -891,7 +895,7 @@ export default function App({ onPortalLayoutChange }) {
     const target = paperLoadSentinelRef.current;
     const scrollRoot = scrollableContentRef.current;
     const canObserve = typeof window !== 'undefined' && 'IntersectionObserver' in window;
-    const isHomePaperView = !loading && !error && !viewCalendar && !viewTextbooks && !viewHistory && !viewNotebook;
+    const isHomePaperView = !loading && !error && !viewCalendar && !viewTextbooks && !viewHistory && !viewNotebook && !viewChallenges;
 
     if (!target || !scrollRoot || !canObserve || !isHomePaperView || !hasMorePaperRows) return undefined;
 
@@ -904,35 +908,39 @@ export default function App({ onPortalLayoutChange }) {
 
     observer.observe(target);
     return () => observer.disconnect();
-  }, [loading, error, viewCalendar, viewTextbooks, viewHistory, viewNotebook, hasMorePaperRows, loadNextPaperPage]);
+  }, [loading, error, viewCalendar, viewTextbooks, viewHistory, viewNotebook, viewChallenges, hasMorePaperRows, loadNextPaperPage]);
 
   useEffect(() => () => {
     if (loadMoreTimerRef.current) clearTimeout(loadMoreTimerRef.current);
   }, []);
 
-  const currentViewLabel = viewCalendar
-    ? 'Assessment calendar'
-    : viewTextbooks
-      ? 'Textbooks'
-      : viewBookmarks
-        ? 'Saved library'
-        : viewHistory
-          ? 'Paper History'
-          : viewNotebook
-            ? 'Mistake Notebook'
-            : 'HSC past papers';
+  const currentViewLabel = viewChallenges
+    ? 'Paper Run & Peer Marking'
+    : viewCalendar
+      ? 'Assessment calendar'
+      : viewTextbooks
+        ? 'Textbooks'
+        : viewBookmarks
+          ? 'Saved library'
+          : viewHistory
+            ? 'Paper History'
+            : viewNotebook
+              ? 'Mistake Notebook'
+              : 'HSC past papers';
 
-  const currentViewDescription = viewCalendar
-    ? 'Track assessment dates and keep the term visible at a glance.'
-    : viewTextbooks
-      ? 'Open subject texts and reference material from one quiet library.'
-      : viewBookmarks
-        ? 'Return to the papers you have saved for practice.'
-        : viewHistory
-          ? 'Papers you opened and those you marked complete.'
-          : viewNotebook
-            ? 'Review your practice, capture useful mistakes, and turn them into next steps.'
-            : 'Browse official papers, trial exams, and resources without the clutter.';
+  const currentViewDescription = viewChallenges
+    ? 'Collaborative challenge pools, blind peer marking assignments, and cohort precision leaderboards.'
+    : viewCalendar
+      ? 'Track assessment dates and keep the term visible at a glance.'
+      : viewTextbooks
+        ? 'Open subject texts and reference material from one quiet library.'
+        : viewBookmarks
+          ? 'Return to the papers you have saved for practice.'
+          : viewHistory
+            ? 'Papers you opened and those you marked complete.'
+            : viewNotebook
+              ? 'Review your practice, capture useful mistakes, and turn them into next steps.'
+              : 'Browse official papers, trial exams, and resources without the clutter.';
 
   const firebaseResetNotice = (
     <FirebaseResetNotice
@@ -1040,6 +1048,8 @@ export default function App({ onPortalLayoutChange }) {
           setViewTextbooks={setViewTextbooks}
           viewCalendar={viewCalendar}
           setViewCalendar={setViewCalendar}
+          viewChallenges={viewChallenges}
+          setViewChallenges={setViewChallenges}
           viewNotebook={viewNotebook}
           setViewNotebook={setViewNotebook}
           bookmarksCount={bookmarks.size}
@@ -1065,7 +1075,9 @@ export default function App({ onPortalLayoutChange }) {
             >
               <Menu size={18} />
             </button>
-            {viewCalendar ? (
+            {viewChallenges ? (
+              <Users size={20} color="var(--brand-experiment)" />
+            ) : viewCalendar ? (
               <Calendar size={20} color="var(--brand-experiment)" />
             ) : viewTextbooks ? (
               <Book size={20} color="var(--brand-experiment)" />
@@ -1178,7 +1190,16 @@ export default function App({ onPortalLayoutChange }) {
 
         <div className="scrollable-content" ref={scrollableContentRef}>
           <div className="content-stack">
-            {viewCalendar ? (
+            {viewChallenges ? (
+              <CohortChallengesView
+                subjects={subjects}
+                schools={schools}
+                papers={papers}
+                onSelectPaper={openPaper}
+                onNavigateToPractice={() => {}}
+                currentUser={user}
+              />
+            ) : viewCalendar ? (
               <CustomCalendar />
             ) : viewTextbooks ? (
               <TextbooksView />

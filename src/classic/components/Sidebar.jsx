@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, GraduationCap, Calendar, Database, Library, Bookmark, X, Smartphone, Share2, PlusSquare, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BookOpen, GraduationCap, Calendar, Database, Library, Bookmark, X, Smartphone, Share2, PlusSquare, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 
 function SidebarButton({ active, icon: Icon, label, onClick, color = 'var(--text-normal)' }) {
   return (
@@ -30,6 +30,8 @@ export default function Sidebar({
   setViewTextbooks,
   viewCalendar,
   setViewCalendar,
+  viewChallenges = false,
+  setViewChallenges,
   viewNotebook = false,
   setViewNotebook,
   bookmarksCount,
@@ -90,7 +92,7 @@ export default function Sidebar({
         <div className="sidebar-section-label">View</div>
         <div className="sidebar-button-stack">
           <SidebarButton
-            active={!viewBookmarks && !viewTextbooks && !viewCalendar && !viewNotebook}
+            active={!viewBookmarks && !viewTextbooks && !viewCalendar && !viewNotebook && !viewChallenges}
             icon={Library}
             label="Past papers"
             onClick={() => {
@@ -98,8 +100,22 @@ export default function Sidebar({
               setViewTextbooks(false);
               setViewCalendar(false);
               setViewNotebook?.(false);
+              setViewChallenges?.(false);
               setSelectedLevel(12);
             }}
+          />
+          <SidebarButton
+            active={viewChallenges}
+            icon={Users}
+            label="Paper Run"
+            onClick={() => {
+              setViewChallenges?.(true);
+              setViewBookmarks(false);
+              setViewTextbooks(false);
+              setViewCalendar(false);
+              setViewNotebook?.(false);
+            }}
+            color="var(--brand-experiment)"
           />
           <SidebarButton
             active={viewBookmarks}
@@ -110,6 +126,7 @@ export default function Sidebar({
               setViewTextbooks(false);
               setViewCalendar(false);
               setViewNotebook?.(false);
+              setViewChallenges?.(false);
             }}
             color="var(--status-positive)"
           />
@@ -122,6 +139,7 @@ export default function Sidebar({
               setViewBookmarks(false);
               setViewCalendar(false);
               setViewNotebook?.(false);
+              setViewChallenges?.(false);
             }}
           />
           <SidebarButton
@@ -133,6 +151,7 @@ export default function Sidebar({
               setViewBookmarks(false);
               setViewTextbooks(false);
               setViewNotebook?.(false);
+              setViewChallenges?.(false);
             }}
             color="var(--status-warning)"
           />

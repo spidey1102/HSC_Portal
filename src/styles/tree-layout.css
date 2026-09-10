@@ -1,0 +1,524 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   Tree Layout — Classical Hierarchical Examination Directory
+   Uses the exact tokens, color palette, card boxes, and padding of classical.css
+   ══════════════════════════════════════════════════════════════════════ */
+
+.tree-portal {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.tree-masthead-wrapper {
+  flex: none;
+  border-bottom: 1px solid var(--color-divider);
+  background: var(--color-bg);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.tree-masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px var(--gutter);
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.tree-masthead-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tree-brand-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  color: var(--color-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tree-masthead-title {
+  display: flex;
+  flex-direction: column;
+}
+
+.tree-masthead-title h1 {
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: var(--font-heading-weight);
+  margin: 0;
+  line-height: 1.15;
+  color: var(--color-text);
+}
+
+.tree-masthead-title .tree-kicker {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-accent-700);
+}
+
+.tree-masthead-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Workspace Switcher */
+.tree-workspace-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: 2px;
+  gap: 2px;
+}
+
+.tree-workspace-btn {
+  padding: 5px 12px;
+  border-radius: calc(var(--radius-md) - 2px);
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: var(--font-heading-weight);
+  cursor: pointer;
+  transition: all 0.14s ease;
+  white-space: nowrap;
+}
+
+.tree-workspace-btn:hover {
+  color: var(--color-text);
+}
+
+.tree-workspace-btn.active {
+  background: var(--color-bg);
+  color: var(--color-accent);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Main Container */
+.tree-main-layout {
+  flex: 1;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 24px var(--gutter) 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Intro Header */
+.tree-intro-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.tree-intro-text h2 {
+  font-family: var(--font-heading);
+  font-size: 32px;
+  margin: 0 0 6px;
+  line-height: 1.15;
+  color: var(--color-text);
+}
+
+.tree-intro-text p {
+  margin: 0;
+  font-size: 14px;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+  max-width: 72ch;
+}
+
+.tree-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Breadcrumbs bar */
+.tree-breadcrumb-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  flex-wrap: wrap;
+}
+
+.tree-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.tree-breadcrumb-link {
+  background: transparent;
+  border: 0;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--color-accent-700);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tree-breadcrumb-link:hover {
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+.tree-breadcrumb-current {
+  color: var(--color-text);
+  font-weight: 600;
+  padding: 2px 6px;
+}
+
+/* Toolbar & Controls */
+.tree-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.tree-search-wrap {
+  position: relative;
+  flex: 1 1 300px;
+  max-width: 480px;
+}
+
+.tree-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+  pointer-events: none;
+}
+
+.tree-search-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 34px 0 36px;
+  font-size: 13.5px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-family: inherit;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.tree-search-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 20%, transparent);
+}
+
+.tree-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: 0;
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.tree-search-clear:hover {
+  color: var(--color-text);
+}
+
+.tree-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Full-Width Tree Container */
+.tree-panel,
+.tree-panel-full {
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tree-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.tree-panel-title {
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: var(--font-heading-weight);
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Tree Root & Branch Nodes */
+.tree-branch-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.12s ease, color 0.12s ease;
+  color: var(--color-text);
+  border: 1px solid transparent;
+  width: 100%;
+}
+
+.tree-row:hover {
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+}
+
+.tree-row.expanded {
+  background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+}
+
+.tree-row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.tree-toggle-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  cursor: pointer;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.tree-toggle-btn:hover {
+  color: var(--color-accent);
+}
+
+.tree-node-icon {
+  color: var(--color-accent);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.tree-node-name {
+  font-family: var(--font-body);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-node-name.is-root {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.tree-node-name.is-subject {
+  font-weight: 600;
+}
+
+.tree-node-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.tree-badge-count {
+  font-family: var(--font-num);
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+
+.tree-sub-branches {
+  margin-left: 26px;
+  padding-left: 12px;
+  border-left: 1.5px solid var(--color-divider);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 3px;
+  margin-bottom: 5px;
+}
+
+@media (max-width: 640px) {
+  .tree-sub-branches {
+    margin-left: 14px;
+    padding-left: 8px;
+  }
+}
+
+/* File Node inside Tree (Leaf paper) */
+.tree-file-node {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+  border: 1px solid color-mix(in srgb, var(--color-divider) 60%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
+  width: 100%;
+}
+
+.tree-file-node:hover {
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+.tree-file-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.tree-file-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.tree-file-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Level Select Pills */
+.tree-pill-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tree-pill-btn {
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  color: var(--color-text);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.14s ease;
+  font-family: inherit;
+}
+
+.tree-pill-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.tree-pill-btn.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-bg);
+  font-weight: 600;
+}
+
+/* Practice Room Modal Overlay */
+.tree-practice-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-bg);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
+.tree-practice-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px var(--gutter);
+  border-bottom: 1px solid var(--color-divider);
+  background: var(--color-surface);
+}

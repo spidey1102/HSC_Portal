@@ -5,6 +5,7 @@ import { getPlatformShortcuts } from '../utils/platformShortcuts';
 export const PORTAL_SECTIONS = [
   { id: 'today', label: 'Today' },
   { id: 'library', label: 'Library' },
+  { id: 'challenges', label: 'Paper Run' },
   { id: 'calendar', label: 'Calendar' },
   { id: 'notebook', label: 'Notebook' },
   { id: 'history', label: 'History' },

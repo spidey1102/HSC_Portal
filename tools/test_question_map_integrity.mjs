@@ -1,3 +1,4 @@
+/* global console */
 import assert from 'node:assert/strict';
 import {
   isObviouslyIncompleteCachedAnalysis,

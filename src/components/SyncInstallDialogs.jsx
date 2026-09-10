@@ -1,6 +1,7 @@
 import { Plus, Share2, X } from 'lucide-react';
 import { useEscapeKey } from '../utils/useEscapeKey';
 import { usePresence } from '../utils/usePresence';
+import { useAuth } from './AuthContext';
 
 /**
  * Sync and install — the two small dialogs.
@@ -10,13 +11,19 @@ import { usePresence } from '../utils/usePresence';
  */
 
 export function SignInDialog({ isOpen, onSignIn, onDismiss }) {
+  const { authError, setAuthError } = useAuth() || {};
+  const handleDismiss = () => {
+    if (setAuthError) setAuthError(null);
+    onDismiss?.();
+  };
+
   const presence = usePresence(isOpen, 220);
-  useEscapeKey(isOpen, onDismiss);
+  useEscapeKey(isOpen, handleDismiss);
 
   if (!presence.mounted) return null;
 
   return (
-    <div className={`dialog-backdrop is-${presence.stage}`} role="presentation" onMouseDown={onDismiss}>
+    <div className={`dialog-backdrop is-${presence.stage}`} role="presentation" onMouseDown={handleDismiss}>
       <section
         className="dialog dialog--narrow"
         role="dialog"
@@ -30,11 +37,30 @@ export function SignInDialog({ isOpen, onSignIn, onDismiss }) {
           Signing in carries your saved papers, sittings, confidence rungs and notebook between the library computer
           and your own. Everything works unsigned — it simply stays on this machine.
         </p>
+
+        {authError && (
+          <div style={{
+            background: 'rgba(217, 119, 6, 0.08)',
+            border: '1px solid rgba(217, 119, 6, 0.25)',
+            borderRadius: '8px',
+            padding: '10px 12px',
+            fontSize: '12px',
+            lineHeight: 1.45,
+            marginBottom: '16px',
+            color: 'var(--text-normal)'
+          }}>
+            <div style={{ fontWeight: 600, color: 'var(--color-accent, #b45309)', marginBottom: '3px' }}>
+              Notice:
+            </div>
+            <div>{authError}</div>
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: '10px' }}>
           <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={onSignIn}>
             Sign in with Google
           </button>
-          <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={onDismiss}>
+          <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={handleDismiss}>
             Not now
           </button>
         </div>

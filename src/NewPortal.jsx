@@ -11,6 +11,7 @@ import PracticeRoom from './components/PracticeRoom';
 import TextbooksView from './components/TextbooksView';
 import PaperHistory from './components/PaperHistory';
 import StudyNotebook from './components/StudyNotebook';
+import CohortChallengesView from './components/CohortChallengesView';
 import AgentCommandCenter from './components/AgentCommandCenter';
 import CustomizationMenu from './components/CustomizationMenu';
 import FirebaseResetNotice from './components/FirebaseResetNotice';
@@ -106,11 +107,13 @@ export default function NewPortal({ onPortalLayoutChange }) {
 
   const handleSignIn = async () => {
     try {
-      await signInWithGoogle();
-      localStorage.setItem('hsc_has_seen_signin_prompt', 'true');
-      setShowSignInPrompt(false);
+      const res = await signInWithGoogle();
+      if (res && !res.error) {
+        localStorage.setItem('hsc_has_seen_signin_prompt', 'true');
+        setShowSignInPrompt(false);
+      }
     } catch (e) {
-      console.error(e);
+      console.warn('Sign-in handled:', e?.message || e);
     }
   };
 
@@ -806,6 +809,17 @@ export default function NewPortal({ onPortalLayoutChange }) {
             onBeginSitting={beginSitting}
             onAsk={askAgent}
           />
+        ) : section === 'challenges' ? (
+          <div className="section-pane pane-scroll">
+            <CohortChallengesView
+              subjects={subjects}
+              schools={schools}
+              papers={papers}
+              onSelectPaper={openPaper}
+              onNavigateToPractice={() => {}}
+              currentUser={user}
+            />
+          </div>
         ) : section === 'calendar' ? (
           <CalendarView
             exams={schedule.myExams}

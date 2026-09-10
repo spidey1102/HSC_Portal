@@ -31,19 +31,27 @@ export function AuthProvider({ children }) {
   const handleSignIn = async () => {
     setAuthError(null);
     try {
-      await signInWithGoogle();
+      const res = await signInWithGoogle();
+      return res;
     } catch (err) {
-      console.error("Sign in failed:", err);
-      let msg = err.message || 'Sign in failed';
-      if (err.code === 'auth/unauthorized-domain') {
-        msg = 'This domain is not authorized in Firebase Console. Please add your domain to Firebase Auth Authorized Domains.';
-      } else if (err.code === 'auth/popup-closed-by-user') {
+      const isExpected = err?.code === 'auth/unauthorized-domain' || err?.code === 'auth/popup-closed-by-user';
+      if (isExpected) {
+        console.warn("Sign in handled:", err?.message || err?.code);
+      } else {
+        console.error("Sign in failed:", err);
+      }
+
+      let msg = err?.message || 'Sign in failed';
+      if (err?.code === 'auth/unauthorized-domain') {
+        const host = typeof window !== 'undefined' ? window.location.hostname : 'this domain';
+        msg = `Domain "${host}" is not authorized in Firebase Console. Add "${host}" to Firebase Console -> Authentication -> Settings -> Authorized Domains. All study tools & cohort sprints work locally without signing in!`;
+      } else if (err?.code === 'auth/popup-closed-by-user') {
         msg = 'Sign in popup was closed before completing.';
-      } else if (err.code === 'auth/operation-not-allowed') {
+      } else if (err?.code === 'auth/operation-not-allowed') {
         msg = 'Google Sign-In is not enabled in Firebase Console.';
       }
       setAuthError(msg);
-      throw err;
+      return { error: err, message: msg };
     }
   };
 
