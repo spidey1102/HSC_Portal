@@ -49,13 +49,7 @@ const DEFAULT_COHORT = {
   created_at: new Date().toISOString()
 };
 
-const DEFAULT_MEMBERS = [
-  { id: 'm-1', user_name: 'Aseem Soti', user_id: 'aseem-soti', role: 'leader' },
-  { id: 'm-2', user_name: 'Muaz', user_id: 'muaz-rhhs', role: 'member' },
-  { id: 'm-3', user_name: 'Sakchhyam', user_id: 'sakchhyam-rhhs', role: 'member' },
-  { id: 'm-4', user_name: 'Yuvi', user_id: 'yuvi-rhhs', role: 'member' },
-  { id: 'm-5', user_name: 'Theo', user_id: 'theo-rhhs', role: 'member' },
-];
+const DEFAULT_MEMBERS = [];
 
 export default function CohortChallengesView({
   subjects = [],
@@ -161,8 +155,10 @@ export default function CohortChallengesView({
 
           // 2. Fetch Members
           const { data: mData } = await supabase.from('cohort_members').select('*').eq('cohort_id', matched.id);
-          if (mData && mData.length > 0) {
+          if (mData) {
             setMembers(mData);
+          } else {
+            setMembers([]);
           }
 
           // 3. Fetch Challenges
@@ -266,12 +262,12 @@ export default function CohortChallengesView({
         setCohorts([insertedGroup]);
 
         // Insert initial members
-        const membersPayload = DEFAULT_MEMBERS.map(m => ({
+        const membersPayload = [{
           cohort_id: insertedGroup.id,
-          user_name: m.user_name,
-          user_id: m.user_id,
-          role: m.role
-        }));
+          user_name: currentUserName,
+          user_id: currentUserId,
+          role: 'leader'
+        }];
         await supabase.from('cohort_members').insert(membersPayload);
 
         // Insert Girraween challenge
@@ -492,6 +488,7 @@ export default function CohortChallengesView({
 
       setActiveCohort(matched);
       localStorage.setItem(LOCAL_STORAGE_COHORT_KEY, matched.id);
+      loadData();
       setShowJoinModal(false);
       setJoinCodeInput('');
       setJoinSuccess(`Welcome to ${matched.name}!`);
