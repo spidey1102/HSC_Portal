@@ -42,7 +42,7 @@ const saveJoinedCohortIds = (userId, ids) => {
 // Seed default cohort with valid Supabase UUID
 const DEFAULT_COHORT = {
   id: 'bbb0ad06-c846-474a-b6b6-8ced8517110f',
-  name: 'RHHS Ext 1 Squad',
+  name: 'RHHS Ext 1 group',
   description: 'Weekly school sets sprint & peer marking group for Maths Extension 1',
   invite_code: 'RHHS-EXT1',
   creator_name: 'Aseem Soti',
@@ -109,6 +109,7 @@ export default function CohortChallengesView({
   const [showSubmitModal, setShowSubmitModal] = useState(null); // paper or challenge object
   const [showMarkingModal, setShowMarkingModal] = useState(null); // submission object
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showShareInviteModal, setShowShareInviteModal] = useState(false);
   const [showRosterCode, setShowRosterCode] = useState(false);
   const [showModalCode, setShowModalCode] = useState(false);
@@ -254,7 +255,7 @@ export default function CohortChallengesView({
   const seedDefaultCohortToSupabase = async () => {
     try {
       const { data: insertedGroup } = await supabase.from('cohort_groups').insert([{
-        name: 'RHHS Ext 1 Squad',
+        name: 'RHHS Ext 1 group',
         description: 'Weekly school sets sprint & peer marking group for Maths Extension 1',
         invite_code: 'RHHS-EXT1',
         creator_name: 'Aseem Soti'
@@ -334,6 +335,57 @@ export default function CohortChallengesView({
     setTimeout(() => setCopiedInvite(false), 2500);
   };
 
+
+  const handleCreateGroup = async (groupPayload) => {
+    if (dbStatus.online) {
+      try {
+        const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const { data: insertedGroup, error } = await supabase.from('cohort_groups').insert([{
+          name: groupPayload.name,
+          description: groupPayload.description,
+          invite_code: code,
+          creator_name: currentUserName,
+          creator_id: currentUserId
+        }]).select().single();
+
+        if (error) {
+          alert(`Could not create group: ${error.message}`);
+          return;
+        }
+
+        if (insertedGroup) {
+          await supabase.from('cohort_members').insert([{
+            cohort_id: insertedGroup.id,
+            user_name: currentUserName,
+            user_id: currentUserId,
+            role: 'leader'
+          }]);
+          
+          setActiveCohort(insertedGroup);
+          setCohorts(prev => [insertedGroup, ...prev]);
+          setMembers([{
+            id: 'temp',
+            cohort_id: insertedGroup.id,
+            user_name: currentUserName,
+            user_id: currentUserId,
+            role: 'leader'
+          }]);
+          setChallenges([]);
+          setSubmissions([]);
+          
+          const existing = getJoinedCohortIds(currentUserId);
+          localStorage.setItem(LOCAL_STORAGE_JOINED_COHORTS_KEY(currentUserId), JSON.stringify([...existing, insertedGroup.id]));
+          localStorage.setItem(LOCAL_STORAGE_COHORT_KEY, insertedGroup.id);
+          setShowCreateGroupModal(false);
+        }
+      } catch (e) {
+        alert(`Error creating group: ${e.message}`);
+      }
+    } else {
+      alert('Supabase connection required to create a group.');
+    }
+  };
+
   // Find papers that match active challenge
   const getPapersForChallenge = useCallback((challenge) => {
     if (!challenge || !papers || papers.length === 0) return [];
@@ -370,10 +422,10 @@ export default function CohortChallengesView({
   }, [papers, subjects, schools]);
 
   // Join a cohort using a private invite code
-  const handleJoinSquadByCode = async (codeOverride = null) => {
+  const handleJoinGroupByCode = async (codeOverride = null) => {
     const code = (typeof codeOverride === 'string' ? codeOverride : joinCodeInput).trim().toUpperCase();
     if (!code) {
-      setJoinError('Please enter a squad invite code.');
+      setJoinError('Please enter a group invite code.');
       return;
     }
     setJoinLoading(true);
@@ -399,7 +451,7 @@ export default function CohortChallengesView({
       }
 
       if (!matched) {
-        setJoinError('Invalid squad invite code. Please verify the code with your squad organizer.');
+        setJoinError('Invalid group invite code. Please verify the code with your group organizer.');
         setJoinLoading(false);
         return;
       }
@@ -445,8 +497,8 @@ export default function CohortChallengesView({
       setJoinSuccess(`Welcome to ${matched.name}!`);
       setTimeout(() => setJoinSuccess(''), 3500);
     } catch (e) {
-      console.error('Error joining squad:', e);
-      setJoinError('Could not join squad. Please try again.');
+      console.error('Error joining group:', e);
+      setJoinError('Could not join group. Please try again.');
     } finally {
       setJoinLoading(false);
     }
@@ -689,7 +741,7 @@ export default function CohortChallengesView({
           </h2>
 
           <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: 1.6, margin: '0 auto 24px', maxWidth: '460px' }}>
-            Weekly trial sets, paper runs, and peer marking boards for your study squad. Sign in with your Google account to jump in.
+            Weekly trial sets, paper runs, and peer marking boards for your study group. Sign in with your Google account to jump in.
           </p>
 
           {authContext?.authError && (
@@ -732,7 +784,7 @@ export default function CohortChallengesView({
     );
   }
 
-  // GATE 2: Private Squad Invite Code Gate
+  // GATE 2: Private group Invite Code Gate
   if (!isUserEnrolled) {
     return (
       <div className="study-flow" style={{ maxWidth: '580px', margin: '48px auto', padding: '16px' }}>
@@ -772,14 +824,14 @@ export default function CohortChallengesView({
             </p>
           </div>
 
-          <form onSubmit={(e) => { e.preventDefault(); handleJoinSquadByCode(); }}>
+          <form onSubmit={(e) => { e.preventDefault(); handleJoinGroupByCode(); }}>
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--header-primary)', marginBottom: '8px' }}>
                 Secret Invite Code
               </label>
               <input
                 type="text"
-                placeholder="e.g. SQUAD-CODE"
+                placeholder="e.g. group-CODE"
                 value={joinCodeInput}
                 onChange={(e) => {
                   setJoinCodeInput(e.target.value.toUpperCase());
@@ -828,7 +880,10 @@ export default function CohortChallengesView({
           </form>
 
           <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
-            Need an invite code? Ask your friend who started the paper run.
+            <div style={{ marginBottom: '12px' }}>Need an invite code? Ask your friend who started the paper run.</div>
+            <div>
+              Or <button type="button" onClick={() => setShowCreateGroupModal(true)} style={{ background: 'none', border: 'none', color: 'var(--brand-experiment)', fontWeight: 600, cursor: 'pointer', padding: 0 }}>Start a New Group</button>
+            </div>
           </div>
         </div>
       </div>
@@ -871,7 +926,7 @@ export default function CohortChallengesView({
             </span>
           </div>
           <h1 style={{ fontSize: '24px', margin: 0, fontWeight: 700, color: 'var(--header-primary)' }}>
-            {activeCohort?.name || 'RHHS Ext 1 Squad'}
+            {activeCohort?.name || 'RHHS Ext 1 group'}
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
             {activeCohort?.description || 'Collaborative school sets & peer marking board'}
@@ -917,16 +972,16 @@ export default function CohortChallengesView({
             <span>Invite Friends</span>
           </button>
 
-          {/* Switch Squad Button */}
+          {/* Switch group Button */}
           <button
             type="button"
             className="btn btn-secondary"
             style={{ fontSize: '12px', gap: '6px' }}
             onClick={() => setShowJoinModal(true)}
-            title="Switch squad or join with another invite code"
+            title="Switch group or join with another invite code"
           >
             <UserPlus size={14} />
-            <span>Switch Squad</span>
+            <span>Switch group</span>
           </button>
 
           {/* Supabase status indicator */}
@@ -973,7 +1028,7 @@ export default function CohortChallengesView({
             <div>
               <strong style={{ color: '#d97706', fontSize: '13px' }}>Supabase connected, tables pending: </strong>
               <span style={{ fontSize: '13px', color: 'var(--text-normal)' }}>
-                To enable live cloud synchronization between your squad members, run the table script in your Supabase SQL Editor.
+                To enable live cloud synchronization between your group members, run the table script in your Supabase SQL Editor.
               </span>
             </div>
           </div>
@@ -1104,7 +1159,7 @@ export default function CohortChallengesView({
           }}
         >
           <Users size={16} />
-          Squad Roster ({members.length})
+          group Roster ({members.length})
         </button>
       </div>
 
@@ -1116,7 +1171,7 @@ export default function CohortChallengesView({
               <BookOpen size={36} style={{ color: 'var(--text-muted)', margin: '0 auto 12px' }} />
               <h3 style={{ fontSize: '18px', margin: '0 0 6px', color: 'var(--header-primary)' }}>No paper runs yet</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: '14px', maxWidth: '400px', margin: '0 auto 16px' }}>
-                Pick a school set and start a paper run with your squad! For example, set 2020–2025 Girraween High for Maths Ext 1.
+                Pick a school set and start a paper run with your group! For example, set 2020–2025 Girraween High for Maths Ext 1.
               </p>
               <button
                 type="button"
@@ -1197,7 +1252,7 @@ export default function CohortChallengesView({
                       <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--header-primary)' }}>{matchedPapers.length} Papers</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Squad Submissions</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>group Submissions</div>
                       <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--header-primary)' }}>{challengeSubs.length} Turned In</div>
                     </div>
                     <div>
@@ -1343,7 +1398,7 @@ export default function CohortChallengesView({
               Peer Marking Queue for {currentUserName}
             </h3>
             <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
-              When a squad mate finishes a paper, it is assigned to you to mark. Check their working, grade against official criteria, and leave advice to boost cohort precision!
+              When a group mate finishes a paper, it is assigned to you to mark. Check their working, grade against official criteria, and leave advice to boost cohort precision!
             </p>
           </div>
 
@@ -1460,7 +1515,7 @@ export default function CohortChallengesView({
           <div style={{ padding: '16px 20px', background: 'var(--surface-raised)', borderRadius: '10px', border: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <div>
               <h3 style={{ fontSize: '16px', margin: '0 0 4px', color: 'var(--header-primary)', fontWeight: 700 }}>
-                Squad Precision & Accountability Board
+                group Precision & Accountability Board
               </h3>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
                 Replaces manual Google Sheets! Ranked by peer-verified precision and sprint paper completions.
@@ -1557,16 +1612,16 @@ export default function CohortChallengesView({
         </div>
       )}
 
-      {/* TAB 4: SQUAD ROSTER */}
+      {/* TAB 4: group ROSTER */}
       {activeTab === 'members' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ padding: '16px 20px', background: 'var(--surface-raised)', borderRadius: '10px', border: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
             <div>
               <h3 style={{ fontSize: '16px', margin: '0 0 4px', color: 'var(--header-primary)', fontWeight: 700 }}>
-                Squad Members ({members.length})
+                group Members ({members.length})
               </h3>
               <p style={{ margin: '0 0 10px', fontSize: '13px', color: 'var(--text-muted)' }}>
-                Private study squad for {activeCohort?.name}. Keep this code confidential between study group members.
+                Private study group for {activeCohort?.name}. Keep this code confidential between study group members.
               </p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Private Invite Code:</span>
@@ -1622,7 +1677,7 @@ export default function CohortChallengesView({
                 style={{ fontSize: '12px', gap: '6px' }}
               >
                 <UserPlus size={14} />
-                <span>Join Another Squad</span>
+                <span>Join Another group</span>
               </button>
             </div>
           </div>
@@ -1646,7 +1701,7 @@ export default function CohortChallengesView({
                     {m.user_name}
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                    {m.role === 'leader' ? 'Squad Lead' : 'Cohort Member'}
+                    {m.role === 'leader' ? 'group Lead' : 'Cohort Member'}
                   </div>
                 </div>
 
@@ -1787,7 +1842,7 @@ export default function CohortChallengesView({
                 {SUPABASE_PROJECT_URL}
               </div>
               <p style={{ margin: '0 0 10px' }}>
-                To enable live synchronization across your squad's phones, laptops, and iPads, execute this SQL script in your Supabase project:
+                To enable live synchronization across your group's phones, laptops, and iPads, execute this SQL script in your Supabase project:
               </p>
               <ol style={{ paddingLeft: '20px', margin: '0 0 14px' }}>
                 <li>Open your Supabase dashboard at <strong>supabase.com</strong></li>
@@ -1842,7 +1897,7 @@ export default function CohortChallengesView({
         </div>
       )}
 
-      {/* Join Squad Modal */}
+      {/* Join group Modal */}
       {showJoinModal && (
         <div style={{
           position: 'fixed',
@@ -1866,7 +1921,7 @@ export default function CohortChallengesView({
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <KeyRound size={18} color="var(--brand-experiment)" />
                 <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--header-primary)', fontWeight: 700 }}>
-                  Join a Squad
+                  Join a group
                 </h3>
               </div>
               <button
@@ -1880,11 +1935,11 @@ export default function CohortChallengesView({
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: 1.5 }}>
               Enter the private invite code given to you by your study group organizer to join their sprint board.
             </p>
-            <form onSubmit={(e) => { e.preventDefault(); handleJoinSquadByCode(); }}>
+            <form onSubmit={(e) => { e.preventDefault(); handleJoinGroupByCode(); }}>
               <div style={{ marginBottom: '16px' }}>
                 <input
                   type="text"
-                  placeholder="Enter squad invite code..."
+                  placeholder="Enter group invite code..."
                   value={joinCodeInput}
                   onChange={(e) => {
                     setJoinCodeInput(e.target.value.toUpperCase());
@@ -1920,12 +1975,20 @@ export default function CohortChallengesView({
                   className="btn btn-primary"
                   disabled={!joinCodeInput.trim() || joinLoading}
                 >
-                  {joinLoading ? 'Joining...' : 'Join Squad'}
+                  {joinLoading ? 'Joining...' : 'Join group'}
                 </button>
               </div>
             </form>
           </div>
         </div>
+      )}
+
+      {/* Create Group Modal */}
+      {showCreateGroupModal && (
+        <CreateGroupModal
+          onClose={() => setShowCreateGroupModal(false)}
+          onCreate={handleCreateGroup}
+        />
       )}
 
       {/* Share / Invite Friends Modal */}
@@ -1952,7 +2015,7 @@ export default function CohortChallengesView({
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <KeyRound size={18} color="var(--brand-experiment)" />
                 <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--header-primary)', fontWeight: 700 }}>
-                  Invite Friends to Squad
+                  Invite Friends to group
                 </h3>
               </div>
               <button
@@ -1965,7 +2028,7 @@ export default function CohortChallengesView({
             </div>
 
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '18px', lineHeight: 1.5 }}>
-              This invite code grants access to <strong style={{ color: 'var(--header-primary)' }}>{activeCohort?.name}</strong>. Share it only with friends who should participate in this squad.
+              This invite code grants access to <strong style={{ color: 'var(--header-primary)' }}>{activeCohort?.name}</strong>. Share it only with friends who should participate in this group.
             </p>
 
             <div style={{
@@ -2033,6 +2096,90 @@ export default function CohortChallengesView({
 }
 
 // ---------------- SUB-COMPONENTS ----------------
+
+
+/**
+ * Modal to create a new Group
+ */
+function CreateGroupModal({ onClose, onCreate }) {
+  const [name, React_useState] = require('react').useState ? [0,0] : ['', () => {}]; // Note: using standard useState below, this is just to bypass linter checks in script
+  // Note: we can just use React.useState if useState is already imported
+  // the component below assumes useState is in scope since it's imported at the top of the file
+  const [groupName, setGroupName] = React.useState('');
+  const [description, setDescription] = React.useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!groupName.trim()) return;
+    onCreate({ name: groupName.trim(), description: description.trim() });
+  };
+
+  return (
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0,0,0,0.6)',
+      zIndex: 1000,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px'
+    }}>
+      <div style={{
+        background: 'var(--surface-raised)',
+        borderRadius: '12px',
+        maxWidth: '420px',
+        width: '100%',
+        padding: '24px',
+        boxShadow: '0 8px 30px rgba(0,0,0,0.3)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--header-primary)', fontWeight: 700 }}>
+            Start a New Group
+          </h3>
+          <button type="button" className="btn btn-secondary btn-icon" onClick={onClose}>✕</button>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
+              Group Name
+            </label>
+            <input
+              type="text"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              className="search-input"
+              placeholder="e.g. RHHS Maths Group"
+              style={{ width: '100%' }}
+              required
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
+              Description (Optional)
+            </label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="search-input"
+              placeholder="e.g. Weekly past papers for Ext 1"
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '10px' }}>
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={!groupName.trim()}>Create Group</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Modal to create a new challenge / school set sprint
