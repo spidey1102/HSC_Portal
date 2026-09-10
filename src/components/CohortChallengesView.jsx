@@ -39,15 +39,7 @@ const saveJoinedCohortIds = (userId, ids) => {
   }
 };
 
-// Seed default cohort with valid Supabase UUID
-const DEFAULT_COHORT = {
-  id: 'bbb0ad06-c846-474a-b6b6-8ced8517110f',
-  name: 'RHHS Ext 1 group',
-  description: 'Weekly school sets sprint & peer marking group for Maths Extension 1',
-  invite_code: 'RHHS-EXT1',
-  creator_name: 'Aseem Soti',
-  created_at: new Date().toISOString()
-};
+
 
 const DEFAULT_MEMBERS = [];
 
@@ -88,8 +80,8 @@ export default function CohortChallengesView({
   const [copiedInvite, setCopiedInvite] = useState(false);
 
   // Active Cohort & Data
-  const [cohorts, setCohorts] = useState([DEFAULT_COHORT]);
-  const [activeCohort, setActiveCohort] = useState(DEFAULT_COHORT);
+  const [cohorts, setCohorts] = useState([]);
+  const [activeCohort, setActiveCohort] = useState(null);
   const [members, setMembers] = useState(DEFAULT_MEMBERS);
   const [challenges, setChallenges] = useState([]);
   const [submissions, setSubmissions] = useState([]);
@@ -191,8 +183,10 @@ export default function CohortChallengesView({
             }
           }
         } else {
-          // If Supabase table is empty, auto-seed default RHHS cohort
-          await seedDefaultCohortToSupabase();
+          setCohorts([]);
+          setActiveCohort(null);
+          setChallenges([]);
+          setMembers([]);
         }
       } catch (err) {
         console.error('Failed to load from Supabase:', err);
@@ -218,22 +212,7 @@ export default function CohortChallengesView({
     } catch {
       // ignore
     }
-    // Seed initial local challenge for Girraween 2020-2025
-    const initialChallenge = {
-      id: 'girraween-week1',
-      cohort_id: DEFAULT_COHORT.id,
-      title: 'Week 1 Sprint: Girraween High (2020–2025)',
-      subject: 'Maths Ext 1',
-      school: 'Girraween',
-      start_year: 2020,
-      end_year: 2025,
-      deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      marking_mode: 'round_robin',
-      status: 'active',
-      created_at: new Date().toISOString(),
-      target_precision: 85
-    };
-    setChallenges([initialChallenge]);
+    setChallenges([]);
   };
 
   const saveLocalFallback = (newChallenges, newSubmissions, newMembers) => {
@@ -248,50 +227,7 @@ export default function CohortChallengesView({
     }
   };
 
-  const seedDefaultCohortToSupabase = async () => {
-    try {
-      const { data: insertedGroup } = await supabase.from('cohort_groups').insert([{
-        name: 'RHHS Ext 1 group',
-        description: 'Weekly school sets sprint & peer marking group for Maths Extension 1',
-        invite_code: 'RHHS-EXT1',
-        creator_name: 'Aseem Soti'
-      }]).select().single();
-
-      if (insertedGroup) {
-        setActiveCohort(insertedGroup);
-        setCohorts([insertedGroup]);
-
-        // Insert initial members
-        const membersPayload = [{
-          cohort_id: insertedGroup.id,
-          user_name: currentUserName,
-          user_id: currentUserId,
-          role: 'leader'
-        }];
-        await supabase.from('cohort_members').insert(membersPayload);
-
-        // Insert Girraween challenge
-        const { data: insertedChallenge } = await supabase.from('cohort_challenges').insert([{
-          cohort_id: insertedGroup.id,
-          title: 'Week 1 Sprint: Girraween High (2020–2025)',
-          subject: 'Maths Ext 1',
-          school: 'Girraween',
-          start_year: 2020,
-          end_year: 2025,
-          deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          marking_mode: 'round_robin',
-          status: 'active'
-        }]).select().single();
-
-        if (insertedChallenge) {
-          setChallenges([insertedChallenge]);
-        }
-      }
-    } catch (e) {
-      console.warn('Could not seed default to Supabase:', e);
-    }
-  };
-
+  
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -326,7 +262,7 @@ export default function CohortChallengesView({
   };
 
   const handleCopyInvite = () => {
-    navigator.clipboard.writeText(activeCohort?.invite_code || 'RHHS-EXT1');
+    navigator.clipboard.writeText(activeCohort?.invite_code || '');
     setCopiedInvite(true);
     setTimeout(() => setCopiedInvite(false), 2500);
   };
@@ -442,9 +378,7 @@ export default function CohortChallengesView({
         }
       }
 
-      if (!matched && code === DEFAULT_COHORT.invite_code.toUpperCase()) {
-        matched = DEFAULT_COHORT;
-      }
+
 
       if (!matched) {
         setJoinError('Invalid group invite code. Please verify the code with your group organizer.');
@@ -923,10 +857,10 @@ export default function CohortChallengesView({
             </span>
           </div>
           <h1 style={{ fontSize: '24px', margin: 0, fontWeight: 700, color: 'var(--header-primary)' }}>
-            {activeCohort?.name || 'RHHS Ext 1 group'}
+            {activeCohort?.name || ''}
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
-            {activeCohort?.description || 'Collaborative school sets & peer marking board'}
+            {activeCohort?.description || ''}
           </p>
         </div>
 
@@ -1633,7 +1567,7 @@ export default function CohortChallengesView({
                   color: 'var(--header-primary)',
                   border: '1px solid var(--border-subtle)'
                 }}>
-                  {showRosterCode ? (activeCohort?.invite_code || 'RHHS-EXT1') : '••••••••'}
+                  {showRosterCode ? (activeCohort?.invite_code || '') : '••••••••'}
                 </code>
                 <button
                   type="button"
@@ -2046,7 +1980,7 @@ export default function CohortChallengesView({
                   letterSpacing: showModalCode ? '2px' : '4px',
                   color: 'var(--header-primary)'
                 }}>
-                  {showModalCode ? (activeCohort?.invite_code || 'RHHS-EXT1') : '••••••••'}
+                  {showModalCode ? (activeCohort?.invite_code || '') : '••••••••'}
                 </code>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <button
