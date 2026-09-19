@@ -1,6 +1,8 @@
 import { Palette, Search } from 'lucide-react';
 import UserButton from './UserButton';
 import { getPlatformShortcuts } from '../utils/platformShortcuts';
+import { TEXTBOOKS_ENABLED } from '../config/featureFlags';
+import { NSW_MATHS_BOOKING_URL } from './NswMathsEventsBanner';
 
 export const PORTAL_SECTIONS = [
   { id: 'today', label: 'Today' },
@@ -8,7 +10,7 @@ export const PORTAL_SECTIONS = [
   { id: 'calendar', label: 'Calendar' },
   { id: 'notebook', label: 'Notebook' },
   { id: 'history', label: 'History' },
-  { id: 'textbooks', label: 'Textbooks' },
+  ...(TEXTBOOKS_ENABLED ? [{ id: 'textbooks', label: 'Textbooks' }] : []),
 ];
 
 /**
@@ -22,6 +24,7 @@ export default function PortalMasthead({
   runhead,
   onOpenPalette,
   onOpenCustomise,
+  showEventsButton = false,
   showActions = true,
 }) {
   const shortcuts = getPlatformShortcuts();
@@ -81,6 +84,16 @@ export default function PortalMasthead({
             {entry.label}
           </button>
         ))}
+        {showEventsButton && (
+          <a
+            className="nsw-maths-events-nav-link"
+            href={NSW_MATHS_BOOKING_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            NSW Maths events
+          </a>
+        )}
       </nav>
     </header>
   );

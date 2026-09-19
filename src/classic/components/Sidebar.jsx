@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BookOpen, GraduationCap, Calendar, Database, Library, Bookmark, X, Smartphone, Share2, PlusSquare, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TEXTBOOKS_ENABLED } from '../../config/featureFlags';
 
 function SidebarButton({ active, icon: Icon, label, onClick, color = 'var(--text-normal)' }) {
   return (
@@ -113,7 +114,7 @@ export default function Sidebar({
             }}
             color="var(--status-positive)"
           />
-          <SidebarButton
+          {TEXTBOOKS_ENABLED && <SidebarButton
             active={viewTextbooks}
             icon={BookOpen}
             label="Textbooks"
@@ -123,7 +124,7 @@ export default function Sidebar({
               setViewCalendar(false);
               setViewNotebook?.(false);
             }}
-          />
+          />}
           <SidebarButton
             active={viewCalendar}
             icon={Calendar}
