@@ -73,6 +73,14 @@ function pathMatchesCategory(filePath, categoryCode) {
   return folderNames.some(name => lowerPath.includes(name.toLowerCase()));
 }
 
+function categoryFromPath(filePath) {
+  const lowerPath = filePath.toLowerCase();
+  if (lowerPath.includes('/assessments/') || lowerPath.includes('/assessment/')) return 'A';
+  if (lowerPath.includes('/trials/') || lowerPath.includes('/trial/')) return 'T';
+  if (lowerPath.includes('/hsc/')) return 'H';
+  return null;
+}
+
 const pdfList = [];
 function scanDir(dir, relativePath = '') {
   let items;
@@ -121,13 +129,16 @@ for (const paper of papers) {
   const wantsSol = paper.w === 1;
   const yearStr = String(paper.y);
 
-  let nameMatches = pdfList.filter(pdf => pdf.normalizedName === normalizedPaperName);
+  let nameMatches = pdfList.filter(pdf => (
+    pdf.normalizedName === normalizedPaperName
+    && (categoryFromPath(pdf.fullPath) === null || categoryFromPath(pdf.fullPath) === category)
+  ));
 
   if (nameMatches.length === 0) {
     nameMatches = pdfList.filter(pdf =>
       pdf.normalizedName.includes(normalizedPaperName) ||
       normalizedPaperName.includes(pdf.normalizedName)
-    );
+    ).filter(pdf => categoryFromPath(pdf.fullPath) === null || categoryFromPath(pdf.fullPath) === category);
   }
 
   if (nameMatches.length === 0) {
@@ -163,8 +174,21 @@ for (const paper of papers) {
     continue;
   }
 
-  let categoryCandidates = subjectCandidates.filter(pdf => pathMatchesCategory(pdf.fullPath, category));
-  if (categoryCandidates.length === 0) categoryCandidates = subjectCandidates;
+  const categoryCandidates = subjectCandidates.filter(pdf => (
+    categoryFromPath(pdf.fullPath) === null || pathMatchesCategory(pdf.fullPath, category)
+  ));
+
+  if (categoryCandidates.length === 0) {
+    unmatched++;
+    if (unmatched <= 30) {
+      unmatchedExamples.push({
+        n: paper.n, v: paper.v, s: subjectName, y: paper.y, l: paper.l, c: category,
+        reason: 'no category match',
+        nameMatchPaths: subjectCandidates.slice(0, 5).map(c => c.fullPath)
+      });
+    }
+    continue;
+  }
 
   let finalCandidates = categoryCandidates;
   if (finalCandidates.length > 1 && wantsSol) {

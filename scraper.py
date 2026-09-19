@@ -147,14 +147,16 @@ def parse_papers(html, subject_name, level, page_url):
     pattern = r'onclick=["\']pdf\(this,\s*(\d+)\)["\'][^>]*>(.*?)</a>'
     matches = re.findall(pattern, html, re.IGNORECASE)
     
-    # Determine paper category based on the filename part of page_url to avoid domain matches like 'thsconline'
+    # Determine paper category from the page filename, never from the host.
+    # Check the more specific non-trial pages first so names such as
+    # assessment_trialpapers.html cannot promote assessment tasks to trials.
     filename = page_url.split('/')[-1].lower()
-    if 'hsc' in filename:
-        category = "HSC Papers"
-    elif 'trial' in filename:
-        category = "Trial Exams"
-    elif 'assessment' in filename:
+    if re.search(r'assessment', filename):
         category = "Assessment Tasks"
+    elif re.search(r'trial', filename):
+        category = "Trial Exams"
+    elif re.search(r'hsc', filename):
+        category = "HSC Papers"
     else:
         category = "Other Resources"
         

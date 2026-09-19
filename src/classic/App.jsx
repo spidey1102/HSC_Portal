@@ -15,6 +15,7 @@ import PaperHistory from './components/PaperHistory';
 import StudyNotebook from './components/StudyNotebook';
 import { Analytics } from '@vercel/analytics/react';
 import { findPaperByIdentifier, getPaperRouteId } from './utils/paperIdentity';
+import { normalisePaperCategories } from '../utils/normalisePaperCategory';
 import { loadMySubjects } from './utils/mySubjects';
 import { getAdaptiveRecommendations, loadRecommendationHistory } from './utils/adaptiveRecommendations';
 import {
@@ -508,7 +509,7 @@ export default function App({ onPortalLayoutChange }) {
       .then(data => {
         setSubjects(data.subjects || []);
         setSchools(data.schools || []);
-        setPapers(data.papers || []);
+        setPapers(normalisePaperCategories(data.papers || []));
         setLoading(false);
       })
       .catch(err => {

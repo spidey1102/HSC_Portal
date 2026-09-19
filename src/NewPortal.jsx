@@ -18,6 +18,7 @@ import { InstallDialog, SignInDialog } from './components/SyncInstallDialogs';
 import OnboardingWizard, { hasCompletedOnboarding } from './components/OnboardingWizard';
 
 import { findPaperByIdentifier, getPaperIdentity, getPaperRouteId } from './utils/paperIdentity';
+import { normalisePaperCategories } from './utils/normalisePaperCategory';
 import { loadMySubjects, saveMySubjects } from './utils/mySubjects';
 import {
   COMPLETED_PAPERS_STORAGE_KEY,
@@ -408,7 +409,7 @@ export default function NewPortal({ onPortalLayoutChange }) {
       .then((payload) => {
         setSubjects(payload.subjects || []);
         setSchools(payload.schools || []);
-        setPapers(payload.papers || []);
+        setPapers(normalisePaperCategories(payload.papers || []));
         setLoading(false);
       })
       .catch((err) => {
