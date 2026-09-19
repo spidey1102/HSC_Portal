@@ -92,6 +92,7 @@ export default function PracticeRoom({
   allPapers = [],
   onSelectPaper,
   agentContext = {},
+  showReaderTools = true,
 }) {
   const paperKey = getPaperIdentity(paper);
   const { user } = useAuth();
@@ -121,12 +122,24 @@ export default function PracticeRoom({
   const [selectionText, setSelectionText] = useState('');
   const [widestPage, setWidestPage] = useState(0);
   const [detectedTiming, setDetectedTiming] = useState(null);
+  const readerToolsEnabled = showReaderTools !== false;
 
   const viewportRef = useRef(null);
   const contentRef = useRef(null);
   const zoom = usePdfZoom(viewportRef, contentRef, 1);
   const toolbar = usePresence(!toolsHidden, 220);
   const reveal = usePresence(toolsHidden, 180);
+
+  useEffect(() => {
+    if (!readerToolsEnabled) {
+      setIsMarginOpen(false);
+      setIsChallengeOpen(false);
+      setIsQuestionMapOpen(false);
+      setShowFormula(false);
+      setSelectionText('');
+      setToolsHidden(false);
+    }
+  }, [readerToolsEnabled]);
 
   useEffect(() => {
     setAnnotations(loadAnnotations(paper));
@@ -665,7 +678,7 @@ export default function PracticeRoom({
             </button>
           )}
 
-          {sheetUrl && (
+          {readerToolsEnabled && sheetUrl && (
             <button
               type="button"
               className={`btn ${showFormula ? 'btn-primary' : 'btn-secondary'}`}
@@ -677,46 +690,50 @@ export default function PracticeRoom({
             </button>
           )}
 
-          <button
-            type="button"
-            className={`btn ${isMarginOpen ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setIsMarginOpen((open) => !open)}
-            title="Ask about this paper"
-          >
-            <Feather size={14} />
-            Margin
-          </button>
+          {readerToolsEnabled && (
+            <>
+              <button
+                type="button"
+                className={`btn ${isMarginOpen ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setIsMarginOpen((open) => !open)}
+                title="Ask about this paper"
+              >
+                <Feather size={14} />
+                Margin
+              </button>
 
-          <button
-            type="button"
-            className={`btn ${isChallengeOpen ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={handleRecommendChallenge}
-            disabled={isRequestingMetadata}
-            title={paperMetadata.status === 'ready'
-              ? 'Find an unusual or challenging question in this paper'
-              : paperMetadata.error || 'Analyse this paper once, then find a recommended challenge'}
-          >
-            <Sparkles size={14} />
-            {paperMetadata.status === 'ready' ? 'Recommended challenge' : 'Find a challenge'}
-          </button>
+              <button
+                type="button"
+                className={`btn ${isChallengeOpen ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={handleRecommendChallenge}
+                disabled={isRequestingMetadata}
+                title={paperMetadata.status === 'ready'
+                  ? 'Find an unusual or challenging question in this paper'
+                  : paperMetadata.error || 'Analyse this paper once, then find a recommended challenge'}
+              >
+                <Sparkles size={14} />
+                {paperMetadata.status === 'ready' ? 'Recommended challenge' : 'Find a challenge'}
+              </button>
 
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={handleQuestionMap}
-            disabled={isRequestingMetadata}
-            title={paperMetadata.status === 'ready'
-              ? 'Open the saved question topics, skills, marks, and page map'
-              : paperMetadata.error || 'Read the questions, topics, and marks out of this paper once'}
-          >
-            <ListChecks size={14} />
-            {paperMetadata.status === 'ready'
-              ? `Question map · ${paperMetadata.questionCount}`
-              : isRequestingMetadata ? 'Starting analysis…'
-                : paperMetadata.status === 'analysing' ? `Analysing ${formatAnalysisElapsed(metadataElapsedSeconds)}`
-                  : paperMetadata.error ? 'Retry structure'
-                    : 'Read structure'}
-          </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleQuestionMap}
+                disabled={isRequestingMetadata}
+                title={paperMetadata.status === 'ready'
+                  ? 'Open the saved question topics, skills, marks, and page map'
+                  : paperMetadata.error || 'Read the questions, topics, and marks out of this paper once'}
+              >
+                <ListChecks size={14} />
+                {paperMetadata.status === 'ready'
+                  ? `Question map · ${paperMetadata.questionCount}`
+                  : isRequestingMetadata ? 'Starting analysis…'
+                    : paperMetadata.status === 'analysing' ? `Analysing ${formatAnalysisElapsed(metadataElapsedSeconds)}`
+                      : paperMetadata.error ? 'Retry structure'
+                        : 'Read structure'}
+              </button>
+            </>
+          )}
 
           {onSharePaper && (
             <button type="button" className="btn btn-secondary btn-icon" onClick={onSharePaper} title="Share this paper" aria-label="Share this paper">
@@ -745,7 +762,7 @@ export default function PracticeRoom({
 
       {actionMessage && <div className="reader-notice">{actionMessage}</div>}
 
-      {isQuestionMapOpen && (
+      {readerToolsEnabled && isQuestionMapOpen && (
         <section className="reader-question-map" aria-label="Question topic map" aria-live="polite">
           <div className="reader-challenge-head">
             <div>
@@ -909,7 +926,7 @@ export default function PracticeRoom({
         </section>
       )}
 
-      {isChallengeOpen && (
+      {readerToolsEnabled && isChallengeOpen && (
         <section className="reader-challenge" aria-label="Recommended challenges" aria-live="polite">
           <div className="reader-challenge-head">
             <div>
@@ -966,7 +983,7 @@ export default function PracticeRoom({
                 selectedId={selectedId}
                 onSelectedIdChange={setSelectedId}
                 onDocumentLoaded={handleDocumentLoaded}
-                onSelectionChange={setSelectionText}
+                onSelectionChange={readerToolsEnabled ? setSelectionText : undefined}
                 viewportRef={viewportRef}
                 contentRef={contentRef}
                 targetPage={challengePage}
@@ -977,7 +994,7 @@ export default function PracticeRoom({
 
             {toolbar.mounted && (
             <div className={`reader-bars is-${toolbar.stage} ${isMarginOpen ? 'is-shifted' : ''}`}>
-              {selectionText && (
+              {readerToolsEnabled && selectionText && (
                 <div className="selection-bar">
                   <span className="kick">Selected</span>
                   <span className="selection-quote">“{selectionText.slice(0, 90)}{selectionText.length > 90 ? '…' : ''}”</span>
@@ -1030,7 +1047,7 @@ export default function PracticeRoom({
                 onFinished={() => flash('Pens down. Open the review while it is fresh.', 6000)}
               />
 
-              {pdfUrl && (
+              {readerToolsEnabled && pdfUrl && (
                 <AnnotationToolbar
                   tool={tool}
                   onToolChange={setTool}
@@ -1055,7 +1072,7 @@ export default function PracticeRoom({
             </div>
             )}
 
-            {reveal.mounted && (
+            {readerToolsEnabled && reveal.mounted && (
               <button
                 type="button"
                 className={`reader-reveal is-${reveal.stage}`}
@@ -1069,14 +1086,14 @@ export default function PracticeRoom({
             )}
           </div>
 
-          {showFormula && sheetUrl && (
+          {readerToolsEnabled && showFormula && sheetUrl && (
             <div className={`reader-pane reader-pane-sheet ${mobileTab === 'formula' ? 'is-active' : ''}`}>
               <iframe className="reader-frame" src={sheetUrl} title="Data sheet" />
             </div>
           )}
         </div>
 
-        {showFormula && sheetUrl && (
+        {readerToolsEnabled && showFormula && sheetUrl && (
           <div className="reader-tabs">
             <div className="seg">
               {[{ id: 'paper', label: 'Paper' }, { id: 'formula', label: 'Data sheet' }].map((entry) => (
@@ -1095,16 +1112,18 @@ export default function PracticeRoom({
         )}
       </div>
 
-      <PaperMargin
-        isOpen={isMarginOpen}
-        onClose={() => setIsMarginOpen(false)}
-        paper={paper}
-        subjectName={subjectName}
-        appContext={marginContext}
-        quotedText={pendingQuestion}
-        onQuoteConsumed={() => setPendingQuestion('')}
-        onOpenCachedQuestion={handleOpenCachedQuestion}
-      />
+      {readerToolsEnabled && (
+        <PaperMargin
+          isOpen={isMarginOpen}
+          onClose={() => setIsMarginOpen(false)}
+          paper={paper}
+          subjectName={subjectName}
+          appContext={marginContext}
+          quotedText={pendingQuestion}
+          onQuoteConsumed={() => setPendingQuestion('')}
+          onOpenCachedQuestion={handleOpenCachedQuestion}
+        />
+      )}
 
       {isReviewOpen && (
         <PracticeReviewModal

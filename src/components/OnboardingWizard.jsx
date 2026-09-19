@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, X } from 'lucide-react';
 import { MAX_RUNG, getAllowanceForRung, saveConfidenceSeeds } from '../utils/practiceLadder';
 import { saveMySubjects } from '../utils/mySubjects';
@@ -33,13 +33,10 @@ function markOnboardingComplete() {
 }
 
 /**
- * Onboarding — a questionnaire rather than a wall of text.
+ * Onboarding — one short setup form.
  *
- * Everything it collects feeds something concrete: the subjects drive the
- * library and the exam countdown, the confidence answers seed each subject's
- * starting rung on the ladder, and the appearance answers set the ground.
- * The Google step is genuinely optional — the portal is fully usable unsigned,
- * and the skip control carries the same weight as the sign-in one.
+ * The answers set the library, Today view, practice starting points and theme.
+ * Signing in is optional.
  */
 export default function OnboardingWizard({
   isOpen,
@@ -58,18 +55,8 @@ export default function OnboardingWizard({
   const [confidence, setConfidence] = useState({});
   const [startStyle, setStartStyle] = useState('ladder');
 
-  const steps = useMemo(() => ([
-    'welcome',
-    'level',
-    'subjects',
-    'confidence',
-    'style',
-    'appearance',
-    'account',
-    'done',
-  ]), []);
-
-  const step = steps[stepIndex];
+  const steps = ['setup'];
+  const step = 'setup';
   const chosenSubjects = subjects.filter((name) => portalSubjects.includes(name));
   const presence = usePresence(isOpen, 220);
 
@@ -83,7 +70,7 @@ export default function OnboardingWizard({
     ));
   };
 
-  const canAdvance = step !== 'subjects' || chosenSubjects.length > 0;
+  const canAdvance = chosenSubjects.length > 0;
 
   const finish = () => {
     const savedSubjects = saveMySubjects(chosenSubjects);
@@ -126,45 +113,30 @@ export default function OnboardingWizard({
       >
         <div className="dialog-head">
           <div>
-            <div className="kick">Setting up · step {stepIndex + 1} of {steps.length}</div>
-            <h3 id="onboarding-title">{
-              step === 'welcome' ? 'Welcome to the Paper Room'
-                : step === 'level' ? 'Which year are you sitting?'
-                  : step === 'subjects' ? 'What do you study?'
-                    : step === 'confidence' ? 'How does each one feel right now?'
-                      : step === 'style' ? 'How should the portal start you off?'
-                        : step === 'appearance' ? 'How should it look?'
-                          : step === 'account' ? 'Carry this between devices?'
-                            : 'You are set up'
-            }</h3>
+            <div className="kick">A few choices to get started</div>
+            <h3 id="onboarding-title">Set up your Paper Room</h3>
           </div>
           <button type="button" className="btn btn-icon btn-secondary" onClick={skipAll} aria-label="Skip setup">
             <X size={15} />
           </button>
         </div>
 
-        <div className="wizard-progress" aria-hidden="true">
-          {steps.map((entry, index) => (
-            <i key={entry} className={index <= stepIndex ? 'on' : ''} />
-          ))}
-        </div>
-
         <div className="dialog-scroll wizard-step" key={step}>
-          {step === 'welcome' && (
+          {step === 'setup' && (
             <>
               <p className="wizard-lede">
-                A few questions, then the portal can prescribe a paper each day rather than leaving you to
-                pick one. Nothing here is permanent — every answer can be changed later in customisation.
+                Choose your year and subjects. You can change these later in Preferences.
               </p>
               <p className="wizard-lede">
-                Answers stay on this device unless you choose to sign in at the end.
+                Your choices stay on this device unless you sign in.
               </p>
             </>
           )}
 
-          {step === 'level' && (
+          {step === 'setup' && (
             <>
-              <p className="wizard-lede">This sets which half of the index the library opens on.</p>
+              <div className="kick">Year</div>
+              <p className="wizard-lede">Choose the year you are sitting.</p>
               <div className="seg">
                 {[12, 11].map((value) => (
                   <label key={value} className="seg-opt">
@@ -181,12 +153,10 @@ export default function OnboardingWizard({
             </>
           )}
 
-          {step === 'subjects' && (
+          {step === 'setup' && (
             <>
-              <p className="wizard-lede">
-                Pin the subjects you are sitting so Today shows <em>your</em> next exam, not everyone&apos;s
-                English Paper 1. Pick at least one.
-              </p>
+              <div className="kick">Subjects</div>
+              <p className="wizard-lede">Choose at least one subject.</p>
               <div className="wizard-chips">
                 {portalSubjects.map((name) => {
                   const selected = subjects.includes(name);
@@ -210,12 +180,10 @@ export default function OnboardingWizard({
             </>
           )}
 
-          {step === 'confidence' && (
+          {step === 'setup' && (
             <>
-              <p className="wizard-lede">
-                This sets your starting rung. Rung 1 opens papers untimed and open book; rung 5 offers them
-                ten per cent under exam time. Your marks take over from here as soon as you sit one.
-              </p>
+              <div className="kick">Starting level</div>
+              <p className="wizard-lede">Set a starting level for each subject.</p>
               {chosenSubjects.length === 0 ? (
                 <p className="dim">No subjects chosen — go back a step to pick some.</p>
               ) : chosenSubjects.map((name) => {
@@ -247,11 +215,10 @@ export default function OnboardingWizard({
             </>
           )}
 
-          {step === 'style' && (
+          {step === 'setup' && (
             <>
-              <p className="wizard-lede">
-                Both settings can change at any time; this only decides what the first week looks like.
-              </p>
+              <div className="kick">Today</div>
+              <p className="wizard-lede">Choose what Today opens with.</p>
               {[
                 { id: 'ladder', title: 'Let the ladder decide', note: 'A paper is prescribed each day, at the allowance your confidence earns.' },
                 { id: 'browse', title: 'I will pick my own', note: 'Today opens on the index instead, and the ladder just keeps score.' },
@@ -273,9 +240,10 @@ export default function OnboardingWizard({
             </>
           )}
 
-          {step === 'appearance' && (
+          {step === 'setup' && (
             <>
-              <p className="wizard-lede">The portal is set in ink on paper. Choose the ground.</p>
+              <div className="kick">Appearance</div>
+              <p className="wizard-lede">Choose a light or dark background.</p>
               <div className="wizard-modes">
                 {MODE_OPTIONS.map((option) => (
                   <label key={option.value} className="seg-opt wizard-mode">
@@ -293,13 +261,10 @@ export default function OnboardingWizard({
             </>
           )}
 
-          {step === 'account' && (
+          {step === 'setup' && (
             <>
-              <p className="wizard-lede">
-                Signing in with Google carries your saved papers, sittings, confidence rungs and notebook
-                between the library computer and your own. It is entirely optional: everything works
-                unsigned, it simply stays on this machine.
-              </p>
+              <div className="kick">Sign in</div>
+              <p className="wizard-lede">Sign in to use your setup on another device. This is optional.</p>
               {isSignedIn ? (
                 <p style={{ color: 'var(--color-accent-700)' }}>Signed in — your work will sync.</p>
               ) : (
@@ -315,12 +280,10 @@ export default function OnboardingWizard({
             </>
           )}
 
-          {step === 'done' && (
+          {step === 'setup' && (
             <>
-              <p className="wizard-lede">
-                {chosenSubjects.length} subject{chosenSubjects.length === 1 ? '' : 's'} pinned, Year {level}.
-                Today will open on {startStyle === 'ladder' ? 'the prescribed sitting' : 'the library index'}.
-              </p>
+              <div className="kick">Ready</div>
+              <p className="wizard-lede">Your setup is ready.</p>
               <div className="wizard-summary">
                 {chosenSubjects.map((name) => (
                   <div key={name} className="aside-row" style={{ padding: '8px 0' }}>
@@ -348,7 +311,7 @@ export default function OnboardingWizard({
           <span style={{ flex: 1 }} />
           <button type="button" className="btn btn-ghost" onClick={skipAll}>Skip setup</button>
           <button type="button" className="btn btn-primary" onClick={next} disabled={!canAdvance}>
-            {stepIndex === steps.length - 1 ? 'Open the portal' : 'Continue'}
+            Open the portal
             <ArrowRight size={15} />
           </button>
         </div>

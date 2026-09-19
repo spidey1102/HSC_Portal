@@ -86,8 +86,8 @@ export default function CustomizationMenu({
 
           <div className="dialog-row" style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
             <div style={{ flex: '1 1 260px' }}>
-              <div style={{ fontFamily: 'var(--font-heading)', fontSize: '16px' }}>Show the prescribed sitting on Today</div>
-              <div className="dim" style={{ fontSize: '12px' }}>Turn off to open straight into the library index.</div>
+              <div style={{ fontFamily: 'var(--font-heading)', fontSize: '16px' }}>Show the prescribed sitting</div>
+              <div className="dim" style={{ fontSize: '12px' }}>Turn it off to open Today on the library.</div>
             </div>
             <div className="seg">
               {[true, false].map((value) => (
@@ -97,6 +97,26 @@ export default function CustomizationMenu({
                     name="customisation-prescription"
                     checked={(settings.showRecommendations !== false) === value}
                     onChange={() => onChange({ showRecommendations: value })}
+                  />
+                  <span>{value ? 'On' : 'Off'}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="dialog-row" style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 260px' }}>
+              <div style={{ fontFamily: 'var(--font-heading)', fontSize: '16px' }}>Paper tools</div>
+              <div className="dim" style={{ fontSize: '12px' }}>Hide annotations, AI help, maps and challenge tools. The timer stays on.</div>
+            </div>
+            <div className="seg">
+              {[true, false].map((value) => (
+                <label key={String(value)} className="seg-opt">
+                  <input
+                    type="radio"
+                    name="customisation-reader-tools"
+                    checked={(settings.showReaderTools !== false) === value}
+                    onChange={() => onChange({ showReaderTools: value })}
                   />
                   <span>{value ? 'On' : 'Off'}</span>
                 </label>

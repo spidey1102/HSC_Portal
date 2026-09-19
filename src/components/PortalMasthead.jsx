@@ -1,8 +1,10 @@
-import { Palette, Search } from 'lucide-react';
+import { Palette, Search, Sparkles } from 'lucide-react';
 import UserButton from './UserButton';
+import WhatsNewDialog from './WhatsNewDialog';
 import { getPlatformShortcuts } from '../utils/platformShortcuts';
 import { TEXTBOOKS_ENABLED } from '../config/featureFlags';
 import { NSW_MATHS_BOOKING_URL } from './NswMathsEventsBanner';
+import { useState } from 'react';
 
 export const PORTAL_SECTIONS = [
   { id: 'today', label: 'Today' },
@@ -28,6 +30,7 @@ export default function PortalMasthead({
   showActions = true,
 }) {
   const shortcuts = getPlatformShortcuts();
+  const [isWhatsNewOpen, setIsWhatsNewOpen] = useState(false);
 
   return (
     <header>
@@ -66,11 +69,22 @@ export default function PortalMasthead({
               >
                 <Palette size={16} />
               </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setIsWhatsNewOpen(true)}
+                title="See recent updates and features"
+              >
+                <Sparkles size={14} />
+                What&apos;s new
+              </button>
               <UserButton />
             </div>
           )}
         </div>
       </div>
+
+      <WhatsNewDialog isOpen={isWhatsNewOpen} onClose={() => setIsWhatsNewOpen(false)} />
 
       <nav className="secrail" aria-label="Sections">
         {PORTAL_SECTIONS.map((entry) => (

@@ -746,6 +746,7 @@ export default function NewPortal({ onPortalLayoutChange }) {
           onSharePaper={() => sharePaper(activePaper)}
           onSelectPaper={openPaper}
           agentContext={agentContext}
+          showReaderTools={appearance.showReaderTools !== false}
         />
         {firebaseResetNotice}
       </>

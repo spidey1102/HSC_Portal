@@ -10,9 +10,9 @@ export default function NswMathsEventsBanner({ onMinimise }) {
         <CalendarDays size={20} strokeWidth={2.2} />
       </div>
       <div className="nsw-maths-events__copy">
-        <span className="nsw-maths-events__eyebrow">NSW Maths</span>
-        <strong>Upcoming events</strong>
-        <p>Mock exams, revision sessions and upcoming bookings.</p>
+        <span className="nsw-maths-events__eyebrow">For NSW students</span>
+        <strong>NSW Maths classes and mocks</strong>
+        <p>Revision sessions and mock exams for NSW Maths students.</p>
       </div>
       <a
         className="nsw-maths-events__link"
@@ -20,7 +20,7 @@ export default function NswMathsEventsBanner({ onMinimise }) {
         target="_blank"
         rel="noreferrer"
       >
-        View dates &amp; book now
+        See classes and dates
         <ArrowUpRight size={16} aria-hidden="true" />
       </a>
       <button
