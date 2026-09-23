@@ -8,7 +8,7 @@ import LibraryView from './components/LibraryView';
 import CalendarView from './components/CalendarView';
 import CommandPalette from './components/CommandPalette';
 import PracticeRoom from './components/PracticeRoom';
-import TextbooksView from './components/TextbooksView';
+import NswMathsEventsBanner from './components/NswMathsEventsBanner';
 import PaperHistory from './components/PaperHistory';
 import StudyNotebook from './components/StudyNotebook';
 import AgentCommandCenter from './components/AgentCommandCenter';
@@ -64,6 +64,7 @@ const TIMER_CEILING_SECONDS = 4 * 60 * 60;
 /** NSW written papers run three hours plus reading time; used to size the clock. */
 const DEFAULT_PAPER_MINUTES = 180;
 const CACHED_QUESTION_TARGET_STORAGE_KEY = 'hsc_cached_question_target';
+const NSW_MATHS_BANNER_MINIMISED_STORAGE_KEY = 'hsc_nsw_maths_banner_minimised';
 
 function slugify(value) {
   if (!value) return '';
@@ -83,6 +84,14 @@ export default function NewPortal({ onPortalLayoutChange }) {
   const [showFirebaseResetNotice, setShowFirebaseResetNotice] = useState(false);
   const [showInstallDialog, setShowInstallDialog] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [isNswMathsBannerMinimised, setIsNswMathsBannerMinimised] = useState(() => (
+    localStorage.getItem(NSW_MATHS_BANNER_MINIMISED_STORAGE_KEY) === 'true'
+  ));
+
+  const minimiseNswMathsBanner = useCallback(() => {
+    localStorage.setItem(NSW_MATHS_BANNER_MINIMISED_STORAGE_KEY, 'true');
+    setIsNswMathsBannerMinimised(true);
+  }, []);
 
   useEffect(() => {
     try {
@@ -753,7 +762,10 @@ export default function NewPortal({ onPortalLayoutChange }) {
         runhead={runhead}
         onOpenPalette={() => setIsPaletteOpen(true)}
         onOpenCustomise={() => setIsCustomizationOpen(true)}
+        showEventsButton={isNswMathsBannerMinimised}
       />
+
+      {!isNswMathsBannerMinimised && <NswMathsEventsBanner onMinimise={minimiseNswMathsBanner} />}
 
       <div className="portal-body">
         {loading ? (
@@ -832,9 +844,7 @@ export default function NewPortal({ onPortalLayoutChange }) {
               onSelectPaper={openPaper}
             />
           </div>
-        ) : (
-          <TextbooksView />
-        )}
+        ) : null}
       </div>
 
       {shareNotice && (

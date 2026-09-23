@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import PaperCard from './components/PaperCard';
 import PracticeRoom from './components/PracticeRoom';
-import TextbooksView from './components/TextbooksView';
+import NswMathsEventsBanner, { NSW_MATHS_BOOKING_URL } from '../components/NswMathsEventsBanner';
 import ExamCountdown from './components/ExamCountdown';
 import CustomCalendar from './components/CustomCalendar';
 import PaperSearch from './components/PaperSearch';
@@ -56,6 +56,7 @@ import UserButton from './components/UserButton';
 
 const PAPER_PAGE_SIZE = 40;
 const FIREBASE_RESET_NOTICE_STORAGE_KEY = 'hsc_new_firebase_2026';
+const NSW_MATHS_BANNER_MINIMISED_STORAGE_KEY = 'hsc_nsw_maths_banner_minimised';
 const PAPER_SORT_OPTIONS = [
   { value: 'newest', label: 'Newest first' },
   { value: 'oldest', label: 'Oldest first' },
@@ -69,6 +70,14 @@ export default function App({ onPortalLayoutChange }) {
   
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
   const [showFirebaseResetNotice, setShowFirebaseResetNotice] = useState(false);
+  const [isNswMathsBannerMinimised, setIsNswMathsBannerMinimised] = useState(() => (
+    localStorage.getItem(NSW_MATHS_BANNER_MINIMISED_STORAGE_KEY) === 'true'
+  ));
+
+  const minimiseNswMathsBanner = useCallback(() => {
+    localStorage.setItem(NSW_MATHS_BANNER_MINIMISED_STORAGE_KEY, 'true');
+    setIsNswMathsBannerMinimised(true);
+  }, []);
 
   useEffect(() => {
     try {
@@ -1165,6 +1174,16 @@ export default function App({ onPortalLayoutChange }) {
               <BookOpenCheck size={16} />
               <span>Notebook</span>
             </button>
+            {isNswMathsBannerMinimised && (
+              <a
+                className="nsw-maths-events-topbar-link"
+                href={NSW_MATHS_BOOKING_URL}
+                target="_blank"
+                rel="noreferrer"
+              >
+                NSW Maths events
+              </a>
+            )}
           </div>
         </div>
 
@@ -1179,10 +1198,9 @@ export default function App({ onPortalLayoutChange }) {
 
         <div className="scrollable-content" ref={scrollableContentRef}>
           <div className="content-stack">
+            {!isNswMathsBannerMinimised && <NswMathsEventsBanner onMinimise={minimiseNswMathsBanner} />}
             {viewCalendar ? (
               <CustomCalendar />
-            ) : viewTextbooks ? (
-              <TextbooksView />
             ) : viewHistory ? (
               <PaperHistory
                 allPapers={papers}
