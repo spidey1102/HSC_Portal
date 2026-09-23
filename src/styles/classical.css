@@ -453,6 +453,10 @@ button.tag-outline:hover { background: color-mix(in srgb, var(--color-accent) 12
 }
 .nsw-maths-events__copy strong { font-family: var(--font-heading); font-size: 17px; }
 .nsw-maths-events__copy p { margin: 0; color: color-mix(in srgb, var(--color-text) 66%, transparent); font-size: 13px; }
+.nsw-maths-events__timezone {
+  color: color-mix(in srgb, var(--color-text) 54%, transparent); font-size: 11px;
+  letter-spacing: 0.02em;
+}
 .nsw-maths-events__link {
   display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding: 9px 12px;
   background: var(--color-accent); color: var(--color-bg); font-size: 13px; font-weight: 750;

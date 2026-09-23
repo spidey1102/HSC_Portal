@@ -1,6 +1,12 @@
 import { ArrowUpRight, CalendarDays, Minimize2 } from 'lucide-react';
 
 export const NSW_MATHS_BOOKING_URL = 'https://bookwhen.com/nswmaths';
+export const NSW_MATHS_EVENT = {
+  name: 'NSWMaths 2026',
+  date: 'Saturday 3 October 2026',
+  time: '9:30am AEST',
+  timezone: 'Sydney time',
+};
 
 /** A site-owned promotion for NSW Maths events and mock exams. */
 export default function NswMathsEventsBanner({ onMinimise }) {
@@ -11,8 +17,9 @@ export default function NswMathsEventsBanner({ onMinimise }) {
       </div>
       <div className="nsw-maths-events__copy">
         <span className="nsw-maths-events__eyebrow">NSW Maths</span>
-        <strong>Upcoming events</strong>
-        <p>Mock exams, revision sessions and upcoming bookings.</p>
+        <strong>{NSW_MATHS_EVENT.name}</strong>
+        <p>Mock exam · {NSW_MATHS_EVENT.date} · {NSW_MATHS_EVENT.time}</p>
+        <span className="nsw-maths-events__timezone">{NSW_MATHS_EVENT.timezone}</span>
       </div>
       <a
         className="nsw-maths-events__link"
