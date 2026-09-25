@@ -1,7 +1,7 @@
+import { formatQuestionLabel } from '../utils/topicQuestionQueue';
+
 function questionLabel(question) {
-  const id = String(question?.id || '').trim();
-  const subpart = String(question?.challenge?.subpartId || '').trim();
-  return `Question ${id}${subpart ? ` (${subpart})` : ''}`;
+  return formatQuestionLabel(question);
 }
 
 function challengeLabel(level) {
@@ -15,9 +15,9 @@ export default function CachedQuestionResults({ results = [], onOpenQuestion }) 
 
   return (
     <section className="cached-question-results" aria-label="Cached question matches">
-      <div className="cached-question-results-title">Five cached questions</div>
+      <div className="cached-question-results-title">Topic Questions ({results.length})</div>
       <div className="cached-question-results-list">
-        {results.map((result) => {
+        {results.map((result, index) => {
           const question = result.question || {};
           const topics = Array.isArray(question.topics) ? question.topics : [];
           const detail = [question.commandVerb, question.skill].filter(Boolean).join(' · ');
@@ -27,11 +27,11 @@ export default function CachedQuestionResults({ results = [], onOpenQuestion }) 
 
           return (
             <button
-              key={result.key}
+              key={result.key || `${result.paperIdentity}_${question.id}_${index}`}
               type="button"
               className="cached-question-result-card"
               disabled={!canOpen}
-              onClick={() => onOpenQuestion?.(result)}
+              onClick={() => onOpenQuestion?.(result, results, index)}
               title={canOpen ? `Open ${result.paperName}, ${questionLabel(question)}, page ${page}` : 'This question cannot be opened yet'}
             >
               <span className="cached-question-result-source">{result.subject} · {result.school} · {result.paperYear || 'Paper year unavailable'}</span>
@@ -46,7 +46,7 @@ export default function CachedQuestionResults({ results = [], onOpenQuestion }) 
                 </span>
               )}
               {detail && <span className="cached-question-result-skill">{detail}</span>}
-              {canOpen && <span className="cached-question-result-go">Take me there →</span>}
+              {canOpen && <span className="cached-question-result-go">Start topic practice →</span>}
             </button>
           );
         })}

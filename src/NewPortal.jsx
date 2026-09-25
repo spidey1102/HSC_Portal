@@ -57,6 +57,7 @@ import { isPrimaryShortcut } from './utils/platformShortcuts';
 import './App.css';
 import { useSync } from './components/SyncContext';
 import { useAuth } from './components/AuthContext';
+import { saveTopicQuestionQueue } from './utils/topicQuestionQueue';
 
 const FIREBASE_RESET_NOTICE_STORAGE_KEY = 'hsc_new_firebase_2026';
 const TIMER_STORAGE_KEY = 'hsc_timer_duration_secs';
@@ -523,12 +524,16 @@ export default function NewPortal({ onPortalLayoutChange }) {
     openPaper(paper);
   }, [openPaper]);
 
-  const openCachedQuestion = useCallback((result) => {
+  const openCachedQuestion = useCallback((result, allResults = null, clickedIndex = 0) => {
     const page = Number(result?.question?.page);
     const paper = papers.find((candidate) => (
       getPaperIdentity(candidate) === String(result?.paperIdentity || '')
     ));
     if (!paper || !Number.isInteger(page) || page < 1) return false;
+
+    if (Array.isArray(allResults) && allResults.length > 0) {
+      saveTopicQuestionQueue(allResults, clickedIndex);
+    }
 
     try {
       sessionStorage.setItem(CACHED_QUESTION_TARGET_STORAGE_KEY, JSON.stringify({
@@ -763,6 +768,7 @@ export default function NewPortal({ onPortalLayoutChange }) {
         onOpenPalette={() => setIsPaletteOpen(true)}
         onOpenCustomise={() => setIsCustomizationOpen(true)}
         showEventsButton={isNswMathsBannerMinimised}
+        onPortalLayoutChange={onPortalLayoutChange}
       />
 
       {!isNswMathsBannerMinimised && <NswMathsEventsBanner onMinimise={minimiseNswMathsBanner} />}

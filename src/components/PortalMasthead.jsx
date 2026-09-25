@@ -1,4 +1,4 @@
-import { Palette, Search } from 'lucide-react';
+import { Palette, Search, FolderTree } from 'lucide-react';
 import UserButton from './UserButton';
 import { getPlatformShortcuts } from '../utils/platformShortcuts';
 import { TEXTBOOKS_ENABLED } from '../config/featureFlags';
@@ -25,6 +25,7 @@ export default function PortalMasthead({
   onOpenPalette,
   onOpenCustomise,
   showEventsButton = false,
+  onPortalLayoutChange,
   showActions = true,
 }) {
   const shortcuts = getPlatformShortcuts();
@@ -47,6 +48,16 @@ export default function PortalMasthead({
           {runhead && <div className="runhead">{runhead}</div>}
           {showActions && (
             <div className="mast-actions" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                onClick={() => onPortalLayoutChange?.('simplified')}
+                title="Switch to Tree Layout directory"
+              >
+                <FolderTree size={14} />
+                Tree Layout
+              </button>
               <button
                 type="button"
                 className="btn btn-secondary"
