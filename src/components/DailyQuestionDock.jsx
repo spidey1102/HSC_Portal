@@ -41,10 +41,8 @@ function InlineImage({ user, postId, kind, name }) {
   return <figure className={`daily-inline-image${expanded ? ' expanded' : ''}`}>
     {!url && !error && <p className="daily-muted">Loading image…</p>}
     {error && <p role="alert" className="daily-error">{error}</p>}
-    {url && <button type="button" className="daily-image-zoom" onClick={() => setExpanded(!expanded)} aria-label={expanded ? 'Fit image to panel' : 'View image at full size'}>
-      <img src={url} alt={name || `${kind} attachment`} onError={() => { setUrl(''); setError('The image could not be loaded.'); }} />
-    </button>}
-    {url && <figcaption>{name || 'Attached image'} · {expanded ? 'Click to fit' : 'Click for full size'}</figcaption>}
+    {url && <div className="daily-image-frame"><img src={url} alt={name || `${kind} attachment`} onError={() => { setUrl(''); setError('The image could not be loaded.'); }} /></div>}
+    {url && <figcaption><span>{name || 'Attached image'}</span><button type="button" onClick={() => setExpanded(!expanded)}>{expanded ? 'Fit to panel' : 'View full size'}</button></figcaption>}
   </figure>;
 }
 
