@@ -3,6 +3,8 @@ import { useCallback, useState } from 'react';
 import ClassicPortal from './ClassicPortal';
 import NewPortal from './NewPortal';
 import TreePortal from './TreePortal';
+import DailyQuestionDock from './components/DailyQuestionDock';
+import { DAILY_QUESTIONS_ENABLED } from './config/featureFlags';
 import { SyncProvider } from './components/SyncContext';
 import { APPEARANCE_STORAGE_KEY, loadAppearanceSettings } from './utils/appearancePresets';
 
@@ -42,12 +44,12 @@ export default function App() {
   }, []);
 
   if (portalLayout === 'simplified' || portalLayout === 'tree') {
-    return <SyncProvider><TreePortal key="simplified" onPortalLayoutChange={handlePortalLayoutChange} /></SyncProvider>;
+    return <SyncProvider><TreePortal key="simplified" onPortalLayoutChange={handlePortalLayoutChange} />{DAILY_QUESTIONS_ENABLED && <DailyQuestionDock />}</SyncProvider>;
   }
 
   if (portalLayout === 'classic') {
-    return <ClassicPortal key="classic" onPortalLayoutChange={handlePortalLayoutChange} />;
+    return <><ClassicPortal key="classic" onPortalLayoutChange={handlePortalLayoutChange} />{DAILY_QUESTIONS_ENABLED && <DailyQuestionDock />}</>;
   }
 
-  return <SyncProvider><NewPortal key="new" onPortalLayoutChange={handlePortalLayoutChange} /></SyncProvider>;
+  return <SyncProvider><NewPortal key="new" onPortalLayoutChange={handlePortalLayoutChange} />{DAILY_QUESTIONS_ENABLED && <DailyQuestionDock />}</SyncProvider>;
 }
