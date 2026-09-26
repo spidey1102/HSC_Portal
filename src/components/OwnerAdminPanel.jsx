@@ -64,7 +64,7 @@ export default function OwnerAdminPanel() {
   }, [user, authLoading]);
 
   useEffect(() => {
-    if (!open || role !== 'owner' || papers.length || paperLoading) return undefined;
+    if (!open || role !== 'owner' || papers.length) return undefined;
     let active = true;
     setPaperLoading(true);
     setPaperError('');
@@ -86,7 +86,7 @@ export default function OwnerAdminPanel() {
         if (active) setPaperLoading(false);
       });
     return () => { active = false; };
-  }, [open, role, papers.length, paperLoading]);
+  }, [open, role, papers.length]);
 
   useEffect(() => {
     if (!open) return undefined;
