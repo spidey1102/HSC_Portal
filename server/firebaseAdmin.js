@@ -1,4 +1,4 @@
-import firebaseConfig from '../../firebase-applet-config.json' with { type: 'json' };
+import firebaseConfig from '../firebase-applet-config.json' with { type: 'json' };
 
 const IDENTITY_LOOKUP_TIMEOUT_MS = 8 * 1000;
 

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
-import { requireAuthenticatedUser } from './lib/firebaseAdmin.js';
+import { requireAuthenticatedUser } from '../server/firebaseAdmin.js';
 import { getSupabaseSql } from '../server/supabaseDb.js';
 import { canManage, canViewAnswers, dateString, errorStatus, findPost, readBody, roleFor, sendJson, todaySydney } from '../server/dailyPosts.js';
 

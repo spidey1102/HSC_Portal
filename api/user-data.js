@@ -1,4 +1,4 @@
-import { requireAuthenticatedUser } from './lib/firebaseAdmin.js';
+import { requireAuthenticatedUser } from '../server/firebaseAdmin.js';
 import { getUserData, saveUserData } from '../server/portalStorage.js';
 
 export const maxDuration = 30;

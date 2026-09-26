@@ -1,4 +1,4 @@
-import { requireAuthenticatedUser } from './lib/firebaseAdmin.js';
+import { requireAuthenticatedUser } from '../server/firebaseAdmin.js';
 import { getSupabaseSql } from '../server/supabaseDb.js';
 import {
   canManage, canViewAnswers, cleanText, dateString, errorStatus, fileName, filePath, findPost,

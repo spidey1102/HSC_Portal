@@ -1,5 +1,5 @@
 import { resolve } from 'path'
-import { getPaperSourceFingerprint, loadPaperRecord } from '../lib/paperSource.js'
+import { getPaperSourceFingerprint, loadPaperRecord } from '../../server/paperSource.js'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { WorkerMessageHandler } from 'pdfjs-dist/legacy/build/pdf.worker.mjs'
 

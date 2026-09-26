@@ -1,9 +1,9 @@
-import { requireAuthenticatedUser } from '../lib/firebaseAdmin.js';
+import { requireAuthenticatedUser } from '../../server/firebaseAdmin.js';
 import { getPaperMetadata } from '../../server/portalStorage.js';
 import {
   getPaperSourceFingerprint,
   loadPaperRecord,
-} from '../lib/paperSource.js';
+} from '../../server/paperSource.js';
 import {
   metadataDocumentId,
   runPaperAnalysisWorker,
