@@ -6,14 +6,11 @@ import './styles/reader.css'
 import './styles/tree-layout.css'
 import App from './App.jsx'
 import { AuthProvider } from './components/AuthContext.jsx'
-import { SyncProvider } from './components/SyncContext.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <AuthProvider>
-      <SyncProvider>
-        <App />
-      </SyncProvider>
+      <App />
     </AuthProvider>
   </StrictMode>,
 )

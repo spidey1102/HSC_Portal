@@ -1,27 +1,17 @@
-# Shared paper metadata setup
+# Portal data storage
 
-The paper-structure cache stores reusable **question counts, question labels, subparts, reliable mark values, and total marks** in the shared Firestore collection `paperMetadata`. It does not store a paper’s full PDF text or any student review data. Student reviews and mistake-notebook entries remain in the signed-in student’s existing `users/{uid}` document.
+Firebase Authentication signs students in. Supabase stores their private study data in `portal_user_data` and shared paper analysis in `paper_metadata`. Server routes verify Firebase ID tokens before reading or writing private data.
 
-## Publish the Firestore rules
+## Student data
 
-Before deploying the application, publish the repository’s updated [`firestore.rules`](../firestore.rules) to the Firebase project. The rules allow anyone to read the non-personal `paperMetadata` collection, while client-side writes are denied. The server route uses the Firebase Admin SDK and is therefore the only writer. The existing `users/{uid}` rule continues to restrict private review and mistake data to the authenticated owner.
+The first successful authenticated request creates an empty `portal_user_data` row if needed. Each student can then save subjects, settings, paper history, reviews, and mistakes under their Firebase UID.
 
-The dedicated `hsc-portal-firebase` project uses Firestore’s default database, `(default)`, in the Sydney region. Confirm that these rules are published to that database.
+The site checks the older Firestore `users/{uid}` document once per student. It copies fields missing from Supabase and keeps existing Supabase values. The older Firestore document is not deleted. If that check is temporarily unavailable, it is retried on a later sign-in.
 
-## Configure protected Vercel environment variables
+Keep [`firestore.rules`](../firestore.rules) published while this migration is in use. Its `users/{uid}` rule lets students read only their own older data.
 
-Set these **server-only** variables for the Production, Preview, and Development environments as appropriate. Never prefix them with `VITE_`, and never place the service-account JSON in a browser-accessible file.
+## Deployment
 
-| Variable | Purpose |
-|---|---|
-| `OPENROUTER_API_KEY` | Portal-owned OpenRouter key. Chat uses Gemma 4 31B and paper analysis uses Gemini Flash Lite through the linked Google AI Studio provider only. |
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | Full JSON for the dedicated `HSC Portal Paper Metadata API` service account. This is used only by the Vercel serverless route and must never be committed. |
-| `FIREBASE_FIRESTORE_DATABASE_ID` | `(default)`; optional because the server route includes the dedicated default database as its fallback. |
+Apply [`20260820_01_create_portal_storage.sql`](../supabase/migrations/20260820_01_create_portal_storage.sql) to the Supabase database. Configure `DATABASE_URL` and `OPENROUTER_API_KEY` as server-only environment variables in Vercel. Do not expose the database URL to browser code.
 
-The server route pins the provider to `google-ai-studio` and disables OpenRouter fallbacks. It uses Gemini 3.1 Flash Lite first, then retries once with Gemini 3.5 Flash Lite only when the first model returns a provider quota or transient server error. This avoids consuming shared OpenRouter capacity. The service-account principal needs permission to read and write Firestore documents in the portal database. The dedicated service account uses the **Cloud Datastore User** role for that purpose. Do not use a browser API key in place of the service-account JSON.
-
-## Verify the flow after deployment
-
-Sign in, open a paper with a direct PDF source, and select **Analyse questions**. The first signed-in request extracts the paper text, asks the server-side model for structured JSON, validates the output, and creates one `paperMetadata` document. Another student opening that paper sees the cached question count and marks through Firestore without another AI call.
-
-If the paper is image-only or its layout cannot be parsed safely, the interface keeps the manual review fields available and does not invent a mark total. Students can still record their score, review, and mistakes.
+After deployment, sign in with a new account and confirm its UID appears in `portal_user_data`. Sign in with an account that has an older Firestore `users/{uid}` document and confirm its study fields appear in Supabase. Existing Supabase values should remain intact.

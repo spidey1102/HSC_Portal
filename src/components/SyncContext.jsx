@@ -1,31 +1,18 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
+import { loadUserData, requestUserData } from '../utils/portalUserSync';
 
 const SyncContext = createContext();
-const USER_DATA_ENDPOINT = '/api/user-data';
 
 function sameStoredValue(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-async function requestUserData(user, method, data) {
-  const token = await user.getIdToken();
-  const response = await fetch(USER_DATA_ENDPOINT, {
-    method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(method === 'PUT' ? { 'Content-Type': 'application/json' } : {}),
-    },
-    ...(method === 'PUT' ? { body: JSON.stringify({ data }) } : {}),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.error || 'The study data could not be synchronised.');
-  return payload;
-}
-
 export function SyncProvider({ children }) {
   const { user } = useAuth();
   const [data, setData] = useState(null);
+  const [syncError, setSyncError] = useState(null);
+  const [retryKey, setRetryKey] = useState(0);
   const dataRef = useRef(null);
   const writeQueueRef = useRef(Promise.resolve());
 
@@ -36,32 +23,33 @@ export function SyncProvider({ children }) {
 
     if (!user) {
       setData(null);
+      setSyncError(null);
       return undefined;
     }
 
     setData(null);
-    requestUserData(user, 'GET')
-      .then((payload) => {
+    setSyncError(null);
+    loadUserData(user)
+      .then((remoteData) => {
         if (cancelled) return;
-        const remoteData = payload?.data && typeof payload.data === 'object' ? payload.data : {};
         dataRef.current = remoteData;
         setData(remoteData);
       })
       .catch((error) => {
         if (cancelled) return;
         console.warn('Could not load synced study data:', error);
-        // Keep the portal usable offline or during a temporary server issue.
-        dataRef.current = {};
-        setData({});
+        // Do not treat a failed read as an empty account: that can overwrite
+        // existing study data when the portal next sends its local cache.
+        setSyncError('Study data is not syncing. Your changes remain on this device.');
       });
 
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, retryKey]);
 
   const updateRemoteFields = useCallback((patch) => {
-    if (!user || !patch || Object.keys(patch).length === 0) return Promise.resolve();
+    if (!user || dataRef.current === null || !patch || Object.keys(patch).length === 0) return Promise.resolve();
 
     const currentData = dataRef.current || {};
     const changedPatch = Object.fromEntries(
@@ -82,7 +70,13 @@ export function SyncProvider({ children }) {
         const savedData = saved?.data && typeof saved.data === 'object' ? saved.data : nextData;
         dataRef.current = savedData;
         setData(savedData);
+        setSyncError(null);
         return savedData;
+      })
+      .catch((error) => {
+        console.warn('Could not save synced study data:', error);
+        setSyncError('Study data is not syncing. Your changes remain on this device.');
+        return undefined;
       });
     writeQueueRef.current = queuedWrite;
     return queuedWrite;
@@ -95,6 +89,9 @@ export function SyncProvider({ children }) {
 
   return (
     <SyncContext.Provider value={{ data, updateRemote, updateRemoteFields }}>
+      {syncError && <div role="alert" style={{ padding: '10px 16px', background: '#fff3cd', color: '#382600' }}>
+        {syncError} <button type="button" onClick={() => setRetryKey((key) => key + 1)}>Retry</button>
+      </div>}
       {children}
     </SyncContext.Provider>
   );

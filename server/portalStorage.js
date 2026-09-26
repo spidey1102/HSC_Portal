@@ -55,6 +55,11 @@ function mapPaperMetadata(row) {
 
 export async function getUserData(firebaseUid) {
   const sql = getSupabaseSql();
+  await sql`
+    insert into public.portal_user_data (firebase_uid)
+    values (${String(firebaseUid)})
+    on conflict (firebase_uid) do nothing
+  `;
   const rows = await sql`
     select data
     from public.portal_user_data

@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import ClassicPortal from './ClassicPortal';
 import NewPortal from './NewPortal';
 import TreePortal from './TreePortal';
+import { SyncProvider } from './components/SyncContext';
 import { APPEARANCE_STORAGE_KEY, loadAppearanceSettings } from './utils/appearancePresets';
 
 /**
@@ -41,12 +42,12 @@ export default function App() {
   }, []);
 
   if (portalLayout === 'simplified' || portalLayout === 'tree') {
-    return <TreePortal key="simplified" onPortalLayoutChange={handlePortalLayoutChange} />;
+    return <SyncProvider><TreePortal key="simplified" onPortalLayoutChange={handlePortalLayoutChange} /></SyncProvider>;
   }
 
   if (portalLayout === 'classic') {
     return <ClassicPortal key="classic" onPortalLayoutChange={handlePortalLayoutChange} />;
   }
 
-  return <NewPortal key="new" onPortalLayoutChange={handlePortalLayoutChange} />;
+  return <SyncProvider><NewPortal key="new" onPortalLayoutChange={handlePortalLayoutChange} /></SyncProvider>;
 }
