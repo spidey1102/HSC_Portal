@@ -80,9 +80,12 @@ export function sendJson(res, status, payload) {
 }
 
 export async function readBody(req) {
-  if (req.body && typeof req.body === 'object') {
-    if (JSON.stringify(req.body).length > 100_000) throw new Error('Request is too large.');
-    return req.body;
+  if (req.body !== undefined && req.body !== null) {
+    const raw = typeof req.body === 'string' || Buffer.isBuffer(req.body)
+      ? String(req.body)
+      : JSON.stringify(req.body);
+    if (raw.length > 100_000) throw new Error('Request is too large.');
+    return JSON.parse(raw || '{}');
   }
   const chunks = [];
   let total = 0;
