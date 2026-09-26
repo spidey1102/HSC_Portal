@@ -47,11 +47,13 @@ export function publicPost(row) {
     questionText: row.question_text,
     questionFileName: row.question_file_name,
     hasQuestionFile: Boolean(row.question_file_path),
+    questionIsImage: /\.(?:jpe?g|png|webp)$/i.test(row.question_file_path || ''),
     publishDate: dateString(row.publish_date),
     solutionReleased: released,
     solutionText: released ? row.solution_text : '',
     solutionFileName: released ? row.solution_file_name : null,
     hasSolutionFile: released && Boolean(row.solution_file_path),
+    solutionIsImage: released && /\.(?:jpe?g|png|webp)$/i.test(row.solution_file_path || ''),
   };
 }
 

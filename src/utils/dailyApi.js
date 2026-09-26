@@ -41,12 +41,17 @@ export async function uploadDailyFile(user, postId, kind, file) {
 export async function openDailyFile(user, params) {
   const popup = window.open('', '_blank');
   try {
-    const query = new URLSearchParams(params);
-    const payload = await request(user, `/api/daily-files?${query}`);
-    if (popup) popup.location.href = payload.url;
-    else window.location.href = payload.url;
+    const url = await getDailyFileUrl(user, params);
+    if (popup) popup.location.href = url;
+    else window.location.href = url;
   } catch (error) {
     if (popup) popup.close();
     throw error;
   }
+}
+
+export async function getDailyFileUrl(user, params) {
+  const query = new URLSearchParams(params);
+  const payload = await request(user, `/api/daily-files?${query}`);
+  return payload.url;
 }

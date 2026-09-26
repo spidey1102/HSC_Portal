@@ -40,6 +40,12 @@
 .daily-rich img { max-width: 100%; }
 .daily-rich .katex-display { overflow-x: auto; }
 .daily-file { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; margin: 7px 0; border: 1px solid #b9a477; border-radius: 8px; background: #fff9eb; color: #41341e; font-weight: 700; }
+.daily-inline-image { margin: 18px 0 24px; padding: 12px; border: 1px solid #ddd5c8; border-radius: 12px; background: #fff; overflow: auto; }
+.daily-image-zoom { display: block; width: 100%; padding: 0; border: 0; background: transparent; text-align: center; cursor: zoom-in; }
+.daily-image-zoom img { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+.daily-inline-image.expanded .daily-image-zoom { width: max-content; min-width: 100%; cursor: zoom-out; }
+.daily-inline-image.expanded .daily-image-zoom img { max-width: none; }
+.daily-inline-image figcaption { margin-top: 8px; color: #68717c; font-size: 12px; text-align: center; }
 .daily-solution, .daily-answer, .daily-submissions, .daily-contributors { margin-top: 25px; padding: 20px; border: 1px solid #ddd5c8; border-radius: 13px; background: #fff; }
 .daily-solution h4, .daily-submissions h4, .daily-contributors h4 { margin: 0 0 12px; font: 700 20px Georgia, serif; }
 .daily-answer { display: grid; gap: 10px; }

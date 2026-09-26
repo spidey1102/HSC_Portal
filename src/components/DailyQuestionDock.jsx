@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { useAuth } from './AuthContext';
-import { getDaily, openDailyFile, postDaily, uploadDailyFile } from '../utils/dailyApi';
+import { getDaily, getDailyFileUrl, openDailyFile, postDaily, uploadDailyFile } from '../utils/dailyApi';
 import './DailyQuestionDock.css';
 
 const todaySydney = () => new Intl.DateTimeFormat('en-CA', {
@@ -18,6 +18,34 @@ const emptyForm = () => ({
 function RichText({ children }) {
   if (!children) return null;
   return <div className="daily-rich"><ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{children}</ReactMarkdown></div>;
+}
+
+function InlineImage({ user, postId, kind, name }) {
+  const [url, setUrl] = useState('');
+  const [error, setError] = useState('');
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setUrl('');
+    setError('');
+    setExpanded(false);
+    getDailyFileUrl(user, { postId, kind }).then((nextUrl) => {
+      if (active) setUrl(nextUrl);
+    }).catch((err) => {
+      if (active) setError(err.message);
+    });
+    return () => { active = false; };
+  }, [user, postId, kind]);
+
+  return <figure className={`daily-inline-image${expanded ? ' expanded' : ''}`}>
+    {!url && !error && <p className="daily-muted">Loading image…</p>}
+    {error && <p role="alert" className="daily-error">{error}</p>}
+    {url && <button type="button" className="daily-image-zoom" onClick={() => setExpanded(!expanded)} aria-label={expanded ? 'Fit image to panel' : 'View image at full size'}>
+      <img src={url} alt={name || `${kind} attachment`} onError={() => { setUrl(''); setError('The image could not be loaded.'); }} />
+    </button>}
+    {url && <figcaption>{name || 'Attached image'} · {expanded ? 'Click to fit' : 'Click for full size'}</figcaption>}
+  </figure>;
 }
 
 export default function DailyQuestionDock() {
@@ -175,12 +203,14 @@ export default function DailyQuestionDock() {
             <div className="daily-meta">{selected.publishDate} · {selected.subject || 'General'}</div>
             <h3>{selected.title}</h3>
             <RichText>{selected.questionText}</RichText>
-            {selected.hasQuestionFile && <button type="button" className="daily-file" onClick={() => openFile({ postId: selected.id, kind: 'question' })}>
+            {selected.hasQuestionFile && selected.questionIsImage && <InlineImage user={user} postId={selected.id} kind="question" name={selected.questionFileName} />}
+            {selected.hasQuestionFile && !selected.questionIsImage && <button type="button" className="daily-file" onClick={() => openFile({ postId: selected.id, kind: 'question' })}>
               <FileUp size={16} /> Open question attachment: {selected.questionFileName || 'file'}
             </button>}
             {selected.solutionReleased && <div className="daily-solution">
               <h4>Official solution</h4><RichText>{selected.solutionText}</RichText>
-              {selected.hasSolutionFile && <button type="button" className="daily-file" onClick={() => openFile({ postId: selected.id, kind: 'solution' })}>
+              {selected.hasSolutionFile && selected.solutionIsImage && <InlineImage user={user} postId={selected.id} kind="solution" name={selected.solutionFileName} />}
+              {selected.hasSolutionFile && !selected.solutionIsImage && <button type="button" className="daily-file" onClick={() => openFile({ postId: selected.id, kind: 'solution' })}>
                 <FileUp size={16} /> Open solution attachment: {selected.solutionFileName || 'file'}
               </button>}
             </div>}

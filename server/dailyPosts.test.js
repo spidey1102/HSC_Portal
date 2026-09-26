@@ -20,7 +20,19 @@ test('public posts hide unreleased solutions and storage paths', () => {
   });
   assert.equal(post.solutionText, '');
   assert.equal(post.hasSolutionFile, false);
+  assert.equal(post.questionIsImage, false);
   assert.equal(JSON.stringify(post).includes('posts/private'), false);
+});
+
+test('public posts identify image attachments for inline display', () => {
+  const post = publicPost({
+    id: 'post-id', title: 'Probability', subject: 'Mathematics', question_text: '',
+    question_file_path: 'posts/post-id/question/question.png', question_file_name: 'proof.png',
+    publish_date: '2026-09-26', solution_text: '', solution_file_path: null,
+    solution_released_at: null,
+  });
+  assert.equal(post.questionIsImage, true);
+  assert.equal(JSON.stringify(post).includes('posts/post-id'), false);
 });
 
 test('attachment paths and calendar dates reject malformed values', () => {
