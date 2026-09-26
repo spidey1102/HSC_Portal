@@ -1,5 +1,6 @@
 import { getDeadline } from '@vercel/functions';
 import { requireAuthenticatedUser } from '../server/firebaseAdmin.js';
+import { isOwner } from '../server/dailyPosts.js';
 import {
   claimPaperAnalysis,
   completePaperAnalysis,
@@ -742,6 +743,7 @@ export default async function handler(req, res) {
     const paperId = requestUrl.searchParams.get('paperId');
     const paperName = requestUrl.searchParams.get('paperName');
     const isRefreshRequest = requestUrl.searchParams.get('refresh') === '1';
+    const isOwnerBatchRequest = requestUrl.searchParams.get('adminBatch') === '1';
     logPhase('request received', { method: req.method, paperId: String(paperId || '') });
     if (!paperId) {
       sendJson(res, 400, { error: 'paperId is required.' });
@@ -763,14 +765,19 @@ export default async function handler(req, res) {
     // analysis request and must authenticate before even returning a cache hit.
     if (req.method === 'POST') {
       logPhase('verifying token');
-      await requireAuthenticatedUser(req);
+      const user = await requireAuthenticatedUser(req);
+      if (isOwnerBatchRequest && !isOwner(user.uid)) {
+        sendJson(res, 403, { error: 'Owner access is required.' });
+        return;
+      }
       logPhase('token verified');
     }
 
     logPhase('reading metadata cache');
     const initial = await readMetadata({ paper, sourceFingerprint });
     logPhase('metadata cache read', { status: initial.data?.status || initial.failure?.status || 'missing' });
-    if (initial.data && !(req.method === 'POST' && isRefreshRequest)) {
+    const adminRetryingFailure = isOwnerBatchRequest && initial.data?.status === 'error';
+    if (initial.data && !(req.method === 'POST' && (isRefreshRequest || adminRetryingFailure))) {
       sendJson(res, initial.data.status === 'analysing' ? 202 : 200, publicMetadata(initial.data, { paper }));
       return;
     }

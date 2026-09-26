@@ -4,6 +4,7 @@ import ClassicPortal from './ClassicPortal';
 import NewPortal from './NewPortal';
 import TreePortal from './TreePortal';
 import DailyQuestionDock from './components/DailyQuestionDock';
+import OwnerAdminPanel from './components/OwnerAdminPanel';
 import { DAILY_QUESTIONS_ENABLED } from './config/featureFlags';
 import { SyncProvider } from './components/SyncContext';
 import { APPEARANCE_STORAGE_KEY, loadAppearanceSettings } from './utils/appearancePresets';
@@ -44,12 +45,12 @@ export default function App() {
   }, []);
 
   if (portalLayout === 'simplified' || portalLayout === 'tree') {
-    return <SyncProvider><TreePortal key="simplified" onPortalLayoutChange={handlePortalLayoutChange} />{DAILY_QUESTIONS_ENABLED && <DailyQuestionDock />}</SyncProvider>;
+    return <SyncProvider><TreePortal key="simplified" onPortalLayoutChange={handlePortalLayoutChange} /><OwnerAdminPanel />{DAILY_QUESTIONS_ENABLED && <DailyQuestionDock />}</SyncProvider>;
   }
 
   if (portalLayout === 'classic') {
-    return <><ClassicPortal key="classic" onPortalLayoutChange={handlePortalLayoutChange} />{DAILY_QUESTIONS_ENABLED && <DailyQuestionDock />}</>;
+    return <><ClassicPortal key="classic" onPortalLayoutChange={handlePortalLayoutChange} /><OwnerAdminPanel />{DAILY_QUESTIONS_ENABLED && <DailyQuestionDock />}</>;
   }
 
-  return <SyncProvider><NewPortal key="new" onPortalLayoutChange={handlePortalLayoutChange} />{DAILY_QUESTIONS_ENABLED && <DailyQuestionDock />}</SyncProvider>;
+  return <SyncProvider><NewPortal key="new" onPortalLayoutChange={handlePortalLayoutChange} /><OwnerAdminPanel />{DAILY_QUESTIONS_ENABLED && <DailyQuestionDock />}</SyncProvider>;
 }

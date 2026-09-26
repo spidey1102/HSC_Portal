@@ -1,4 +1,5 @@
 import { requireAuthenticatedUser } from '../../server/firebaseAdmin.js';
+import { isOwner } from '../../server/dailyPosts.js';
 import { getPaperMetadata } from '../../server/portalStorage.js';
 import {
   getPaperSourceFingerprint,
@@ -26,8 +27,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    await requireAuthenticatedUser(req);
     const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const user = await requireAuthenticatedUser(req);
+    if (requestUrl.searchParams.get('adminBatch') === '1' && !isOwner(user.uid)) {
+      sendJson(res, 403, { error: 'Owner access is required.' });
+      return;
+    }
     const paperId = requestUrl.searchParams.get('paperId');
     const paperName = requestUrl.searchParams.get('paperName');
     if (!paperId) {

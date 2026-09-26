@@ -119,12 +119,13 @@ function normaliseMetadata(data, { cached = true } = {}) {
   };
 }
 
-function metadataRequestUrl(paper, suffix = '', { refresh = false } = {}) {
+function metadataRequestUrl(paper, suffix = '', { refresh = false, adminBatch = false } = {}) {
   const params = new URLSearchParams({
     paperId: String(paper?.v || ''),
     paperName: String(paper?.n || ''),
   });
   if (refresh) params.set('refresh', '1');
+  if (adminBatch) params.set('adminBatch', '1');
   return `/api/paper-metadata${suffix}?${params.toString()}`;
 }
 
@@ -147,8 +148,8 @@ export async function getPaperMetadata(paper) {
   return readMetadataResponse(paper);
 }
 
-export async function analysePaperMetadata(paper, idToken, { refresh = false } = {}) {
-  const response = await fetch(metadataRequestUrl(paper, '', { refresh }), {
+export async function analysePaperMetadata(paper, idToken, { refresh = false, adminBatch = false } = {}) {
+  const response = await fetch(metadataRequestUrl(paper, '', { refresh, adminBatch }), {
     method: 'POST',
     headers: { Authorization: `Bearer ${idToken}` },
   });
@@ -158,7 +159,7 @@ export async function analysePaperMetadata(paper, idToken, { refresh = false } =
     // The claim endpoint returns immediately. Start the long worker request without
     // awaiting it so the reader can render its elapsed analysis timer straight away.
     if (payload?.started) {
-      void fetch(metadataRequestUrl(paper, '/worker'), {
+      void fetch(metadataRequestUrl(paper, '/worker', { adminBatch }), {
         method: 'POST',
         headers: { Authorization: `Bearer ${idToken}` },
       }).catch(() => {

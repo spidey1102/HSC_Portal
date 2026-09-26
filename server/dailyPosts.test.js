@@ -1,6 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canViewAnswers, filePath, publicPost, validDate } from './dailyPosts.js';
+import { canViewAnswers, filePath, isOwner, publicPost, validDate } from './dailyPosts.js';
+
+test('owner access is granted only to UIDs in the server allowlist', () => {
+  const previous = process.env.DAILY_POST_OWNER_UIDS;
+  process.env.DAILY_POST_OWNER_UIDS = 'account-owner-only';
+  try {
+    assert.equal(isOwner('account-owner-only'), true);
+    assert.equal(isOwner('another-account'), false);
+    assert.equal(isOwner(''), false);
+  } finally {
+    if (previous === undefined) delete process.env.DAILY_POST_OWNER_UIDS;
+    else process.env.DAILY_POST_OWNER_UIDS = previous;
+  }
+});
 
 test('only the active author can view private submissions', () => {
   const post = { author_uid: 'poster-1' };
