@@ -87,9 +87,8 @@ export default async function handler(req, res) {
     const action = String(body.action || '');
 
     if (action === 'delete') {
-      if (role !== 'owner') throw new Error('Owner access is required to delete questions.');
       const post = await findPost(String(body.postId || ''));
-      if (!post) throw new Error('Question not found.');
+      if (!post || !canManage(post, user.uid, role)) throw new Error('Poster access is required to delete this question.');
       const submissions = await sql`
         select file_path from public.daily_submissions where post_id = ${post.id}
       `;

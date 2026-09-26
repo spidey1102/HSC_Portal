@@ -294,7 +294,7 @@ export default function DailyQuestionDock() {
               <button type="button" disabled={busy || !form.title} onClick={() => run(savePost, 'Draft saved.')}>Save</button>
               {edited && !edited.published && <button type="button" disabled={busy} onClick={() => run(async () => { await savePost(); await postDaily(user, { action: 'publish', postId: edited.id }); }, 'Question published for its scheduled day.')}>Publish</button>}
               {edited?.published && !edited.solutionReleased && <button type="button" disabled={busy} onClick={() => run(async () => { await savePost(); await postDaily(user, { action: 'release', postId: edited.id }); }, 'Official solution released.')}>Reveal solution</button>}
-              {identity.role === 'owner' && edited && <button type="button" className="daily-delete-button" disabled={busy} onClick={() => {
+              {edited && (identity.role === 'owner' || (identity.role === 'poster' && edited.authorUid === identity.uid)) && <button type="button" className="daily-delete-button" disabled={busy} onClick={() => {
                 if (!window.confirm(`Delete “${edited.title}”? This also permanently deletes all private answers for this question.`)) return;
                 run(async () => {
                   const result = await postDaily(user, { action: 'delete', postId: edited.id });
