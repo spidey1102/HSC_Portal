@@ -14,6 +14,24 @@ const emptyForm = () => ({
   title: '', subject: '', questionText: '', solutionText: '', publishDate: todaySydney(),
   questionFilePath: null, questionFileName: null, solutionFilePath: null, solutionFileName: null,
 });
+const subjectSections = [
+  { id: 'all', label: 'All subjects' },
+  { id: 'ADV', label: 'Advanced' },
+  { id: 'EXT1', label: 'Extension 1' },
+  { id: 'EXT2', label: 'Extension 2' },
+];
+
+function subjectId(subject) {
+  const value = String(subject || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
+  if (value === 'adv' || value === 'advanced') return 'ADV';
+  if (value === 'ext1' || value === 'extension1') return 'EXT1';
+  if (value === 'ext2' || value === 'extension2') return 'EXT2';
+  return '';
+}
+
+function subjectLabel(subject) {
+  return subjectSections.find((section) => section.id === subjectId(subject))?.label || subject || 'General';
+}
 
 function RichText({ children }) {
   if (!children) return null;
@@ -50,6 +68,7 @@ export default function DailyQuestionDock() {
   const { user, signInWithGoogle } = useAuth();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState('today');
+  const [subjectSection, setSubjectSection] = useState('all');
   const [posts, setPosts] = useState([]);
   const [submittedIds, setSubmittedIds] = useState([]);
   const [identity, setIdentity] = useState(null);
@@ -102,8 +121,11 @@ export default function DailyQuestionDock() {
 
   useEffect(() => { if (open) reload(); }, [open, reload]);
 
-  const current = posts[0] || null;
-  const selected = useMemo(() => posts.find((post) => post.id === selectedId) || current, [posts, selectedId, current]);
+  const sectionPosts = useMemo(() => subjectSection === 'all'
+    ? posts
+    : posts.filter((post) => subjectId(post.subject) === subjectSection), [posts, subjectSection]);
+  const current = sectionPosts[0] || null;
+  const selected = useMemo(() => sectionPosts.find((post) => post.id === selectedId) || current, [sectionPosts, selectedId, current]);
   const edited = useMemo(() => managed.find((post) => post.id === manageId) || null, [managed, manageId]);
 
   useEffect(() => {
@@ -129,8 +151,8 @@ export default function DailyQuestionDock() {
     setError('');
     setNotice('');
     try {
-      await task();
-      if (success) setNotice(success);
+      const result = await task();
+      if (success) setNotice(typeof success === 'function' ? success(result) : success);
       await reload();
     } catch (err) {
       setError(err.message);
@@ -190,15 +212,23 @@ export default function DailyQuestionDock() {
         {notice && <p role="status" className="daily-notice">{notice}</p>}
         {loading && <p className="daily-muted">Loading questions…</p>}
 
-        {(view === 'today' || view === 'archive') && <div className="daily-content">
+        {(view === 'today' || view === 'archive') && <div className={`daily-content daily-content-${view}`}>
+          <nav className="daily-subject-tabs" aria-label="Question subjects">
+            {subjectSections.map((section) => <button
+              type="button"
+              key={section.id}
+              className={subjectSection === section.id ? 'active' : ''}
+              onClick={() => { setSubjectSection(section.id); setSelectedId(null); }}
+            >{section.label}</button>)}
+          </nav>
           {view === 'archive' && <div className="daily-archive">
-            {posts.map((post) => <button type="button" key={post.id} className={selected?.id === post.id ? 'active' : ''} onClick={() => setSelectedId(post.id)}>
-              <small>{post.publishDate} · {post.subject || 'General'}</small><strong>{post.title}</strong>
+            {sectionPosts.map((post) => <button type="button" key={post.id} className={selected?.id === post.id ? 'active' : ''} onClick={() => setSelectedId(post.id)}>
+              <small>{post.publishDate} · {subjectLabel(post.subject)}</small><strong>{post.title}</strong>
             </button>)}
           </div>}
-          {!selected && !loading && <p className="daily-empty">No question has been posted yet. Check back soon.</p>}
+          {!selected && !loading && <p className="daily-empty">{subjectSection === 'all' ? 'No question has been posted yet. Check back soon.' : `No ${subjectSections.find((section) => section.id === subjectSection)?.label} question has been posted yet. Check back soon.`}</p>}
           {selected && <article className="daily-question">
-            <div className="daily-meta">{selected.publishDate} · {selected.subject || 'General'}</div>
+            <div className="daily-meta">{selected.publishDate} · {subjectLabel(selected.subject)}</div>
             <h3>{selected.title}</h3>
             <RichText>{selected.questionText}</RichText>
             {selected.hasQuestionFile && selected.questionIsImage && <InlineImage user={user} postId={selected.id} kind="question" name={selected.questionFileName} />}
@@ -243,7 +273,12 @@ export default function DailyQuestionDock() {
           <div className="daily-editor">
             <p className="daily-muted">Signed in as {identity.uid} · {identity.role}</p>
             <label>Title<input value={form.title} maxLength={160} onChange={(event) => setForm({ ...form, title: event.target.value })} disabled={edited?.published} /></label>
-            <label>Subject<input value={form.subject} maxLength={80} onChange={(event) => setForm({ ...form, subject: event.target.value })} disabled={edited?.published} /></label>
+            <label>Subject<select value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })} disabled={edited?.published}>
+              <option value="">General</option>
+              <option value="ADV">Advanced</option>
+              <option value="EXT1">Extension 1</option>
+              <option value="EXT2">Extension 2</option>
+            </select></label>
             <label>Day (Sydney time)<input type="date" value={form.publishDate} onChange={(event) => setForm({ ...form, publishDate: event.target.value })} disabled={edited?.published} /></label>
             <label>Question<textarea rows={5} value={form.questionText} onChange={(event) => setForm({ ...form, questionText: event.target.value })} disabled={edited?.published} /></label>
             <label className="daily-upload">Question PDF or image
@@ -259,6 +294,17 @@ export default function DailyQuestionDock() {
               <button type="button" disabled={busy || !form.title} onClick={() => run(savePost, 'Draft saved.')}>Save</button>
               {edited && !edited.published && <button type="button" disabled={busy} onClick={() => run(async () => { await savePost(); await postDaily(user, { action: 'publish', postId: edited.id }); }, 'Question published for its scheduled day.')}>Publish</button>}
               {edited?.published && !edited.solutionReleased && <button type="button" disabled={busy} onClick={() => run(async () => { await savePost(); await postDaily(user, { action: 'release', postId: edited.id }); }, 'Official solution released.')}>Reveal solution</button>}
+              {identity.role === 'owner' && edited && <button type="button" className="daily-delete-button" disabled={busy} onClick={() => {
+                if (!window.confirm(`Delete “${edited.title}”? This also permanently deletes all private answers for this question.`)) return;
+                run(async () => {
+                  const result = await postDaily(user, { action: 'delete', postId: edited.id });
+                  setManageId(null);
+                  setSubmissions([]);
+                  return result;
+                }, (result) => result.cleanupWarning
+                  ? 'Question deleted, but some stored attachments could not be removed.'
+                  : 'Question and its private answers deleted.');
+              }}>Delete question</button>}
             </div>
             {edited && edited.authorUid === identity.uid && <section className="daily-submissions">
               <h4>Student submissions</h4>

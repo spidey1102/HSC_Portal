@@ -27,13 +27,19 @@
 .daily-tabs button { padding: 7px 14px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: #5e6671; font-weight: 700; }
 .daily-tabs button.active { background: #eadbb9; border-color: #c5ac77; color: #352812; }
 .daily-content, .daily-manage { min-height: 0; flex: 1; overflow: auto; }
-.daily-content { display: flex; }
+.daily-content { display: grid; grid-template-columns: 250px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+.daily-subject-tabs { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 7px; padding: 12px 18px; border-bottom: 1px solid #ded7cc; }
+.daily-subject-tabs button { padding: 7px 12px; border: 1px solid #ddd5c8; border-radius: 999px; background: #fff; color: #5e6671; font: 700 13px system-ui, sans-serif; }
+.daily-subject-tabs button.active { border-color: #ac843f; background: #eadbb9; color: #352812; }
+.daily-content-today .daily-question { grid-column: 1 / -1; }
 .daily-archive, .daily-manage-list { width: 250px; flex: none; padding: 18px; border-right: 1px solid #ded7cc; overflow: auto; }
+.daily-archive { grid-column: 1; grid-row: 2; }
 .daily-archive button, .daily-manage-list button { display: block; width: 100%; padding: 11px; margin-bottom: 7px; text-align: left; border: 1px solid #ddd5c8; border-radius: 10px; background: #fff; color: #29333d; }
 .daily-archive button.active, .daily-manage-list button.active { border-color: #ac843f; background: #fff6df; }
 .daily-archive small, .daily-manage-list small { display: block; color: #777; }
 .daily-archive strong, .daily-manage-list strong { display: block; line-height: 1.25; }
-.daily-question { width: min(720px, 100%); margin: 0 auto; padding: 30px 26px 60px; overflow: auto; }
+.daily-question { grid-column: 2; grid-row: 2; width: min(720px, 100%); margin: 0 auto; padding: 30px 26px 60px; overflow: auto; }
+.daily-empty { grid-column: 1 / -1; }
 .daily-question h3 { margin: 6px 0 18px; font: 700 clamp(23px, 3vw, 32px)/1.2 Georgia, serif; }
 .daily-meta { color: #806733; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
 .daily-rich { white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -51,7 +57,7 @@
 .daily-solution h4, .daily-submissions h4, .daily-contributors h4 { margin: 0 0 12px; font: 700 20px Georgia, serif; }
 .daily-answer { display: grid; gap: 10px; }
 .daily-answer label, .daily-editor label { font-weight: 700; }
-.daily-answer textarea, .daily-editor textarea, .daily-editor input, .daily-contributors input { width: 100%; padding: 10px 11px; border: 1px solid #bfc2c6; border-radius: 8px; background: #fff; color: #202831; font: inherit; }
+.daily-answer textarea, .daily-editor textarea, .daily-editor input, .daily-editor select, .daily-contributors input { width: 100%; padding: 10px 11px; border: 1px solid #bfc2c6; border-radius: 8px; background: #fff; color: #202831; font: inherit; }
 .daily-answer button[type="submit"], .daily-answer > button, .daily-actions button, .daily-contributors > button, .daily-submissions > button { width: fit-content; padding: 9px 14px; border: 0; border-radius: 8px; background: #263e43; color: #fff; font-weight: 700; }
 .daily-upload { display: grid; gap: 7px; }
 .daily-upload input { font-size: 13px; }
@@ -66,6 +72,7 @@
 .daily-editor label { display: grid; gap: 5px; }
 .daily-editor label input, .daily-editor label textarea { margin-top: 2px; font-weight: 400; }
 .daily-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.daily-actions .daily-delete-button { background: #9b3028; }
 .daily-submissions article { padding: 13px 0; border-top: 1px solid #e8e3dc; }
 .daily-submissions article:first-of-type { margin-top: 15px; }
 .daily-person { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 0; border-bottom: 1px solid #eee; overflow-wrap: anywhere; }
@@ -76,7 +83,11 @@
   .daily-panel { width: 100%; height: 100%; border-radius: 0; }
   .daily-header { padding: 16px 18px 11px; }
   .daily-tabs { padding: 0 18px 10px; }
-  .daily-content, .daily-manage { display: block; }
+  .daily-content { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); }
+  .daily-manage { display: block; }
+  .daily-content-today .daily-question, .daily-question { grid-column: 1; grid-row: 3; }
+  .daily-archive { grid-column: 1; grid-row: 2; }
+  .daily-empty { grid-column: 1; grid-row: 2 / span 2; }
   .daily-archive, .daily-manage-list { width: 100%; max-height: 160px; border-right: 0; border-bottom: 1px solid #ded7cc; display: flex; gap: 7px; }
   .daily-archive button, .daily-manage-list button { width: 190px; flex: none; margin: 0; }
   .daily-question { padding: 22px 18px 55px; }

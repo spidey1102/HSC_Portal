@@ -1,11 +1,19 @@
 import { requireAuthenticatedUser } from '../server/firebaseAdmin.js';
 import { getSupabaseSql } from '../server/supabaseDb.js';
+import { createClient } from '@supabase/supabase-js';
 import {
   canManage, canViewAnswers, cleanText, dateString, errorStatus, fileName, filePath, findPost,
   managedPost, publicPost, readBody, roleFor, sendJson, todaySydney, validDate,
 } from '../server/dailyPosts.js';
 
 export const maxDuration = 30;
+
+function questionStorage() {
+  const url = String(process.env.SUPABASE_URL || '').trim();
+  const key = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  if (!url || !key) throw new Error('Daily question file storage is not configured.');
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } }).storage.from('daily-questions');
+}
 
 async function optionalUser(req) {
   if (!req.headers?.authorization) return null;
@@ -77,6 +85,40 @@ export default async function handler(req, res) {
     const role = await roleFor(user.uid);
     const body = await readBody(req);
     const action = String(body.action || '');
+
+    if (action === 'delete') {
+      if (role !== 'owner') throw new Error('Owner access is required to delete questions.');
+      const post = await findPost(String(body.postId || ''));
+      if (!post) throw new Error('Question not found.');
+      const submissions = await sql`
+        select file_path from public.daily_submissions where post_id = ${post.id}
+      `;
+      await sql.begin(async (transaction) => {
+        await transaction`delete from public.daily_submissions where post_id = ${post.id}`;
+        await transaction`delete from public.daily_posts where id = ${post.id}`;
+      });
+
+      const paths = [...new Set([
+        post.question_file_path,
+        post.solution_file_path,
+        ...submissions.map((row) => row.file_path),
+      ].filter(Boolean))];
+      let cleanupWarning = false;
+      if (paths.length) {
+        try {
+          const bucket = questionStorage();
+          for (let index = 0; index < paths.length; index += 100) {
+            const { error } = await bucket.remove(paths.slice(index, index + 100));
+            if (error) throw error;
+          }
+        } catch (error) {
+          console.error('Daily question attachment cleanup failed:', error);
+          cleanupWarning = true;
+        }
+      }
+      sendJson(res, 200, { ok: true, cleanupWarning });
+      return;
+    }
 
     if (action === 'grant' || action === 'revoke') {
       if (role !== 'owner') throw new Error('Owner access is required.');
@@ -184,7 +226,7 @@ export default async function handler(req, res) {
     throw new Error('Unknown action.');
   } catch (error) {
     const message = error?.code === '23505'
-      ? 'That day already has a question, or you have already submitted an answer.'
+      ? 'That subject already has a question for that day, or you have already submitted an answer.'
       : String(error?.message || 'The request could not be completed.');
     sendJson(res, errorStatus(error), { error: message });
   }
