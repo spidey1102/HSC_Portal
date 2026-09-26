@@ -1,5 +1,6 @@
 import { Palette, Search, FolderTree } from 'lucide-react';
 import UserButton from './UserButton';
+import DeclutterToggle from './DeclutterToggle';
 import { getPlatformShortcuts } from '../utils/platformShortcuts';
 import { TEXTBOOKS_ENABLED } from '../config/featureFlags';
 import { NSW_MATHS_BOOKING_URL } from './NswMathsEventsBanner';
@@ -26,6 +27,8 @@ export default function PortalMasthead({
   onOpenCustomise,
   showEventsButton = false,
   onPortalLayoutChange,
+  declutter = false,
+  onToggleDeclutter,
   showActions = true,
 }) {
   const shortcuts = getPlatformShortcuts();
@@ -58,6 +61,12 @@ export default function PortalMasthead({
                 <FolderTree size={14} />
                 Tree Layout
               </button>
+              <DeclutterToggle
+                enabled={declutter}
+                onToggle={onToggleDeclutter}
+                className="btn btn-secondary"
+                style={{ fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+              />
               <button
                 type="button"
                 className="btn btn-secondary"

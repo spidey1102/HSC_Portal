@@ -17,6 +17,7 @@ export const APPEARANCE_DEFAULTS = {
   layout: 'standard',
   portalLayout: 'new',
   showRecommendations: true,
+  declutter: false,
 };
 
 /**
@@ -154,8 +155,9 @@ export function loadAppearanceSettings() {
       ? parsed.portalLayout
       : APPEARANCE_DEFAULTS.portalLayout;
     const showRecommendations = parsed?.showRecommendations !== false;
+    const declutter = parsed?.declutter === true;
 
-    return { mode, preset, accent, density, layout, portalLayout, showRecommendations };
+    return { mode, preset, accent, density, layout, portalLayout, showRecommendations, declutter };
   } catch (error) {
     return { ...APPEARANCE_DEFAULTS };
   }

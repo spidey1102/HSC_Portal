@@ -503,6 +503,8 @@ button.tag-outline:hover { background: color-mix(in srgb, var(--color-accent) 12
   background: var(--color-surface);
   min-height: 0;
 }
+.portal-split-decluttered { grid-template-columns: minmax(0, 1fr); }
+.portal-split-decluttered .portal-aside { max-width: 960px; width: 100%; margin: 0 auto; }
 
 /* Library: the search band is fixed, the facet rail and the index scroll apart. */
 .library-view { display: flex; flex-direction: column; height: 100%; min-height: 0; }

@@ -767,11 +767,15 @@ export default function NewPortal({ onPortalLayoutChange }) {
         runhead={runhead}
         onOpenPalette={() => setIsPaletteOpen(true)}
         onOpenCustomise={() => setIsCustomizationOpen(true)}
-        showEventsButton={isNswMathsBannerMinimised}
+        showEventsButton={isNswMathsBannerMinimised && !(appearance.declutter && section === 'today')}
         onPortalLayoutChange={onPortalLayoutChange}
+        declutter={appearance.declutter}
+        onToggleDeclutter={() => updateAppearance({ declutter: !appearance.declutter })}
       />
 
-      {!isNswMathsBannerMinimised && <NswMathsEventsBanner onMinimise={minimiseNswMathsBanner} />}
+      {!isNswMathsBannerMinimised && !(appearance.declutter && section === 'today') && (
+        <NswMathsEventsBanner onMinimise={minimiseNswMathsBanner} />
+      )}
 
       <div className="portal-body">
         {loading ? (
@@ -798,6 +802,7 @@ export default function NewPortal({ onPortalLayoutChange }) {
             selectedLevel={selectedLevel}
             satPaperIds={satPaperIds}
             showPrescription={appearance.showRecommendations !== false}
+            declutter={appearance.declutter}
             onBeginSitting={beginSitting}
             onOpenCachedQuestion={openCachedQuestion}
             onOpenSubject={(subjectName) => {

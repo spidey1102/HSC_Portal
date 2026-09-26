@@ -1028,6 +1028,11 @@ textarea:focus,
   gap: 16px;
 }
 
+.decluttered-home {
+  width: min(960px, 100%);
+  margin: 0 auto;
+}
+
 .workspace-panel {
   padding: 18px;
 }

@@ -9,6 +9,7 @@ import PaperSearch from './components/PaperSearch';
 import AdaptiveRecommendations from './components/AdaptiveRecommendations';
 import AgentCommandCenter from './components/AgentCommandCenter';
 import CustomizationMenu from './components/CustomizationMenu';
+import DeclutterToggle from '../components/DeclutterToggle';
 import FirebaseResetNotice from './components/FirebaseResetNotice';
 import { Library, RefreshCw, Trash2, Book, Menu, Calendar, Moon, Sun, Clock, BotMessageSquare, Palette, BookOpenCheck } from 'lucide-react';
 import PaperHistory from './components/PaperHistory';
@@ -1025,6 +1026,13 @@ export default function App({ onPortalLayoutChange }) {
     );
   }
 
+  const isDeclutteredHome = appearance.declutter
+    && !viewBookmarks
+    && !viewTextbooks
+    && !viewCalendar
+    && !viewHistory
+    && !viewNotebook;
+
   return (
     <div className={`app-container ${isSidebarOpen ? 'sidebar-visible' : ''} ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       {/* Mobile Sidebar Backdrop */}
@@ -1118,6 +1126,11 @@ export default function App({ onPortalLayoutChange }) {
                 <span>Tree Layout</span>
               </button>
             )}
+            <DeclutterToggle
+              enabled={appearance.declutter}
+              onToggle={() => updateAppearance({ declutter: !appearance.declutter })}
+              style={{ padding: '10px 12px' }}
+            />
             <button
               type="button"
               onClick={() => updateAppearance({ mode: theme === 'dark' ? 'light' : 'dark' })}
@@ -1185,7 +1198,7 @@ export default function App({ onPortalLayoutChange }) {
               <BookOpenCheck size={16} />
               <span>Notebook</span>
             </button>
-            {isNswMathsBannerMinimised && (
+            {isNswMathsBannerMinimised && !isDeclutteredHome && (
               <a
                 className="nsw-maths-events-topbar-link"
                 href={NSW_MATHS_BOOKING_URL}
@@ -1209,7 +1222,9 @@ export default function App({ onPortalLayoutChange }) {
 
         <div className="scrollable-content" ref={scrollableContentRef}>
           <div className="content-stack">
-            {!isNswMathsBannerMinimised && <NswMathsEventsBanner onMinimise={minimiseNswMathsBanner} />}
+            {!isNswMathsBannerMinimised && !isDeclutteredHome && (
+              <NswMathsEventsBanner onMinimise={minimiseNswMathsBanner} />
+            )}
             {viewCalendar ? (
               <CustomCalendar />
             ) : viewHistory ? (
@@ -1224,6 +1239,13 @@ export default function App({ onPortalLayoutChange }) {
                 const matchingPaper = findPaperByIdentifier(papers, paperId);
                 if (matchingPaper) openPaper(matchingPaper);
               }} />
+            ) : isDeclutteredHome ? (
+              <div className="decluttered-home">
+                <ExamCountdown
+                  subjectName={selectedSubject !== null ? subjects[selectedSubject] : null}
+                  portalSubjects={subjects}
+                />
+              </div>
             ) : (
               <>
                 <section className="hero-band">

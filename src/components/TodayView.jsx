@@ -120,6 +120,7 @@ export default function TodayView({
   selectedLevel = 12,
   satPaperIds = new Set(),
   showPrescription = true,
+  declutter = false,
   onBeginSitting,
   onOpenCachedQuestion,
   onOpenSubject,
@@ -180,6 +181,7 @@ export default function TodayView({
   useEffect(() => { setAllowanceId(null); }, [prescription?.subject, defaultAllowance]);
 
   useEffect(() => {
+    if (declutter) return undefined;
     let cancelled = false;
 
     const requestCachedQuestions = async (search) => {
@@ -247,7 +249,7 @@ export default function TodayView({
 
     void loadRecommendations();
     return () => { cancelled = true; };
-  }, [questionSearch.contextLabel, questionSearch.topic, questionSearch.subject, selectedLevel, excludedQuestionKeys]);
+  }, [declutter, questionSearch.contextLabel, questionSearch.topic, questionSearch.subject, selectedLevel, excludedQuestionKeys]);
 
   const refreshQuestionRecommendations = useCallback(() => {
     setExcludedQuestionKeysBySubject((current) => {
@@ -266,8 +268,8 @@ export default function TodayView({
   const nextThree = exams.slice(0, 3);
 
   return (
-    <div className="portal-split">
-      <div className="portal-main pane-scroll">
+    <div className={`portal-split${declutter ? ' portal-split-decluttered' : ''}`}>
+      {!declutter && <div className="portal-main pane-scroll">
         <div className="kick">Prescribed for today</div>
         <h1 className="display">{headline}</h1>
         <p className="lede">{describePrescription(prescription, seed)}</p>
@@ -404,7 +406,7 @@ export default function TodayView({
             </div>
           );
         })}
-      </div>
+      </div>}
 
       <aside className="portal-aside pane-scroll">
         <div className="kick">Your next written exams</div>
@@ -433,6 +435,7 @@ export default function TodayView({
           </>
         )}
 
+        {!declutter && <>
         <div className="kick" style={{ marginTop: '26px' }}>Weak spots worth an hour</div>
         <p className="dim" style={{ fontSize: '12.5px', margin: '6px 0 10px' }}>
           {pick(WEAK_SPOT_NOTE, seed)}
@@ -479,6 +482,7 @@ export default function TodayView({
             Install to the home screen
           </button>
         )}
+        </>}
       </aside>
     </div>
   );
