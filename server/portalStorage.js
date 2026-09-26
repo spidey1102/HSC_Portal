@@ -55,6 +55,13 @@ function mapPaperMetadata(row) {
 
 export async function getUserData(firebaseUid) {
   const sql = getSupabaseSql();
+  // An authenticated visit should establish the user's storage record even if
+  // they have not changed any settings yet. Preserve existing study data.
+  await sql`
+    insert into public.portal_user_data (firebase_uid)
+    values (${String(firebaseUid)})
+    on conflict (firebase_uid) do nothing
+  `;
   const rows = await sql`
     select data
     from public.portal_user_data
