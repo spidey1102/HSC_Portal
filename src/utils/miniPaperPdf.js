@@ -171,7 +171,7 @@ export async function createMiniPaperPdf(build, papers = []) {
       const sourceLabel = `${paper.n || 'School trial paper'} ${paper.y || ''} · original page ${sourcePageNumber}`;
       doc.text(sourceLabel, PAGE_MARGIN, footerY);
       doc.setTextColor(78, 121, 103);
-      doc.textWithLink('Open source paper', { x: A4_WIDTH - PAGE_MARGIN - 92, y: footerY, url });
+      doc.textWithLink('Open source paper', A4_WIDTH - PAGE_MARGIN - 92, footerY, { url });
       doc.setFontSize(8);
       doc.setTextColor(120, 120, 120);
       doc.text(`${outputPage} / ${totalPages}`, A4_WIDTH - PAGE_MARGIN, A4_HEIGHT - 24, { align: 'right' });
