@@ -77,6 +77,7 @@
 .builder-difficulty { flex: none; font-size: 10px; text-transform: capitalize; color: color-mix(in srgb, var(--color-text) 70%, transparent); }
 .builder-warnings { padding-left: 19px; color: var(--status-warning, #9a6500); font-size: 12px; }
 .builder-start-button { width: 100%; margin-top: 7px; }
+.builder-pdf-button { width: 100%; margin-top: 7px; }
 .builder-start-help { margin: 7px 0 0; font-size: 12px; }
 
 @media (max-width: 850px) {

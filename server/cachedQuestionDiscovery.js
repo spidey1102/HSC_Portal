@@ -198,6 +198,7 @@ export async function collectCachedQuestionCandidates({
             page,
             marks: parentMarks,
             topics: parentTopics.slice(0, 3),
+            sourcePages: [...new Set([page, ...subparts.map((subpart) => Number(subpart?.page)).filter((candidatePage) => Number.isInteger(candidatePage) && candidatePage > 0)])].sort((left, right) => left - right),
             skill: String(question?.skill || '').trim(),
             commandVerb: String(question?.commandVerb || '').trim(),
             challenge: {
@@ -246,6 +247,7 @@ export async function collectCachedQuestionCandidates({
             page: subpartPage,
             marks: subpartMarks,
             topics: Array.isArray(subpart?.topics) ? subpart.topics.slice(0, 3) : [],
+            sourcePages: [subpartPage],
             skill: String(subpart?.skill || '').trim(),
             commandVerb: String(subpart?.commandVerb || '').trim(),
             challenge: {

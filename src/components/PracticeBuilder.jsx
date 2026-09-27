@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Check, RefreshCw, Sparkles } from 'lucide-react';
+import { ArrowRight, Check, Download, RefreshCw, Sparkles } from 'lucide-react';
 import { fetchPracticeBuilderFacets, generatePracticeSet } from '../utils/practiceBuilder';
 import { extractQuestionKeys } from '../utils/topicQuestionQueue';
 
@@ -13,7 +13,7 @@ const DIFFICULTIES = [
 ];
 
 export default function PracticeBuilder({
-  subjects = [], mySubjects = [], selectedLevel = 12, onLevelChange, onStart,
+  subjects = [], mySubjects = [], papers = [], selectedLevel = 12, onLevelChange, onStart,
 }) {
   const initialSubject = mySubjects.find((name) => subjects.includes(name)) || subjects[0] || '';
   const [subject, setSubject] = useState(initialSubject);
@@ -27,7 +27,9 @@ export default function PracticeBuilder({
   const [generatedSet, setGeneratedSet] = useState(null);
   const [isLoadingTopics, setIsLoadingTopics] = useState(false);
   const [isBuilding, setIsBuilding] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [error, setError] = useState('');
+  const [exportError, setExportError] = useState('');
 
   useEffect(() => {
     if (!subjects.length) return;
@@ -84,6 +86,20 @@ export default function PracticeBuilder({
       setError(requestError.message || 'We couldn’t build a set from those filters. Try another topic, difficulty, or length.');
     } finally {
       setIsBuilding(false);
+    }
+  };
+
+  const downloadPdf = async () => {
+    if (!generatedSet?.questions?.length || isExportingPdf) return;
+    setIsExportingPdf(true);
+    setExportError('');
+    try {
+      const { createMiniPaperPdf } = await import('../utils/miniPaperPdf');
+      await createMiniPaperPdf(generatedSet, papers);
+    } catch (exportFailure) {
+      setExportError(exportFailure.message || 'The PDF could not be created. Please try again.');
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
@@ -242,6 +258,10 @@ export default function PracticeBuilder({
               <button type="button" className="btn btn-primary builder-start-button" onClick={() => onStart?.(generatedSet)}>
                 Start practice test <ArrowRight size={16} />
               </button>
+              <button type="button" className="btn btn-secondary builder-pdf-button" onClick={downloadPdf} disabled={isExportingPdf}>
+                {isExportingPdf ? <><RefreshCw size={15} className="spin" /> Creating PDF…</> : <><Download size={15} /> Download paper PDF</>}
+              </button>
+              {exportError && <p className="builder-error" role="alert">{exportError}</p>}
               <p className="dim builder-start-help">Opens the first question and starts your practice timer.</p>
               {topics.length > 0 && <div className="builder-selected-topics">{topics.map((name) => <span key={name}>{name}</span>)}</div>}
               <ol className="builder-question-list">

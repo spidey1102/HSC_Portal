@@ -854,6 +854,7 @@ export default function NewPortal({ onPortalLayoutChange }) {
           <PracticeBuilder
             subjects={subjects}
             mySubjects={mySubjects}
+            papers={papers}
             selectedLevel={selectedLevel}
             onLevelChange={setSelectedLevel}
             onStart={beginMiniPaper}
