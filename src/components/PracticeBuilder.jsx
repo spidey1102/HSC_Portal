@@ -88,7 +88,7 @@ export default function PracticeBuilder({
   };
 
   return (
-    <main className="section-pane practice-builder">
+    <main className="section-pane practice-builder pane-scroll">
       <div className="builder-heading">
         <div>
           <div className="kick">A focused practice session</div>
