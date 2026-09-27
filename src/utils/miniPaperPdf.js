@@ -42,7 +42,7 @@ function textRows(textContent, viewport) {
     rows.set(key, row);
   }
   return [...rows.entries()]
-    .map(([top, items]) => ({ top, text: items.sort((left, right) => left.x - right.x).map((item) => item.text).join(' ').replace(/\s+/g, ' ').trim() }))
+    .map(([top, items]) => ({ top, x: Math.min(...items.map((item) => item.x)), text: items.sort((left, right) => left.x - right.x).map((item) => item.text).join(' ').replace(/\s+/g, ' ').trim() }))
     .sort((left, right) => left.top - right.top);
 }
 
@@ -126,6 +126,61 @@ function cropForQuestionPage(question, pageNumber, rows, viewport) {
   return textCrop ? { left: 0, right: Number.POSITIVE_INFINITY, ...textCrop } : null;
 }
 
+function selectedLetter(question) {
+  const id = String(question?.challenge?.subpartId || '').trim().toLowerCase();
+  return id.match(/^\(?([a-h])\)?(?:\(?[ivx]+\)?)?$/)?.[1] || '';
+}
+
+function partMarker(row) {
+  const match = row.text.match(/^\s*\(?([a-h])\)\s*(?:\S|$)/i);
+  return match && row.x < 180 ? match[1].toLowerCase() : '';
+}
+
+function questionEnd(row, id) {
+  return new RegExp(`^end of question\\s*${escapeRegExp(id)}\\b`, 'i').test(row.text)
+    || nextQuestionPattern(id).test(row.text);
+}
+
+function planSubpartPages(question, pages) {
+  const letter = selectedLetter(question);
+  if (!letter) return null;
+  const id = questionNumber(question);
+  const markers = pages.flatMap((page, pageIndex) => page.rows
+    .filter((row) => row.top >= (page.crop?.top ?? 0) - 12 && row.top < (page.crop?.bottom ?? page.viewport.height) + 8)
+    .map((row) => ({ ...row, pageIndex, letter: partMarker(row) }))
+    .filter((row) => row.letter || questionEnd(row, id)));
+  const start = markers.find((row) => row.letter === letter);
+  if (!start) return null;
+  const end = markers.find((row) => row.pageIndex > start.pageIndex
+    || (row.pageIndex === start.pageIndex && row.top > start.top + 2)
+      ? (row.letter && row.letter !== letter) || questionEnd(row, id)
+      : false);
+  const firstPart = markers.find((row) => row.letter);
+  const planned = [];
+  for (let index = 0; index < pages.length; index += 1) {
+    const page = pages[index];
+    const base = page.crop || { left: 0, right: page.viewport.width, top: 0, bottom: page.viewport.height };
+    const fragments = [];
+    // Keep the shared question stem, which can define diagrams and values used by every part.
+    if (firstPart?.pageIndex === index && (start.pageIndex !== index || start.top > firstPart.top + 2)) {
+      const stemBottom = Math.min(base.bottom, firstPart.top - 5);
+      if (stemBottom > base.top + 12) fragments.push({ ...base, bottom: stemBottom });
+    }
+    if (index >= start.pageIndex && (!end || index <= end.pageIndex)) {
+      const top = index === start.pageIndex
+        ? (start === firstPart ? base.top : Math.max(base.top, start.top - 8))
+        : base.top;
+      const bottom = end?.pageIndex === index ? Math.min(base.bottom, end.top - 14) : base.bottom;
+      if (bottom > top + 12) fragments.push({ ...base, top, bottom });
+    }
+    const substantiveRows = page.rows.filter((row) => fragments.some((fragment) => row.top >= fragment.top && row.top < fragment.bottom)
+      && !/^question\s*\d+.*(?:continued|continues on page)/i.test(row.text)
+      && !/^end of question\s*\d+/i.test(row.text));
+    if (fragments.length && substantiveRows.length) planned.push({ ...page, fragments });
+  }
+  return planned.length ? planned : null;
+}
+
 /** Assemble a downloadable paper from page-addressed questions in their source PDFs. */
 export async function createMiniPaperPdf(build, papers = []) {
   if (!Array.isArray(build?.questions) || build.questions.length === 0) throw new Error('Build a practice set before exporting it.');
@@ -133,7 +188,6 @@ export async function createMiniPaperPdf(build, papers = []) {
   const documents = new Map();
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true });
   addCover(doc, build);
-  const totalPages = build.questions.reduce((count, question) => count + sourcePagesFor(question).length, 0);
   let outputPage = 0;
 
   for (let questionIndex = 0; questionIndex < build.questions.length; questionIndex += 1) {
@@ -150,24 +204,29 @@ export async function createMiniPaperPdf(build, papers = []) {
       documents.set(url, pdfDocument);
     }
 
-    for (let sourcePageNumberIndex = 0; sourcePageNumberIndex < pages.length; sourcePageNumberIndex += 1) {
-      const sourcePageNumber = pages[sourcePageNumberIndex];
+    const pageDetails = [];
+    for (const sourcePageNumber of pages) {
       if (sourcePageNumber > pdfDocument.numPages) throw new Error(`${paper.n || 'A source paper'} has no page ${sourcePageNumber}.`);
       const sourcePage = await pdfDocument.getPage(sourcePageNumber);
       const viewport = sourcePage.getViewport({ scale: 1 });
       const rows = textRows(await sourcePage.getTextContent(), viewport);
+      pageDetails.push({ sourcePageNumber, sourcePage, viewport, rows,
+        crop: cropForQuestionPage(result.question, sourcePageNumber, rows, viewport) });
+    }
+    const subpartPlan = planSubpartPages(result.question, pageDetails);
+    const selectedPages = subpartPlan || pageDetails.map((page) => ({ ...page, fragments: [page.crop] }));
+
+    for (let sourcePageNumberIndex = 0; sourcePageNumberIndex < selectedPages.length; sourcePageNumberIndex += 1) {
+      const { sourcePageNumber, sourcePage, viewport, rows, fragments } = selectedPages[sourcePageNumberIndex];
       const isFirstSourcePage = sourcePageNumberIndex === 0;
       const expectedLabel = labelPattern(questionNumber(result.question));
       const questionLabelPresent = rows.some((row) => expectedLabel.test(row.text));
       const conflictingQuestionLabel = rows.some((row) => anyQuestionLabelPattern().test(row.text) && !expectedLabel.test(row.text));
       const sourceMismatch = isFirstSourcePage && !questionLabelPresent && conflictingQuestionLabel;
-      const crop = sourceMismatch ? null : (cropForQuestionPage(result.question, sourcePageNumber, rows, viewport)
-        || (isFirstSourcePage ? null : { left: 0, right: Number.POSITIVE_INFINITY, top: 12, bottom: viewport.height - 16 }));
       const hasSubpart = Boolean(result.question?.challenge?.subpartId);
-      const cropNeedsReview = Boolean(result.question?.cropReview)
+      const cropNeedsReview = (hasSubpart && !subpartPlan)
         || (isFirstSourcePage && !questionLabelPresent)
-        || sourceMismatch
-        || (!crop?.fromGeometry && !questionLabelPresent);
+        || sourceMismatch;
       const renderedViewport = sourcePage.getViewport({ scale: 2 });
       const fullCanvas = makeCanvas(renderedViewport.width, renderedViewport.height);
       const context = fullCanvas.getContext('2d', { alpha: false });
@@ -175,16 +234,26 @@ export async function createMiniPaperPdf(build, papers = []) {
       await sourcePage.render({ canvasContext: context, viewport: renderedViewport }).promise;
 
       const cropScale = renderedViewport.scale / viewport.scale;
-      const cropLeft = crop ? Math.max(0, crop.left * cropScale) : 0;
-      const cropRight = crop ? Math.min(fullCanvas.width, Number.isFinite(crop.right) ? crop.right * cropScale : fullCanvas.width) : fullCanvas.width;
-      const cropTop = crop ? Math.max(0, crop.top * cropScale) : 0;
-      const cropBottom = crop ? Math.min(fullCanvas.height, crop.bottom * cropScale) : fullCanvas.height;
-      const cropCanvas = makeCanvas(cropRight - cropLeft, cropBottom - cropTop);
-      cropCanvas.getContext('2d', { alpha: false }).drawImage(
-        fullCanvas,
-        cropLeft, cropTop, cropRight - cropLeft, cropBottom - cropTop,
-        0, 0, cropCanvas.width, cropCanvas.height,
+      const sourceCrops = fragments.map((crop) => ({
+        left: crop ? Math.max(0, crop.left * cropScale) : 0,
+        right: crop ? Math.min(fullCanvas.width, Number.isFinite(crop.right) ? crop.right * cropScale : fullCanvas.width) : fullCanvas.width,
+        top: crop ? Math.max(0, crop.top * cropScale) : 0,
+        bottom: crop ? Math.min(fullCanvas.height, crop.bottom * cropScale) : fullCanvas.height,
+      })).filter((crop) => crop.right > crop.left && crop.bottom > crop.top);
+      const cropCanvas = makeCanvas(
+        Math.max(...sourceCrops.map((crop) => crop.right - crop.left)),
+        sourceCrops.reduce((height, crop) => height + crop.bottom - crop.top, 0),
       );
+      const cropContext = cropCanvas.getContext('2d', { alpha: false });
+      cropContext.fillStyle = '#fff';
+      cropContext.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
+      let targetTop = 0;
+      for (const crop of sourceCrops) {
+        const width = crop.right - crop.left;
+        const height = crop.bottom - crop.top;
+        cropContext.drawImage(fullCanvas, crop.left, crop.top, width, height, 0, targetTop, width, height);
+        targetTop += height;
+      }
 
       outputPage += 1;
       doc.addPage();
@@ -232,7 +301,7 @@ export async function createMiniPaperPdf(build, papers = []) {
       doc.textWithLink('Open source paper', A4_WIDTH - PAGE_MARGIN - 92, footerY, { url });
       doc.setFontSize(8);
       doc.setTextColor(120, 120, 120);
-      doc.text(`${outputPage} / ${totalPages}`, A4_WIDTH - PAGE_MARGIN, A4_HEIGHT - 24, { align: 'right' });
+      doc.text(String(outputPage), A4_WIDTH - PAGE_MARGIN, A4_HEIGHT - 24, { align: 'right' });
       fullCanvas.width = 1;
       fullCanvas.height = 1;
       cropCanvas.width = 1;

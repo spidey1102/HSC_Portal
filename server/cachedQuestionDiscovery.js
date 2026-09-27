@@ -93,6 +93,30 @@ function questionRelevance(question, topicQuery) {
   return bestScore;
 }
 
+function practiceSubparts(subparts) {
+  const groups = new Map();
+  for (const subpart of subparts) {
+    const id = String(subpart?.id || '').trim().toLowerCase();
+    const nested = id.match(/^\(?([a-h])\)?(?:\(?[ivx]+\)?)$/);
+    const groupId = nested?.[1] || id;
+    const group = groups.get(groupId) || [];
+    group.push(subpart);
+    groups.set(groupId, group);
+  }
+  return [...groups.entries()].map(([id, group]) => {
+    const parent = group.find((part) => String(part?.id || '').trim().toLowerCase() === id);
+    if (parent) return parent;
+    if (group.length === 1 && String(group[0]?.id || '').trim().toLowerCase() === id) return group[0];
+    const marks = group.map((part) => Number(part?.marks));
+    return {
+      ...group[0], id,
+      marks: marks.every((mark) => Number.isFinite(mark) && mark > 0) ? marks.reduce((sum, mark) => sum + mark, 0) : null,
+      page: Math.min(...group.map((part) => Number(part?.page)).filter((page) => Number.isInteger(page) && page > 0)),
+      topics: [...new Set(group.flatMap((part) => Array.isArray(part?.topics) ? part.topics : []))],
+    };
+  });
+}
+
 function randomiseEqualScores(candidates) {
   const grouped = new Map();
   for (const candidate of candidates) {
@@ -121,6 +145,7 @@ export async function collectCachedQuestionCandidates({
   requireMarks = false,
   preferSubparts = false,
   requireIndexedPaper = false,
+  groupRomanSubparts = false,
 } = {}) {
   const sql = getSupabaseSql();
   const index = loadPaperIndex();
@@ -213,7 +238,7 @@ export async function collectCachedQuestionCandidates({
         });
       }
 
-      for (const subpart of subparts) {
+      for (const subpart of groupRomanSubparts ? practiceSubparts(subparts) : subparts) {
         const subpartId = String(subpart?.id || '').trim();
         const subpartPage = Number(subpart?.page ?? page);
         if (!subpartId || !Number.isInteger(subpartPage) || subpartPage < 1) continue;

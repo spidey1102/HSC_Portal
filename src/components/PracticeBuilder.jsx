@@ -257,7 +257,7 @@ export default function PracticeBuilder({
               </div>
               {generatedSet.questions.some((question) => question.question?.cropReview) && (
                 <p className="builder-crop-notice" role="status">
-                  Some images need review. Selected subparts may show the full question; check each source before sharing the PDF.
+                  The PDF crops lettered parts where source text allows. Check any crop warning in the downloaded paper before sharing it.
                 </p>
               )}
               <button type="button" className="btn btn-primary builder-start-button" onClick={() => onStart?.(generatedSet)}>
@@ -277,7 +277,7 @@ export default function PracticeBuilder({
                       <strong>{question.question?.id}{question.question?.challenge?.subpartId ? `(${question.question.challenge.subpartId})` : ''} · {question.question?.marks} marks</strong>
                       <span>{String(question.paperName || '').replace(/\s+w\.?\s*sol(?:utions?)?/gi, '').trim()} {question.paperYear} · page {question.question?.geometry?.segments?.[0]?.page || question.question?.page}</span>
                       <span>{(question.question?.topics || []).join(' · ')}</span>
-                      {question.question?.cropReview && <span className="builder-crop-warning">Image needs review · PDF includes the full question</span>}
+                      {question.question?.cropReview && <span className="builder-crop-warning">Crop checked during PDF export</span>}
                     </div>
                     <span className={`builder-difficulty is-${question.question?.challenge?.level}`}>{question.question?.challenge?.level}</span>
                   </li>

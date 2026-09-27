@@ -43,7 +43,7 @@ function facetResponse(subject, level, candidates) {
 export async function getPracticeBuilderFacets({ subject, level }) {
   const safeSubject = validateSubject(subject);
   const safeLevel = validateLevel(level);
-  const candidates = await collectCachedQuestionCandidates({ subject: safeSubject, level: safeLevel, preferSubparts: true, requireIndexedPaper: true });
+  const candidates = await collectCachedQuestionCandidates({ subject: safeSubject, level: safeLevel, preferSubparts: true, requireIndexedPaper: true, groupRomanSubparts: true });
   return facetResponse(safeSubject, safeLevel, candidates);
 }
 
@@ -70,7 +70,7 @@ export async function createPracticeBuilderSet(body = {}) {
   const options = normaliseBuilderOptions({ ...body, subject, level, target: { mode: target.mode, value: targetValue } });
   const excludedCandidates = await collectCachedQuestionCandidates({
     subject, level, topics: options.topics, difficulty: options.difficulty === 'mixed' ? 'any' : options.difficulty,
-    excludeQuestionKeys: options.excludeQuestionKeys, requireMarks: true, requireIndexedPaper: true,
+    excludeQuestionKeys: options.excludeQuestionKeys, requireMarks: true, requireIndexedPaper: true, groupRomanSubparts: true,
   });
   let result = buildPracticeSet(excludedCandidates, options);
   const tolerance = Math.max(2, Math.round(options.targetMarks * 0.1));
@@ -78,7 +78,7 @@ export async function createPracticeBuilderSet(body = {}) {
     && (!result.questions.length || result.summary.totalMarks < options.targetMarks - tolerance)) {
     const fallbackCandidates = await collectCachedQuestionCandidates({
       subject, level, topics: options.topics, difficulty: options.difficulty === 'mixed' ? 'any' : options.difficulty,
-      requireMarks: true, requireIndexedPaper: true,
+      requireMarks: true, requireIndexedPaper: true, groupRomanSubparts: true,
     });
     const fallback = buildPracticeSet(fallbackCandidates, { ...options, excludeQuestionKeys: [] });
     if (fallback.questions.length && (!result.questions.length
