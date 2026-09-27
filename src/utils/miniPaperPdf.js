@@ -18,12 +18,16 @@ function questionNumber(question) {
 }
 
 function labelPattern(id) {
-  return new RegExp(`^(?:question\\s*)?${escapeRegExp(id)}(?:\\s*[.)]|\\s|$)`, 'i');
+  const escaped = escapeRegExp(id);
+  return new RegExp(`^(?:question\\s*${escaped}\\b|${escaped}\\s*[.)]\\s*\\S|${escaped}\\s*\\(\\s*(?:[a-z]|\\d+\\s*marks?))`, 'i');
 }
 
 function nextQuestionPattern(id) {
-  const nextId = Number(id) + 1;
-  return new RegExp(`^(?:question\\s*)?${nextId}(?:\\s*[.)]|\\s|$)`, 'i');
+  return labelPattern(Number(id) + 1);
+}
+
+function anyQuestionLabelPattern() {
+  return /^(?:question\s*\d{1,3}\b|\d{1,3}\s*[.)]\s*\S|\d{1,3}\s*\(\s*(?:[a-z]|\d+\s*marks?))/i;
 }
 
 function textRows(textContent, viewport) {
@@ -101,15 +105,24 @@ function sourcePagesFor(result) {
   return [...new Set(pages.map(Number).filter((page) => Number.isInteger(page) && page > 0))].sort((left, right) => left - right);
 }
 
-function cropForQuestionPage(question, pageNumber, rows, pageHeight) {
-  const segment = question?.geometry?.confidence !== 'low'
-    ? question?.geometry?.segments?.find((item) => Number(item?.page) === pageNumber)
-    : null;
+function orderedGeometrySegments(question) {
+  if (question?.geometry?.confidence === 'low' || !Array.isArray(question?.geometry?.segments)) return [];
+  return [...question.geometry.segments]
+    .filter((segment) => Number.isInteger(Number(segment?.page)) && Number(segment.page) > 0)
+    .sort((left, right) => Number(left.page) - Number(right.page));
+}
+
+function cropForQuestionPage(question, pageNumber, rows, viewport) {
+  const segment = orderedGeometrySegments(question).find((item) => Number(item?.page) === pageNumber);
   const bbox = Array.isArray(segment?.bbox) ? segment.bbox.map(Number) : [];
   if (bbox.length === 4 && bbox.every(Number.isFinite) && bbox[2] > bbox[0] && bbox[3] > bbox[1]) {
-    return { left: bbox[0], top: bbox[1], right: bbox[2], bottom: bbox[3] };
+    const sourceWidth = Number(segment.pageWidth);
+    const sourceHeight = Number(segment.pageHeight);
+    const scaleX = Number.isFinite(sourceWidth) && sourceWidth > 0 ? viewport.width / sourceWidth : 1;
+    const scaleY = Number.isFinite(sourceHeight) && sourceHeight > 0 ? viewport.height / sourceHeight : 1;
+    return { left: bbox[0] * scaleX, top: bbox[1] * scaleY, right: bbox[2] * scaleX, bottom: bbox[3] * scaleY, fromGeometry: true };
   }
-  const textCrop = findQuestionCrop(rows, questionNumber(question), pageHeight);
+  const textCrop = findQuestionCrop(rows, questionNumber(question), viewport.height);
   return textCrop ? { left: 0, right: Number.POSITIVE_INFINITY, ...textCrop } : null;
 }
 
@@ -144,8 +157,17 @@ export async function createMiniPaperPdf(build, papers = []) {
       const viewport = sourcePage.getViewport({ scale: 1 });
       const rows = textRows(await sourcePage.getTextContent(), viewport);
       const isFirstSourcePage = sourcePageNumberIndex === 0;
-      const crop = cropForQuestionPage(result.question, sourcePageNumber, rows, viewport.height)
-        || (isFirstSourcePage ? null : { left: 0, right: Number.POSITIVE_INFINITY, top: 12, bottom: viewport.height - 16 });
+      const expectedLabel = labelPattern(questionNumber(result.question));
+      const questionLabelPresent = rows.some((row) => expectedLabel.test(row.text));
+      const conflictingQuestionLabel = rows.some((row) => anyQuestionLabelPattern().test(row.text) && !expectedLabel.test(row.text));
+      const sourceMismatch = isFirstSourcePage && !questionLabelPresent && conflictingQuestionLabel;
+      const crop = sourceMismatch ? null : (cropForQuestionPage(result.question, sourcePageNumber, rows, viewport)
+        || (isFirstSourcePage ? null : { left: 0, right: Number.POSITIVE_INFINITY, top: 12, bottom: viewport.height - 16 }));
+      const hasSubpart = Boolean(result.question?.challenge?.subpartId);
+      const cropNeedsReview = Boolean(result.question?.cropReview)
+        || (isFirstSourcePage && !questionLabelPresent)
+        || sourceMismatch
+        || (!crop?.fromGeometry && !questionLabelPresent);
       const renderedViewport = sourcePage.getViewport({ scale: 2 });
       const fullCanvas = makeCanvas(renderedViewport.width, renderedViewport.height);
       const context = fullCanvas.getContext('2d', { alpha: false });
@@ -171,14 +193,32 @@ export async function createMiniPaperPdf(build, papers = []) {
       doc.setTextColor(30, 30, 30);
       const part = result.question?.challenge?.subpartId ? `(${result.question.challenge.subpartId})` : '';
       doc.text(`${questionIndex + 1}.  Question ${result.question?.id || ''}${part}  ·  ${result.question?.marks || '?'} marks`, PAGE_MARGIN, 34);
+      if (cropNeedsReview) {
+        doc.setFont('times', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(154, 101, 0);
+        const reviewMessage = sourceMismatch
+          ? 'The source page shows a different question; image omitted for review.'
+          : hasSubpart
+            ? 'Full question shown; selected subpart crop needs review.'
+            : 'Source image needs review.';
+        doc.text(reviewMessage, PAGE_MARGIN, 49);
+      }
 
-      const image = cropCanvas.toDataURL('image/jpeg', 0.9);
-      const availableWidth = A4_WIDTH - PAGE_MARGIN * 2;
-      const availableHeight = A4_HEIGHT - 145;
-      const ratio = Math.min(availableWidth / cropCanvas.width, availableHeight / cropCanvas.height);
-      const imageWidth = cropCanvas.width * ratio;
-      const imageHeight = cropCanvas.height * ratio;
-      doc.addImage(image, 'JPEG', (A4_WIDTH - imageWidth) / 2, 48, imageWidth, imageHeight, undefined, 'FAST');
+      if (!sourceMismatch) {
+        const image = cropCanvas.toDataURL('image/jpeg', 0.9);
+        const availableWidth = A4_WIDTH - PAGE_MARGIN * 2;
+        const availableHeight = A4_HEIGHT - (cropNeedsReview ? 160 : 145);
+        const ratio = Math.min(availableWidth / cropCanvas.width, availableHeight / cropCanvas.height);
+        const imageWidth = cropCanvas.width * ratio;
+        const imageHeight = cropCanvas.height * ratio;
+        doc.addImage(image, 'JPEG', (A4_WIDTH - imageWidth) / 2, cropNeedsReview ? 61 : 48, imageWidth, imageHeight, undefined, 'FAST');
+      } else {
+        doc.setFont('times', 'normal');
+        doc.setFontSize(11);
+        doc.setTextColor(90, 90, 90);
+        doc.text('Open the credited source paper below to find the selected question.', PAGE_MARGIN, 75);
+      }
 
       const footerY = A4_HEIGHT - 58;
       doc.setDrawColor(195, 195, 195);

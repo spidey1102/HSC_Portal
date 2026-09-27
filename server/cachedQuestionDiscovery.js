@@ -171,6 +171,8 @@ export async function collectCachedQuestionCandidates({
       const parentHasMarks = Number.isFinite(parentMarks) && parentMarks > 0;
       const parentTopics = Array.isArray(question?.topics) ? question.topics : [];
       const subparts = Array.isArray(question?.subparts) ? question.subparts : [];
+      const geometry = question?.geometry && typeof question.geometry === 'object' ? question.geometry : null;
+      const hasReliableGeometry = geometry?.confidence === 'high' && Array.isArray(geometry?.segments) && geometry.segments.length > 0;
       const hasUsableMarkedSubparts = (requireMarks || preferSubparts) && subparts.some((subpart) => {
         const subpartMarks = Number(subpart?.marks);
         const hasOwnLabels = (Array.isArray(subpart?.topics) && subpart.topics.some((label) => String(label || '').trim()))
@@ -199,6 +201,8 @@ export async function collectCachedQuestionCandidates({
             marks: parentMarks,
             topics: parentTopics.slice(0, 3),
             sourcePages: [...new Set([page, ...subparts.map((subpart) => Number(subpart?.page)).filter((candidatePage) => Number.isInteger(candidatePage) && candidatePage > 0)])].sort((left, right) => left - right),
+            geometry,
+            cropReview: !hasReliableGeometry,
             skill: String(question?.skill || '').trim(),
             commandVerb: String(question?.commandVerb || '').trim(),
             challenge: {
@@ -231,6 +235,11 @@ export async function collectCachedQuestionCandidates({
 
         const subpartKey = questionResultKey(paper.paperIdentity, `${id}(${subpartId})`);
         if (excluded.has(subpartKey)) continue;
+        const subpartGeometry = geometry?.subparts?.find((item) => String(item?.id || '').toLowerCase() === subpartId.toLowerCase());
+        const subpartCropGeometry = subpartGeometry?.geometry || subpartGeometry;
+        const hasReliableSubpartGeometry = subpartCropGeometry?.confidence === 'high'
+          && Array.isArray(subpartCropGeometry?.segments) && subpartCropGeometry.segments.length > 0;
+        const selectedGeometry = hasReliableSubpartGeometry ? subpartCropGeometry : geometry;
         candidates.push({
           score: subpartScore,
           key: subpartKey,
@@ -248,6 +257,8 @@ export async function collectCachedQuestionCandidates({
             marks: subpartMarks,
             topics: Array.isArray(subpart?.topics) ? subpart.topics.slice(0, 3) : [],
             sourcePages: [subpartPage],
+            geometry: selectedGeometry,
+            cropReview: !hasReliableSubpartGeometry,
             skill: String(subpart?.skill || '').trim(),
             commandVerb: String(subpart?.commandVerb || '').trim(),
             challenge: {

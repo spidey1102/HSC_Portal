@@ -255,6 +255,11 @@ export default function PracticeBuilder({
                 <div><strong>~{generatedSet.summary.estimatedMinutes}</strong><span>min estimated</span></div>
                 <div><strong>{generatedSet.summary.sourcePaperCount}</strong><span>source papers</span></div>
               </div>
+              {generatedSet.questions.some((question) => question.question?.cropReview) && (
+                <p className="builder-crop-notice" role="status">
+                  Some images need review. Selected subparts may show the full question; check each source before sharing the PDF.
+                </p>
+              )}
               <button type="button" className="btn btn-primary builder-start-button" onClick={() => onStart?.(generatedSet)}>
                 Start practice test <ArrowRight size={16} />
               </button>
@@ -270,8 +275,9 @@ export default function PracticeBuilder({
                     <span className="builder-question-index">{index + 1}</span>
                     <div className="builder-question-info">
                       <strong>{question.question?.id}{question.question?.challenge?.subpartId ? `(${question.question.challenge.subpartId})` : ''} · {question.question?.marks} marks</strong>
-                      <span>{String(question.paperName || '').replace(/\s+w\.?\s*sol(?:utions?)?/gi, '').trim()} {question.paperYear} · page {question.question?.page}</span>
+                      <span>{String(question.paperName || '').replace(/\s+w\.?\s*sol(?:utions?)?/gi, '').trim()} {question.paperYear} · page {question.question?.geometry?.segments?.[0]?.page || question.question?.page}</span>
                       <span>{(question.question?.topics || []).join(' · ')}</span>
+                      {question.question?.cropReview && <span className="builder-crop-warning">Image needs review · PDF includes the full question</span>}
                     </div>
                     <span className={`builder-difficulty is-${question.question?.challenge?.level}`}>{question.question?.challenge?.level}</span>
                   </li>
