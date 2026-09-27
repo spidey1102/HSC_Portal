@@ -13,6 +13,7 @@ export function normaliseBuilderOptions(options = {}) {
     difficulty: ['routine', 'challenging', 'stretch'].includes(String(options.difficulty || '').toLowerCase())
       ? String(options.difficulty).toLowerCase() : 'mixed',
     preferSolutions: options.preferSolutions !== false,
+    pdfOnly: options.pdfOnly === true,
     target: { mode, value: targetValue },
     targetMarks: mode === 'time' ? Math.max(1, Math.round(targetValue / DEFAULT_MINUTES_PER_MARK)) : targetValue,
     excludeQuestionKeys: (Array.isArray(options.excludeQuestionKeys) ? options.excludeQuestionKeys : []).slice(0, 200).map(String),
@@ -84,6 +85,7 @@ export function buildPracticeSet(rawCandidates, rawOptions = {}) {
     const marks = marksOf(candidate);
     return candidate?.key && Number.isFinite(marks) && marks > 0
       && !excluded.has(candidate.key)
+      && (!options.pdfOnly || Boolean(candidate.question?.pdfCrop))
       && (!options.subject || norm(candidate.subject) === norm(options.subject))
       && Number(candidate.level ?? options.level) === options.level
       && matchesDifficulty(candidate, options.difficulty)
@@ -126,7 +128,9 @@ export function buildPracticeSet(rawCandidates, rawOptions = {}) {
   const warnings = [];
   const selectedMarks = selected.reduce((sum, entry) => sum + marksOf(entry), 0);
   if (!selected.length) {
-    warnings.push(options.difficulty === 'mixed'
+    warnings.push(options.pdfOnly
+      ? 'No questions with verified PDF images are available for these filters yet.'
+      : options.difficulty === 'mixed'
       ? 'No suitable marked questions are available for these filters yet.'
       : `No ${options.difficulty} questions with known marks are available for these filters yet.`);
     return { ...options, summary: { questionCount: 0, totalMarks: 0, estimatedMinutes: 0, sourcePaperCount: 0, withSolutionsCount: 0 }, questions: [], warnings };

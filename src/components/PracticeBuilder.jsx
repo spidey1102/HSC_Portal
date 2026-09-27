@@ -24,6 +24,7 @@ export default function PracticeBuilder({
   const [targetMode, setTargetMode] = useState('time');
   const [targetValue, setTargetValue] = useState(30);
   const [preferSolutions, setPreferSolutions] = useState(true);
+  const [pdfOnly, setPdfOnly] = useState(false);
   const [generatedSet, setGeneratedSet] = useState(null);
   const [isLoadingTopics, setIsLoadingTopics] = useState(false);
   const [isBuilding, setIsBuilding] = useState(false);
@@ -60,13 +61,15 @@ export default function PracticeBuilder({
   const targetPresets = targetMode === 'time' ? TIME_PRESETS : MARK_PRESETS;
   const availableCount = facets?.markedQuestionCount;
   const canBuild = Boolean(subject && facets && facets.markedQuestionCount > 0 && !isLoadingTopics && !isBuilding && Number(targetValue) > 0);
+  const pdfReady = Boolean(generatedSet?.questions?.length && generatedSet.questions.every((entry) => entry.question?.pdfCrop));
+  const unverifiedCount = generatedSet?.questions?.filter((entry) => !entry.question?.pdfCrop).length || 0;
 
   const toggleTopic = (name) => {
     setTopics((current) => current.includes(name) ? current.filter((item) => item !== name) : [...current, name].slice(0, 8));
     setGeneratedSet(null);
   };
 
-  const build = async () => {
+  const build = async (verifiedOnly = pdfOnly) => {
     if (!canBuild) return;
     setIsBuilding(true);
     setError('');
@@ -78,6 +81,7 @@ export default function PracticeBuilder({
         difficulty,
         target: { mode: targetMode, value: Number(targetValue) },
         preferSolutions,
+        pdfOnly: verifiedOnly,
         excludeQuestionKeys: generatedSet ? extractQuestionKeys(generatedSet.questions) : [],
       });
       setGeneratedSet(payload);
@@ -90,7 +94,7 @@ export default function PracticeBuilder({
   };
 
   const downloadPdf = async () => {
-    if (!generatedSet?.questions?.length || isExportingPdf) return;
+    if (!pdfReady || isExportingPdf) return;
     setIsExportingPdf(true);
     setExportError('');
     try {
@@ -222,7 +226,12 @@ export default function PracticeBuilder({
             <input type="checkbox" checked={preferSolutions} onChange={(event) => { setPreferSolutions(event.target.checked); setGeneratedSet(null); }} />
             Prefer questions from papers with solutions
           </label>
-          <button type="button" className="btn btn-primary builder-build-button" onClick={build} disabled={!canBuild}>
+          <label className="builder-solution-toggle">
+            <input type="checkbox" checked={pdfOnly} onChange={(event) => { setPdfOnly(event.target.checked); setGeneratedSet(null); }} />
+            Use only questions with verified PDF images
+          </label>
+          <p className="dim">{facets?.pdfReadyQuestionCount || 0} questions have verified PDF images for this subject and year.</p>
+          <button type="button" className="btn btn-primary builder-build-button" onClick={() => build()} disabled={!canBuild}>
             {isBuilding ? <><RefreshCw size={15} className="spin" /> Building set…</> : generatedSet ? 'Regenerate set' : 'Build practice set'}
           </button>
           {!canBuild && !isLoadingTopics && <p className="dim builder-help">{facets && facets.markedQuestionCount === 0
@@ -255,15 +264,20 @@ export default function PracticeBuilder({
                 <div><strong>~{generatedSet.summary.estimatedMinutes}</strong><span>min estimated</span></div>
                 <div><strong>{generatedSet.summary.sourcePaperCount}</strong><span>source papers</span></div>
               </div>
-              {generatedSet.questions.some((question) => question.question?.cropReview) && (
+              {!pdfReady && (
                 <p className="builder-crop-notice" role="status">
-                  The PDF crops lettered parts where source text allows. Check any crop warning in the downloaded paper before sharing it.
+                  PDF unavailable: {unverifiedCount} {unverifiedCount === 1 ? 'question needs' : 'questions need'} a verified image. You can still start this practice test.
                 </p>
+              )}
+              {!pdfReady && facets?.pdfReadyQuestionCount > 0 && (
+                <button type="button" className="btn btn-secondary" onClick={() => { setPdfOnly(true); build(true); }} disabled={isBuilding}>
+                  Build a PDF-ready set
+                </button>
               )}
               <button type="button" className="btn btn-primary builder-start-button" onClick={() => onStart?.(generatedSet)}>
                 Start practice test <ArrowRight size={16} />
               </button>
-              <button type="button" className="btn btn-secondary builder-pdf-button" onClick={downloadPdf} disabled={isExportingPdf}>
+              <button type="button" className="btn btn-secondary builder-pdf-button" onClick={downloadPdf} disabled={isExportingPdf || !pdfReady}>
                 {isExportingPdf ? <><RefreshCw size={15} className="spin" /> Creating PDF…</> : <><Download size={15} /> Download paper PDF</>}
               </button>
               {exportError && <p className="builder-error" role="alert">{exportError}</p>}
@@ -275,9 +289,9 @@ export default function PracticeBuilder({
                     <span className="builder-question-index">{index + 1}</span>
                     <div className="builder-question-info">
                       <strong>{question.question?.id}{question.question?.challenge?.subpartId ? `(${question.question.challenge.subpartId})` : ''} · {question.question?.marks} marks</strong>
-                      <span>{String(question.paperName || '').replace(/\s+w\.?\s*sol(?:utions?)?/gi, '').trim()} {question.paperYear} · page {question.question?.geometry?.segments?.[0]?.page || question.question?.page}</span>
+                      <span>{String(question.paperName || '').replace(/\s+w\.?\s*sol(?:utions?)?/gi, '').trim()} {question.paperYear} · page {question.question?.page}</span>
                       <span>{(question.question?.topics || []).join(' · ')}</span>
-                      {question.question?.cropReview && <span className="builder-crop-warning">Crop checked during PDF export</span>}
+                      <span className="builder-crop-warning">{question.question?.pdfCrop ? 'PDF image verified' : 'PDF image unavailable'}</span>
                     </div>
                     <span className={`builder-difficulty is-${question.question?.challenge?.level}`}>{question.question?.challenge?.level}</span>
                   </li>

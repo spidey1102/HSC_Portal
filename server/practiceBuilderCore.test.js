@@ -116,3 +116,14 @@ test('returns an empty best-effort result with a warning for an empty pool', () 
   assert.equal(result.questions.length, 0);
   assert.ok(result.warnings.length);
 });
+
+test('PDF-ready mode excludes questions without verified crops', () => {
+  const unverified = candidate({ id: '1', marks: 5 });
+  const verified = candidate({ id: '2', marks: 5, paper: 'b' });
+  verified.question.pdfCrop = { sourceSha256: 'verified' };
+  const result = buildPracticeSet([unverified, verified], options({ pdfOnly: true }));
+  assert.deepEqual(result.questions.map((item) => item.key), [verified.key]);
+  const unavailable = buildPracticeSet([unverified], options({ pdfOnly: true }));
+  assert.equal(unavailable.questions.length, 0);
+  assert.match(unavailable.warnings[0], /verified PDF images/);
+});

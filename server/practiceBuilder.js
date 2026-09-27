@@ -17,11 +17,13 @@ function facetResponse(subject, level, candidates) {
   const topics = new Map();
   const difficulty = { routine: 0, challenging: 0, stretch: 0 };
   let markedQuestionCount = 0;
+  let pdfReadyQuestionCount = 0;
   for (const candidate of candidates) {
     const marks = Number(candidate.question?.marks);
     const hasMarks = Number.isFinite(marks) && marks > 0;
     if (hasMarks) {
       markedQuestionCount += 1;
+      if (candidate.question?.pdfCrop) pdfReadyQuestionCount += 1;
       const kind = candidate.question?.challenge?.level;
       if (Object.hasOwn(difficulty, kind)) difficulty[kind] += 1;
     }
@@ -34,6 +36,7 @@ function facetResponse(subject, level, candidates) {
     subject, level,
     questionCount: candidates.length,
     markedQuestionCount,
+    pdfReadyQuestionCount,
     topics: [...topics.entries()].map(([name, count]) => ({ name, count }))
       .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name)),
     difficulty,

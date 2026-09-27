@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 import { getSupabaseSql } from './supabaseDb.js';
+import { correctedPracticeQuestion, verifiedPracticeCrop } from './verifiedPracticeCrops.js';
 
 const MAX_RETURNED_QUESTIONS = 5;
 const MAX_SCANNED_PAPERS = 250;
@@ -61,10 +62,14 @@ function loadPaperIndex() {
   const paperIdentities = new Set((Array.isArray(parsed.papers) ? parsed.papers : []).map((paper) => (
     JSON.stringify([paper.v, paper.s, paper.l, paper.c, paper.y, paper.h, paper.w, paper.n])
   )));
+  const sourcePathByIdentity = new Map((Array.isArray(parsed.papers) ? parsed.papers : []).map((paper) => [
+    JSON.stringify([paper.v, paper.s, paper.l, paper.c, paper.y, paper.h, paper.w, paper.n]), String(paper.cf || ''),
+  ]));
   paperIndexCache = {
     subjects: Array.isArray(parsed.subjects) ? parsed.subjects : [],
     schools: Array.isArray(parsed.schools) ? parsed.schools : [],
     paperIdentities,
+    sourcePathByIdentity,
   };
   return paperIndexCache;
 }
@@ -184,7 +189,9 @@ export async function collectCachedQuestionCandidates({
     if (wantedLevel && paper.l !== wantedLevel) continue;
 
     const questions = Array.isArray(row.questions) ? row.questions : [];
-    for (const question of questions) {
+    const sourcePath = index.sourcePathByIdentity.get(paper.paperIdentity) || '';
+    for (const mappedQuestion of questions) {
+      const question = correctedPracticeQuestion(sourcePath, mappedQuestion);
       const id = String(question?.id || '').trim();
       const page = Number(question?.page);
       if (!id || !Number.isInteger(page) || page < 1) continue;
@@ -228,6 +235,7 @@ export async function collectCachedQuestionCandidates({
             sourcePages: [...new Set([page, ...subparts.map((subpart) => Number(subpart?.page)).filter((candidatePage) => Number.isInteger(candidatePage) && candidatePage > 0)])].sort((left, right) => left - right),
             geometry,
             cropReview: !hasReliableGeometry,
+            pdfCrop: verifiedPracticeCrop(sourcePath, id, 'whole', parentMarks),
             skill: String(question?.skill || '').trim(),
             commandVerb: String(question?.commandVerb || '').trim(),
             challenge: {
@@ -284,6 +292,7 @@ export async function collectCachedQuestionCandidates({
             sourcePages: [subpartPage],
             geometry: selectedGeometry,
             cropReview: !hasReliableSubpartGeometry,
+            pdfCrop: verifiedPracticeCrop(sourcePath, id, subpartId, subpartMarks),
             skill: String(subpart?.skill || '').trim(),
             commandVerb: String(subpart?.commandVerb || '').trim(),
             challenge: {
