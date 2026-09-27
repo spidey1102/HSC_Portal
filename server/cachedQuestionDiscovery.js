@@ -58,9 +58,13 @@ function loadPaperIndex() {
   if (paperIndexCache) return paperIndexCache;
   const raw = readFileSync(resolve(process.cwd(), 'public', 'papers.json'), 'utf-8');
   const parsed = JSON.parse(raw);
+  const paperIdentities = new Set((Array.isArray(parsed.papers) ? parsed.papers : []).map((paper) => (
+    JSON.stringify([paper.v, paper.s, paper.l, paper.c, paper.y, paper.h, paper.w, paper.n])
+  )));
   paperIndexCache = {
     subjects: Array.isArray(parsed.subjects) ? parsed.subjects : [],
     schools: Array.isArray(parsed.schools) ? parsed.schools : [],
+    paperIdentities,
   };
   return paperIndexCache;
 }
@@ -107,17 +111,21 @@ function randomiseEqualScores(candidates) {
  * inspect uncached papers; a returned question is therefore immediately
  * reusable and page-addressable for every student.
  */
-export async function searchCachedQuestions({
+export async function collectCachedQuestionCandidates({
   topic = '',
+  topics = [],
   subject = '',
   difficulty = 'any',
   level = null,
   excludeQuestionKeys = [],
+  requireMarks = false,
+  preferSubparts = false,
+  requireIndexedPaper = false,
 } = {}) {
   const sql = getSupabaseSql();
   const index = loadPaperIndex();
   const wantedSubject = normaliseText(subject);
-  const wantedDifficulty = ['any', 'challenging', 'stretch'].includes(String(difficulty || '').toLowerCase())
+  const wantedDifficulty = ['any', 'routine', 'challenging', 'stretch'].includes(String(difficulty || '').toLowerCase())
     ? String(difficulty || 'any').toLowerCase()
     : 'any';
   const requestedLevel = Number(level);
@@ -137,9 +145,11 @@ export async function searchCachedQuestions({
   `;
 
   const candidates = [];
+  const wantedTopics = (Array.isArray(topics) ? topics : []).map(normaliseText).filter(Boolean);
   for (const row of rows) {
     const paper = parsePaperIdentity(row.paper_key);
     if (!paper) continue;
+    if (requireIndexedPaper && !index.paperIdentities.has(paper.paperIdentity)) continue;
     const subjectName = String(index.subjects[paper.s] || 'Unknown subject');
     const schoolName = String(index.schools[paper.h] || 'Unknown source');
     const normalisedSubjectName = normaliseText(subjectName);
@@ -156,24 +166,38 @@ export async function searchCachedQuestions({
       const level = String(question?.challenge?.level || 'routine').toLowerCase();
       if (wantedDifficulty !== 'any' && level !== wantedDifficulty) continue;
 
-      const score = questionRelevance(question, topic);
-      if (score <= 0) continue;
-
       const key = questionResultKey(paper.paperIdentity, id);
-      if (!excluded.has(key)) {
+      const parentMarks = question?.marks === null || question?.marks === undefined ? null : Number(question.marks);
+      const parentHasMarks = Number.isFinite(parentMarks) && parentMarks > 0;
+      const parentTopics = Array.isArray(question?.topics) ? question.topics : [];
+      const subparts = Array.isArray(question?.subparts) ? question.subparts : [];
+      const hasUsableMarkedSubparts = (requireMarks || preferSubparts) && subparts.some((subpart) => {
+        const subpartMarks = Number(subpart?.marks);
+        const hasOwnLabels = (Array.isArray(subpart?.topics) && subpart.topics.some((label) => String(label || '').trim()))
+          || Boolean(String(subpart?.skill || '').trim())
+          || Boolean(String(subpart?.commandVerb || '').trim());
+        return Number.isFinite(subpartMarks) && subpartMarks > 0 && hasOwnLabels;
+      });
+      const matchesRequestedTopics = (labels) => !wantedTopics.length || labels.some((label) => wantedTopics.includes(normaliseText(label)));
+      const parentScore = questionRelevance(question, topic);
+      if (parentScore > 0 && matchesRequestedTopics(parentTopics) && (!requireMarks || parentHasMarks)
+        && !hasUsableMarkedSubparts && !excluded.has(key)) {
         candidates.push({
-          score,
+          score: parentScore,
           key,
+          parentKey: key,
           paperIdentity: paper.paperIdentity,
           paperName: paper.n || String(row.paper_name || ''),
           paperYear: Number.isFinite(paper.y) ? paper.y : null,
           subject: subjectName,
           school: schoolName,
+          hasSolutions: paper.w === 1,
+          allTopics: parentTopics.map((label) => String(label || '').trim()).filter(Boolean),
           question: {
             id,
             page,
-            marks: question?.marks === null || question?.marks === undefined ? null : Number(question.marks),
-            topics: Array.isArray(question?.topics) ? question.topics.slice(0, 3) : [],
+            marks: parentMarks,
+            topics: parentTopics.slice(0, 3),
             skill: String(question?.skill || '').trim(),
             commandVerb: String(question?.commandVerb || '').trim(),
             challenge: {
@@ -184,7 +208,6 @@ export async function searchCachedQuestions({
         });
       }
 
-      const subparts = Array.isArray(question?.subparts) ? question.subparts : [];
       for (const subpart of subparts) {
         const subpartId = String(subpart?.id || '').trim();
         const subpartPage = Number(subpart?.page ?? page);
@@ -201,22 +224,27 @@ export async function searchCachedQuestions({
           || Boolean(subpartQuestion.commandVerb);
         if (!hasOwnLabels) continue;
         const subpartScore = questionRelevance(subpartQuestion, topic);
-        if (subpartScore <= 0) continue;
+        const subpartMarks = subpart?.marks === null || subpart?.marks === undefined ? null : Number(subpart.marks);
+        const subpartHasMarks = Number.isFinite(subpartMarks) && subpartMarks > 0;
+        if (subpartScore <= 0 || !matchesRequestedTopics(subpartQuestion.topics) || (requireMarks && !subpartHasMarks)) continue;
 
         const subpartKey = questionResultKey(paper.paperIdentity, `${id}(${subpartId})`);
         if (excluded.has(subpartKey)) continue;
         candidates.push({
           score: subpartScore,
           key: subpartKey,
+          parentKey: key,
           paperIdentity: paper.paperIdentity,
           paperName: paper.n || String(row.paper_name || ''),
           paperYear: Number.isFinite(paper.y) ? paper.y : null,
           subject: subjectName,
           school: schoolName,
+          hasSolutions: paper.w === 1,
+          allTopics: subpartQuestion.topics.map((label) => String(label || '').trim()).filter(Boolean),
           question: {
             id,
             page: subpartPage,
-            marks: subpart?.marks === null || subpart?.marks === undefined ? null : Number(subpart.marks),
+            marks: subpartMarks,
             topics: Array.isArray(subpart?.topics) ? subpart.topics.slice(0, 3) : [],
             skill: String(subpart?.skill || '').trim(),
             commandVerb: String(subpart?.commandVerb || '').trim(),
@@ -230,6 +258,22 @@ export async function searchCachedQuestions({
     }
   }
 
+  return candidates;
+}
+
+export async function searchCachedQuestions({
+  topic = '', subject = '', difficulty = 'any', level = null, excludeQuestionKeys = [],
+} = {}) {
+  const wantedDifficulty = ['challenging', 'stretch'].includes(String(difficulty || '').toLowerCase())
+    ? String(difficulty).toLowerCase() : 'any';
+  const requestedLevel = Number(level);
+  const wantedLevel = [11, 12].includes(requestedLevel) ? requestedLevel : null;
+  // Preserve the established search contract: routine is not an explicit filter
+  // in the Agent/topic search UI, and results remain capped at five.
+  const candidates = await collectCachedQuestionCandidates({
+    topic, subject, difficulty: ['challenging', 'stretch'].includes(String(difficulty || '').toLowerCase()) ? difficulty : 'any',
+    level, excludeQuestionKeys,
+  });
   const selected = randomiseEqualScores(candidates).slice(0, MAX_RETURNED_QUESTIONS);
   return {
     topic: String(topic || '').trim(),
@@ -238,7 +282,11 @@ export async function searchCachedQuestions({
     level: wantedLevel,
     found: candidates.length,
     returned: selected.length,
-    questions: selected,
+    questions: selected.map((candidate) => {
+      const result = { ...candidate };
+      delete result.allTopics;
+      return result;
+    }),
   };
 }
 

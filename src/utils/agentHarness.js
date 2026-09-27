@@ -315,7 +315,7 @@ export const AGENT_TOOLS = [
         properties: {
           section: {
             type: 'string',
-            enum: ['today', 'library', 'calendar', 'notebook', 'history', 'textbooks'],
+            enum: ['today', 'library', 'builder', 'calendar', 'notebook', 'history', 'textbooks'],
           },
         },
         required: ['section'],
@@ -762,7 +762,7 @@ export async function executeTool(toolName, args, appContext) {
 
     case 'open_section': {
       const section = String(args.section || '').trim();
-      const allowed = ['today', 'library', 'calendar', 'notebook', 'history', 'textbooks'];
+      const allowed = ['today', 'library', 'builder', 'calendar', 'notebook', 'history', 'textbooks'];
       if (!allowed.includes(section)) return { success: false, error: `Unknown section "${section}".` };
       if (typeof goToSection !== 'function') return { success: false, error: 'Navigation is not available here.' };
       goToSection(section);

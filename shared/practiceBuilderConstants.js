@@ -1,0 +1,1 @@
+export const DEFAULT_MINUTES_PER_MARK = 1.8;

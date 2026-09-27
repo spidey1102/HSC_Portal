@@ -34,6 +34,7 @@ export function saveTopicQuestionQueue(questions, currentIndex = 0, topicTitle =
   }
   try {
     const queueData = {
+      mode: 'topic',
       questions,
       currentIndex: Math.max(0, Math.min(currentIndex, questions.length - 1)),
       topicTitle: topicTitle || questions[0]?.question?.topics?.[0] || questions[0]?.subject || 'Topic Practice',
@@ -51,6 +52,40 @@ export function saveTopicQuestionQueue(questions, currentIndex = 0, topicTitle =
   }
 }
 
+export function saveMiniPaperQueue({
+  questions, subject, topics = [], totalMarks = 0, estimatedMinutes = 0, targetMode = 'marks', targetValue = 0,
+}) {
+  if (!Array.isArray(questions) || questions.length === 0) {
+    clearTopicQuestionQueue();
+    return null;
+  }
+  try {
+    const queueData = {
+      mode: 'mini-paper',
+      questions,
+      currentIndex: 0,
+      topicTitle: String(subject || 'Mini-paper'),
+      hasMore: false,
+      miniPaper: {
+        subject: String(subject || ''),
+        topics: Array.isArray(topics) ? topics : [],
+        totalMarks: Number(totalMarks) || 0,
+        estimatedMinutes: Number(estimatedMinutes) || 0,
+        targetMode,
+        targetValue: Number(targetValue) || 0,
+        startedAt: Date.now(),
+      },
+      updatedAt: Date.now(),
+    };
+    sessionStorage.setItem(TOPIC_QUESTION_QUEUE_STORAGE_KEY, JSON.stringify(queueData));
+    window.dispatchEvent(new CustomEvent('hsc:topic-queue-updated', { detail: queueData }));
+    return queueData;
+  } catch (error) {
+    console.warn('Failed to save mini-paper queue:', error);
+    return null;
+  }
+}
+
 /**
  * Load the current topic question session queue from sessionStorage
  */
@@ -60,7 +95,7 @@ export function loadTopicQuestionQueue() {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed?.questions) || parsed.questions.length === 0) return null;
-    return parsed;
+    return { ...parsed, mode: parsed.mode === 'mini-paper' ? 'mini-paper' : 'topic' };
   } catch {
     return null;
   }
@@ -112,7 +147,7 @@ export function appendToTopicQuestionQueue(newQuestions, hasMore = true) {
  * Fetches the next batch of cached questions for the current topic queue
  */
 export async function fetchMoreTopicQuestions(queue) {
-  if (!queue || !Array.isArray(queue.questions)) return { success: false, questions: [] };
+  if (!queue || queue.mode === 'mini-paper' || !Array.isArray(queue.questions)) return { success: false, questions: [] };
 
   const existingKeys = extractQuestionKeys(queue.questions);
   const searchParams = queue.searchParams || {

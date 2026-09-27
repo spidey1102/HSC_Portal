@@ -28,6 +28,7 @@ import PaperMargin from './pdf/PaperMargin';
 import { analysePaperMetadata, createEmptyPaperMetadata, getPaperMetadata } from '../utils/paperMetadata';
 import {
   loadTopicQuestionQueue,
+  saveTopicQuestionQueue,
   updateTopicQueueIndex,
   clearTopicQuestionQueue,
   formatQuestionLabel,
@@ -44,6 +45,7 @@ import { useAnnotationHistory } from '../utils/useAnnotationHistory';
 import {
   createExamTimer,
   formatClock,
+  pauseTimer,
   readTimer,
   setDuration,
   setReadingTime,
@@ -222,6 +224,8 @@ export default function PracticeRoom({
   const [actionMessage, setActionMessage] = useState('');
   const [isCompleted, setIsCompleted] = useState(false);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [isMiniPaperComplete, setIsMiniPaperComplete] = useState(false);
+  const [completedMiniPaper, setCompletedMiniPaper] = useState(null);
   const [isMarginOpen, setIsMarginOpen] = useState(false);
   const [showFormula, setShowFormula] = useState(false);
   const [mobileTab, setMobileTab] = useState('paper');
@@ -251,6 +255,11 @@ export default function PracticeRoom({
     setWidestPage(widest);
     zoom.setScale(1);
 
+    if (topicQueue?.mode === 'mini-paper') {
+      setDetectedTiming(null);
+      return;
+    }
+
     const timing = parsePaperTiming(firstPageText);
     if (timing.source !== 'document') return;
     setDetectedTiming(timing);
@@ -263,7 +272,7 @@ export default function PracticeRoom({
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zoom.setScale]);
+  }, [zoom.setScale, topicQueue?.mode]);
 
   const flash = useCallback((message, duration = 2200) => {
     setActionMessage(message);
@@ -490,14 +499,8 @@ export default function PracticeRoom({
       return;
     }
 
-    if (Array.isArray(allResults) && allResults.length > 0) {
-      const queueData = {
-        questions: allResults,
-        currentIndex: clickedIndex,
-        topicTitle: allResults[0]?.question?.topics?.[0] || allResults[0]?.subject || 'Topic Practice',
-      };
-      sessionStorage.setItem('hsc_topic_question_queue', JSON.stringify(queueData));
-      window.dispatchEvent(new CustomEvent('hsc:topic-queue-updated', { detail: queueData }));
+    if (Array.isArray(allResults) && allResults.length > 0 && topicQueue?.mode !== 'mini-paper') {
+      saveTopicQuestionQueue(allResults, clickedIndex);
     }
 
     const label = `Question ${String(result.question.id || '').trim()}`;
@@ -519,7 +522,9 @@ export default function PracticeRoom({
     } catch {
       // The destination still opens if browser storage is unavailable.
     }
-    onSelectPaper(targetPaper);
+    onSelectPaper(targetPaper, topicQueue?.mode === 'mini-paper'
+      ? { replace: true, preserveReturnTo: true }
+      : undefined);
   };
 
   const handleNavigateTopicQueue = useCallback(async (direction) => {
@@ -531,6 +536,7 @@ export default function PracticeRoom({
 
     // If moving forward and reaching or approaching the end of current list (e.g. 5th question)
     if (nextIndex >= topicQueue.questions.length) {
+      if (topicQueue.mode === 'mini-paper') return;
       if (topicQueue.hasMore !== false && !isLoadingMoreQuestions) {
         setIsLoadingMoreQuestions(true);
         try {
@@ -554,13 +560,26 @@ export default function PracticeRoom({
     if (!targetItem) return;
 
     // Trigger pre-fetching in background when moving into the last 2 questions
-    if (nextIndex >= topicQueue.questions.length - 2 && topicQueue.hasMore !== false && !isLoadingMoreQuestions) {
+    if (topicQueue.mode !== 'mini-paper' && nextIndex >= topicQueue.questions.length - 2 && topicQueue.hasMore !== false && !isLoadingMoreQuestions) {
       fetchMoreTopicQuestions(topicQueue).catch(() => {});
     }
 
     updateTopicQueueIndex(nextIndex);
     handleOpenCachedQuestion(targetItem);
   }, [topicQueue, handleOpenCachedQuestion, isLoadingMoreQuestions]);
+
+  const finishMiniPaper = () => {
+    setCompletedMiniPaper(topicQueue?.mode === 'mini-paper' ? {
+      subject: topicQueue.miniPaper?.subject || subjectName,
+      questionCount: topicQueue.questions?.length || 0,
+      totalMarks: topicQueue.miniPaper?.totalMarks || 0,
+      elapsedSeconds,
+    } : null);
+    clearTopicQuestionQueue();
+    setTopicQueue(null);
+    setTimer((current) => pauseTimer(current));
+    setIsMiniPaperComplete(true);
+  };
 
   useEffect(() => {
     try {
@@ -713,7 +732,7 @@ export default function PracticeRoom({
       <header className="reader-head">
         <button type="button" className="btn btn-secondary" onClick={onClose}>
           <ArrowLeft size={14} />
-          Library
+          {topicQueue?.mode === 'mini-paper' || isMiniPaperComplete ? 'Back to Build' : 'Library'}
         </button>
 
         <div className="reader-title">
@@ -795,12 +814,12 @@ export default function PracticeRoom({
             </button>
           )}
 
-          <button type="button" className="btn btn-secondary" onClick={() => setIsReviewOpen(true)} title="Review this sitting">
+          {topicQueue?.mode !== 'mini-paper' && !isMiniPaperComplete && <button type="button" className="btn btn-secondary" onClick={() => setIsReviewOpen(true)} title="Review this sitting">
             <ClipboardCheck size={14} />
             Review
-          </button>
+          </button>}
 
-          {isCompleted ? (
+          {topicQueue?.mode === 'mini-paper' || isMiniPaperComplete ? null : isCompleted ? (
             <button type="button" className="btn btn-secondary" onClick={handleUnmarkCompleted}>
               <X size={14} />
               Sat
@@ -814,7 +833,7 @@ export default function PracticeRoom({
         </div>
       </header>
 
-      {/* Topic Practice Session Queue Bar */}
+      {/* Topic practice or fixed mini-paper navigation */}
       {topicQueue && Array.isArray(topicQueue.questions) && topicQueue.questions.length > 0 && (() => {
         const currentIndex = Math.max(0, Math.min(topicQueue.currentIndex ?? 0, topicQueue.questions.length - 1));
         const currentItem = topicQueue.questions[currentIndex];
@@ -823,16 +842,19 @@ export default function PracticeRoom({
         const currentQ = currentItem?.question;
         const currentLabel = currentQ ? formatQuestionLabel(currentQ) : 'Current Question';
         const page = currentQ?.page;
+        const isMiniPaper = topicQueue.mode === 'mini-paper';
+        const completedMarks = topicQueue.questions.slice(0, currentIndex + 1)
+          .reduce((sum, item) => sum + (Number(item.question?.marks) || 0), 0);
 
         return (
-          <div className="topic-queue-bar" role="region" aria-label="Topic practice navigation">
+          <div className={`topic-queue-bar${isMiniPaper ? ' is-mini-paper' : ''}`} role="region" aria-label={isMiniPaper ? 'Mini-paper navigation' : 'Topic practice navigation'}>
             <div className="topic-queue-info">
               <span className="topic-queue-badge">
                 <Sparkles size={13} />
-                Topic Practice
+                {isMiniPaper ? 'Mini-paper' : 'Topic Practice'}
               </span>
               <span className="topic-queue-title">
-                {topicQueue.topicTitle || 'Similar Questions'}
+                {isMiniPaper ? topicQueue.miniPaper?.subject || topicQueue.topicTitle : topicQueue.topicTitle || 'Similar Questions'}
               </span>
               <span className="topic-queue-subtitle">
                 — {currentItem?.paperName || 'Paper'} · {currentLabel}{page ? ` · Page ${page}` : ''}
@@ -852,11 +874,15 @@ export default function PracticeRoom({
                 <span>Prev Question</span>
               </button>
 
-              <span className="topic-queue-count" title="Current position in topic session">
-                {currentIndex + 1} of {topicQueue.questions.length}
+              <span className="topic-queue-count" title={isMiniPaper ? 'Scheduled marks reached in this set' : 'Current position in topic session'}>
+                {currentIndex + 1} of {topicQueue.questions.length}{isMiniPaper ? ` · ${completedMarks}/${topicQueue.miniPaper?.totalMarks || 0} marks` : ''}
               </span>
 
-              <button
+              {isMiniPaper && !hasNext ? (
+                <button type="button" className="topic-queue-btn is-finish" onClick={finishMiniPaper}>
+                  <span>Finish set</span><Check size={15} />
+                </button>
+              ) : <button
                 type="button"
                 className="topic-queue-btn"
                 disabled={!hasNext && topicQueue.hasMore === false}
@@ -875,17 +901,21 @@ export default function PracticeRoom({
                     <ChevronRight size={16} />
                   </>
                 )}
-              </button>
+              </button>}
 
               <button
                 type="button"
                 className="topic-queue-close"
                 onClick={() => {
-                  clearTopicQuestionQueue();
-                  setTopicQueue(null);
+                  if (isMiniPaper) {
+                    onClose?.();
+                  } else {
+                    clearTopicQuestionQueue();
+                    setTopicQueue(null);
+                  }
                 }}
-                title="Dismiss topic queue"
-                aria-label="Dismiss topic queue"
+                title={isMiniPaper ? 'Return to the builder' : 'Dismiss topic queue'}
+                aria-label={isMiniPaper ? 'Return to the builder' : 'Dismiss topic queue'}
               >
                 <X size={15} />
               </button>
@@ -893,6 +923,20 @@ export default function PracticeRoom({
           </div>
         );
       })()}
+
+      {isMiniPaperComplete && (
+        <section className="mini-paper-complete card" role="status">
+          <div className="kick"><Check size={13} /> Set complete</div>
+          <h2>Practice set complete</h2>
+          <p>{completedMiniPaper?.subject || subjectName}</p>
+          <div className="mini-paper-complete-stats">
+            <span>{completedMiniPaper?.questionCount || 0} questions</span>
+            <span>{completedMiniPaper?.totalMarks || 0} marks</span>
+            <span>{formatAnalysisElapsed(completedMiniPaper?.elapsedSeconds || 0)} elapsed</span>
+          </div>
+          <button type="button" className="btn btn-primary" onClick={onClose}>Back to Builder</button>
+        </section>
+      )}
 
       {actionMessage && <div className="reader-notice">{actionMessage}</div>}
 
@@ -1175,7 +1219,7 @@ export default function PracticeRoom({
               <ExamTimerBar
                 state={timer}
                 onStateChange={setTimer}
-                durationSource={detectedTiming ? 'document' : ladderEntry ? 'ladder' : 'manual'}
+                durationSource={topicQueue?.mode === 'mini-paper' ? 'mini-paper' : detectedTiming ? 'document' : ladderEntry ? 'ladder' : 'manual'}
                 sourceDetail={detectedTiming ? describeTiming(detectedTiming) : null}
                 suggestedReadingMinutes={detectedTiming?.readingMinutes || 0}
                 onFinished={() => flash('Pens down. Open the review while it is fresh.', 6000)}

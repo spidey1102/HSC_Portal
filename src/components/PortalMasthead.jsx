@@ -8,6 +8,7 @@ import { NSW_MATHS_BOOKING_URL } from './NswMathsEventsBanner';
 export const PORTAL_SECTIONS = [
   { id: 'today', label: 'Today' },
   { id: 'library', label: 'Library' },
+  { id: 'builder', label: 'Build' },
   { id: 'calendar', label: 'Calendar' },
   { id: 'notebook', label: 'Notebook' },
   { id: 'history', label: 'History' },

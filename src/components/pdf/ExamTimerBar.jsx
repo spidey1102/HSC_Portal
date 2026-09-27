@@ -80,6 +80,7 @@ function useShapeMorph(shapeKey) {
 }
 
 const SOURCE_LABELS = {
+  'mini-paper': 'Mini-paper time',
   document: 'Read from the paper',
   ladder: 'Set by your ladder allowance',
   'subject-default': 'Official time for this course',

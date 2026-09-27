@@ -81,6 +81,13 @@ export default function CommandPalette({
         run: () => onNavigate?.('calendar'),
       },
       {
+        id: 'builder',
+        icon: ListChecks,
+        name: 'Build a practice set',
+        hint: '',
+        run: () => onNavigate?.('builder'),
+      },
+      {
         id: 'ask',
         icon: Gauge,
         name: query.trim() ? `Ask the agent: “${query.trim()}”` : 'Ask the agent about your marks',

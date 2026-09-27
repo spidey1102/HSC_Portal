@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/react';
 
 import PortalMasthead from './components/PortalMasthead';
 import TodayView from './components/TodayView';
+import PracticeBuilder from './components/PracticeBuilder';
 import LibraryView from './components/LibraryView';
 import CalendarView from './components/CalendarView';
 import CommandPalette from './components/CommandPalette';
@@ -57,7 +58,7 @@ import { isPrimaryShortcut } from './utils/platformShortcuts';
 import './App.css';
 import { useSync } from './components/SyncContext';
 import { useAuth } from './components/AuthContext';
-import { saveTopicQuestionQueue } from './utils/topicQuestionQueue';
+import { saveMiniPaperQueue, saveTopicQuestionQueue } from './utils/topicQuestionQueue';
 
 const FIREBASE_RESET_NOTICE_STORAGE_KEY = 'hsc_new_firebase_2026';
 const TIMER_STORAGE_KEY = 'hsc_timer_duration_secs';
@@ -482,8 +483,8 @@ export default function NewPortal({ onPortalLayoutChange }) {
     activePaperId ? findPaperByIdentifier(papers, activePaperId) : null
   ), [papers, activePaperId]);
 
-  const openPaper = useCallback((paper, { replace = false } = {}) => {
-    paperReturnToRef.current = readLocation();
+  const openPaper = useCallback((paper, { replace = false, preserveReturnTo = false } = {}) => {
+    if (!preserveReturnTo || !paperReturnToRef.current) paperReturnToRef.current = readLocation();
     const params = new URLSearchParams(window.location.search);
     params.set('paper', getPaperRouteId(paper));
     window.history[replace ? 'replaceState' : 'pushState']({}, '', `/?${params.toString()}`);
@@ -524,14 +525,14 @@ export default function NewPortal({ onPortalLayoutChange }) {
     openPaper(paper);
   }, [openPaper]);
 
-  const openCachedQuestion = useCallback((result, allResults = null, clickedIndex = 0) => {
+  const openCachedQuestion = useCallback((result, allResults = null, clickedIndex = 0, { queue = true, replace = false, preserveReturnTo = false } = {}) => {
     const page = Number(result?.question?.page);
     const paper = papers.find((candidate) => (
       getPaperIdentity(candidate) === String(result?.paperIdentity || '')
     ));
     if (!paper || !Number.isInteger(page) || page < 1) return false;
 
-    if (Array.isArray(allResults) && allResults.length > 0) {
+    if (queue && Array.isArray(allResults) && allResults.length > 0) {
       saveTopicQuestionQueue(allResults, clickedIndex);
     }
 
@@ -544,9 +545,28 @@ export default function NewPortal({ onPortalLayoutChange }) {
     } catch {
       // The paper still opens even if a private browser blocks session storage.
     }
-    openPaper(paper);
+    openPaper(paper, { replace, preserveReturnTo });
     return true;
   }, [openPaper, papers]);
+
+  const beginMiniPaper = useCallback((build) => {
+    if (!Array.isArray(build?.questions) || !build.questions.length) return;
+    saveMiniPaperQueue({
+      questions: build.questions,
+      subject: build.subject,
+      topics: build.topics,
+      totalMarks: build.summary?.totalMarks,
+      estimatedMinutes: build.summary?.estimatedMinutes,
+      targetMode: build.target?.mode,
+      targetValue: build.target?.value,
+    });
+    try {
+      localStorage.setItem(TIMER_STORAGE_KEY, String(Math.min(TIMER_CEILING_SECONDS, Math.max(300, Number(build.summary?.estimatedMinutes) * 60))));
+    } catch {
+      // The reader can still open with its saved timer if local storage is unavailable.
+    }
+    openCachedQuestion(build.questions[0], null, 0, { queue: false });
+  }, [openCachedQuestion]);
 
   const toggleBookmark = useCallback((viewno) => {
     setBookmarks((prev) => {
@@ -829,6 +849,14 @@ export default function NewPortal({ onPortalLayoutChange }) {
             onOpenPaper={openPaper}
             onBeginSitting={beginSitting}
             onAsk={askAgent}
+          />
+        ) : section === 'builder' ? (
+          <PracticeBuilder
+            subjects={subjects}
+            mySubjects={mySubjects}
+            selectedLevel={selectedLevel}
+            onLevelChange={setSelectedLevel}
+            onStart={beginMiniPaper}
           />
         ) : section === 'calendar' ? (
           <CalendarView
