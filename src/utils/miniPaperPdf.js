@@ -92,8 +92,25 @@ function sourcePdfUrl(paper) {
 }
 
 function sourcePagesFor(result) {
+  const geometryPages = result.question?.geometry?.confidence !== 'low' && Array.isArray(result.question?.geometry?.segments)
+    ? result.question.geometry.segments.map((segment) => Number(segment?.page))
+      .filter((page) => Number.isInteger(page) && page > 0)
+    : [];
+  if (geometryPages.length) return [...new Set(geometryPages)].sort((left, right) => left - right);
   const pages = Array.isArray(result.question?.sourcePages) ? result.question.sourcePages : [result.question?.page];
   return [...new Set(pages.map(Number).filter((page) => Number.isInteger(page) && page > 0))].sort((left, right) => left - right);
+}
+
+function cropForQuestionPage(question, pageNumber, rows, pageHeight) {
+  const segment = question?.geometry?.confidence !== 'low'
+    ? question?.geometry?.segments?.find((item) => Number(item?.page) === pageNumber)
+    : null;
+  const bbox = Array.isArray(segment?.bbox) ? segment.bbox.map(Number) : [];
+  if (bbox.length === 4 && bbox.every(Number.isFinite) && bbox[2] > bbox[0] && bbox[3] > bbox[1]) {
+    return { left: bbox[0], top: bbox[1], right: bbox[2], bottom: bbox[3] };
+  }
+  const textCrop = findQuestionCrop(rows, questionNumber(question), pageHeight);
+  return textCrop ? { left: 0, right: Number.POSITIVE_INFINITY, ...textCrop } : null;
 }
 
 /** Assemble a downloadable paper from page-addressed questions in their source PDFs. */
@@ -127,9 +144,8 @@ export async function createMiniPaperPdf(build, papers = []) {
       const viewport = sourcePage.getViewport({ scale: 1 });
       const rows = textRows(await sourcePage.getTextContent(), viewport);
       const isFirstSourcePage = sourcePageNumberIndex === 0;
-      const crop = isFirstSourcePage
-        ? findQuestionCrop(rows, questionNumber(result.question), viewport.height)
-        : findQuestionCrop(rows, questionNumber(result.question), viewport.height) || { top: 12, bottom: viewport.height - 16 };
+      const crop = cropForQuestionPage(result.question, sourcePageNumber, rows, viewport.height)
+        || (isFirstSourcePage ? null : { left: 0, right: Number.POSITIVE_INFINITY, top: 12, bottom: viewport.height - 16 });
       const renderedViewport = sourcePage.getViewport({ scale: 2 });
       const fullCanvas = makeCanvas(renderedViewport.width, renderedViewport.height);
       const context = fullCanvas.getContext('2d', { alpha: false });
@@ -137,12 +153,14 @@ export async function createMiniPaperPdf(build, papers = []) {
       await sourcePage.render({ canvasContext: context, viewport: renderedViewport }).promise;
 
       const cropScale = renderedViewport.scale / viewport.scale;
+      const cropLeft = crop ? Math.max(0, crop.left * cropScale) : 0;
+      const cropRight = crop ? Math.min(fullCanvas.width, Number.isFinite(crop.right) ? crop.right * cropScale : fullCanvas.width) : fullCanvas.width;
       const cropTop = crop ? Math.max(0, crop.top * cropScale) : 0;
       const cropBottom = crop ? Math.min(fullCanvas.height, crop.bottom * cropScale) : fullCanvas.height;
-      const cropCanvas = makeCanvas(fullCanvas.width, cropBottom - cropTop);
+      const cropCanvas = makeCanvas(cropRight - cropLeft, cropBottom - cropTop);
       cropCanvas.getContext('2d', { alpha: false }).drawImage(
         fullCanvas,
-        0, cropTop, fullCanvas.width, cropBottom - cropTop,
+        cropLeft, cropTop, cropRight - cropLeft, cropBottom - cropTop,
         0, 0, cropCanvas.width, cropCanvas.height,
       );
 
