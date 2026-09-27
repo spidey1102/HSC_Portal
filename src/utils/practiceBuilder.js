@@ -10,11 +10,11 @@ async function readResponse(response) {
 
 export async function fetchPracticeBuilderFacets(subject, level, { signal } = {}) {
   const params = new URLSearchParams({ subject, level: String(level) });
-  return readResponse(await fetch(`/api/practice-builder?${params}`, { signal }));
+  return readResponse(await fetch(`/api/paper-metadata?practiceBuilder=1&${params}`, { signal }));
 }
 
 export async function generatePracticeSet(options, { signal } = {}) {
-  return readResponse(await fetch('/api/practice-builder', {
+  return readResponse(await fetch('/api/paper-metadata?practiceBuilder=1', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(options),

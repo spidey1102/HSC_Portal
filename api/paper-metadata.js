@@ -14,6 +14,7 @@ import {
   loadPaperRecord,
 } from '../server/paperSource.js';
 import { getCompletionRoute, isRetryableProviderStatus, userSafeProviderError } from '../openRouterRouting.js';
+import { createPracticeBuilderSet, getPracticeBuilderFacets } from '../server/practiceBuilder.js';
 
 // This route only claims a shared job and returns immediately. The separate worker
 // route owns the five-minute analysis allowance.
@@ -724,6 +725,33 @@ export async function runPaperAnalysisWorker({ paper, sourceFingerprint, request
 }
 
 export default async function handler(req, res) {
+  const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  if (requestUrl.searchParams.get('practiceBuilder') === '1') {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-store');
+    try {
+      if (req.method === 'GET') {
+        res.status(200).json(await getPracticeBuilderFacets({
+          subject: requestUrl.searchParams.get('subject'),
+          level: requestUrl.searchParams.get('level'),
+        }));
+        return;
+      }
+      if (req.method === 'POST') {
+        res.status(200).json(await createPracticeBuilderSet(req.body || {}));
+        return;
+      }
+      res.setHeader('Allow', 'GET, POST');
+      res.status(405).json({ error: 'Method not allowed.' });
+    } catch (error) {
+      const inputMessage = error?.message || '';
+      const isInputError = /^(Choose|Year level|Too many)/i.test(inputMessage);
+      res.status(isInputError ? 400 : 500).json({
+        error: isInputError ? inputMessage : 'The practice builder is temporarily unavailable. Please try again.',
+      });
+    }
+    return;
+  }
   const requestStartedAt = Date.now();
   const logPhase = (phase, details = {}) => {
     console.info('[paper-metadata] claim route phase', {
@@ -739,7 +767,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const paperId = requestUrl.searchParams.get('paperId');
     const paperName = requestUrl.searchParams.get('paperName');
     const isRefreshRequest = requestUrl.searchParams.get('refresh') === '1';
