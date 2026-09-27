@@ -239,6 +239,10 @@ export default function PracticeBuilder({
                 <div><strong>~{generatedSet.summary.estimatedMinutes}</strong><span>min estimated</span></div>
                 <div><strong>{generatedSet.summary.sourcePaperCount}</strong><span>source papers</span></div>
               </div>
+              <button type="button" className="btn btn-primary builder-start-button" onClick={() => onStart?.(generatedSet)}>
+                Start practice test <ArrowRight size={16} />
+              </button>
+              <p className="dim builder-start-help">Opens the first question and starts your practice timer.</p>
               {topics.length > 0 && <div className="builder-selected-topics">{topics.map((name) => <span key={name}>{name}</span>)}</div>}
               <ol className="builder-question-list">
                 {generatedSet.questions.map((question, index) => (
@@ -255,7 +259,7 @@ export default function PracticeBuilder({
               </ol>
               {generatedSet.warnings?.length > 0 && <ul className="builder-warnings">{generatedSet.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
               <button type="button" className="btn btn-primary builder-start-button" onClick={() => onStart?.(generatedSet)}>
-                Start practice <ArrowRight size={16} />
+                Start practice test <ArrowRight size={16} />
               </button>
             </div>
           ) : (
