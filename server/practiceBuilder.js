@@ -1,5 +1,5 @@
 import { collectCachedQuestionCandidates } from './cachedQuestionDiscovery.js';
-import { buildPracticeSet, normaliseBuilderOptions } from './practiceBuilderCore.js';
+import { buildPracticeSet, normaliseBuilderOptions, practiceCandidatesWithSelectableParts } from './practiceBuilderCore.js';
 import { reviewedPracticeCandidates, reviewedPracticePaperCount } from './reviewedPracticeCandidates.js';
 
 async function builderCandidates(options) {
@@ -32,6 +32,7 @@ function validateLevel(level) {
 }
 
 function facetResponse(subject, level, candidates) {
+  candidates = practiceCandidatesWithSelectableParts(candidates);
   const topics = new Map();
   const difficulty = { routine: 0, challenging: 0, stretch: 0 };
   let markedQuestionCount = 0;

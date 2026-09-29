@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import reviewed from './reviewedPracticeData.js';
 import { getPracticeBuilderFacets, createPracticeBuilderSet } from './practiceBuilder.js';
+import { buildPracticeSet, practiceCandidatesWithSelectableParts } from './practiceBuilderCore.js';
 
 test('all reviewed sources retain their approval fingerprint and exact catalog identity', () => {
   const catalog = JSON.parse(readFileSync(new URL('../public/papers.json', import.meta.url)));
@@ -38,6 +39,7 @@ test('reviewed builder works without database access for both subjects', async (
       assert.equal(build.summary.totalMarks, build.questions.reduce((sum, q) => sum + q.question.marks, 0));
       assert.ok(Math.abs(build.summary.totalMarks - value) <= Math.max(2, value * .1));
       assert.ok(build.questions.every((q) => q.question.pdfCrop));
+      assert.ok(build.questions.every((q) => !(q.question.pdfCrop.unitId === 'whole' && q.question.marks >= 10)));
       for (const question of build.questions) {
         if (question.key === question.parentKey) assert.equal(build.questions.filter((q) => q.parentKey === question.parentKey).length, 1);
       }
@@ -77,4 +79,19 @@ test('Maths Ext 1 topic builds draw from the other reviewed school papers too', 
     assert.ok(schools.has('Sydney Boys'));
     assert.ok(schools.size >= 4, `Expected a mix of mapped school sources, got ${[...schools].join(', ')}`);
   }
+});
+
+test('builder selects lettered crops instead of whole large questions', () => {
+  const selectable = practiceCandidatesWithSelectableParts(reviewed.candidates);
+  assert.ok(!selectable.some((item) => item.paperName === 'Blacktown Boys 2022' && item.question.id === '14'));
+
+  const build = buildPracticeSet(reviewed.candidates, {
+    subject: 'Maths Ext 1', level: 12, pdfOnly: true,
+    topics: ['Differential Equations'], target: { mode: 'marks', value: 5 },
+  });
+  assert.ok(build.questions.length);
+  assert.ok(build.questions.every((item) => !(item.question.pdfCrop.unitId === 'whole' && item.question.marks >= 10)));
+  const splitQuestion = build.questions.find((item) => item.paperName === 'Blacktown Boys 2024 w. sol' && item.question.id === '13');
+  assert.equal(splitQuestion.question.pdfCrop.unitId, 'd');
+  assert.equal(splitQuestion.question.marks, 4);
 });

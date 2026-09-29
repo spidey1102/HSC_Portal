@@ -30,6 +30,21 @@ function parentOf(candidate) {
   return candidate.parentKey || `${candidate.paperIdentity}::${candidate.question?.id}`;
 }
 
+// Prefer approved lettered units whenever a paper has them. Large whole-question
+// crops are not a useful fallback: they can include unrelated parts and prevent
+// the topic filter from describing the work the student will actually see.
+export function practiceCandidatesWithSelectableParts(rawCandidates) {
+  const candidates = Array.isArray(rawCandidates) ? rawCandidates : [];
+  const parentsWithParts = new Set(candidates
+    .filter((candidate) => candidate?.key && candidate.key !== parentOf(candidate))
+    .map(parentOf));
+  return candidates.filter((candidate) => {
+    if (!candidate?.key || candidate.key !== parentOf(candidate)) return true;
+    if (parentsWithParts.has(parentOf(candidate))) return false;
+    return marksOf(candidate) < 10;
+  });
+}
+
 function canAdd(candidate, chosen) {
   const parentKey = parentOf(candidate);
   return !chosen.some((entry) => {
@@ -81,7 +96,7 @@ function matchesDifficulty(candidate, difficulty) {
 export function buildPracticeSet(rawCandidates, rawOptions = {}) {
   const options = normaliseBuilderOptions(rawOptions);
   const excluded = new Set(options.excludeQuestionKeys);
-  let candidates = (Array.isArray(rawCandidates) ? rawCandidates : []).filter((candidate) => {
+  const eligibleCandidates = (Array.isArray(rawCandidates) ? rawCandidates : []).filter((candidate) => {
     const marks = marksOf(candidate);
     return candidate?.key && Number.isFinite(marks) && marks > 0
       && !excluded.has(candidate.key)
@@ -90,6 +105,12 @@ export function buildPracticeSet(rawCandidates, rawOptions = {}) {
       && Number(candidate.level ?? options.level) === options.level
       && matchesDifficulty(candidate, options.difficulty)
       && (!options.topics.length || options.topics.some((topic) => topicsOf(candidate).includes(norm(topic))));
+  });
+  let candidates = practiceCandidatesWithSelectableParts(eligibleCandidates);
+  const skippedLargeQuestions = eligibleCandidates.some((candidate) => {
+    const parentKey = parentOf(candidate);
+    return candidate.key === parentKey && marksOf(candidate) >= 10
+      && !candidates.some((unit) => parentOf(unit) === parentKey && unit.key !== parentKey);
   });
 
   const selected = [];
@@ -126,6 +147,7 @@ export function buildPracticeSet(rawCandidates, rawOptions = {}) {
   // If exclusions made the pool too small, make a second best-effort pass
   // without exclusions and say so explicitly in the preview.
   const warnings = [];
+  if (skippedLargeQuestions) warnings.push('Some large questions were skipped because verified part-by-part crops are not available yet.');
   const selectedMarks = selected.reduce((sum, entry) => sum + marksOf(entry), 0);
   if (!selected.length) {
     warnings.push(options.pdfOnly
