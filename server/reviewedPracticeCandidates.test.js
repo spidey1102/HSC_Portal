@@ -60,3 +60,21 @@ test('topics, year, exclusions and unavailable PDF coverage are respected', asyn
   assert.ok(next.questions.every((q) => !first.questions.some((old) => old.key === q.key)));
   assert.equal((await getPracticeBuilderFacets({ subject: 'Chemistry', level: 11, pdfOnly: true })).pdfReadyQuestionCount, 0);
 });
+
+test('Maths Ext 1 topic builds draw from the other reviewed school papers too', async () => {
+  const options = {
+    subject: 'Maths Ext 1',
+    level: 12,
+    pdfOnly: true,
+    topics: ['Calculus', 'Trigonometry', 'Binomial Theorem', 'Probability', 'Permutations and Combinations', 'Mathematical Induction', 'Projectile Motion'],
+    preferSolutions: true,
+  };
+  for (const value of [20, 50]) {
+    const build = await createPracticeBuilderSet({ ...options, target: { mode: 'marks', value } });
+    const schools = new Set(build.questions.map((item) => item.school));
+    assert.ok(schools.has('Fort St'));
+    assert.ok(schools.has('James Ruse'));
+    assert.ok(schools.has('Sydney Boys'));
+    assert.ok(schools.size >= 4, `Expected a mix of mapped school sources, got ${[...schools].join(', ')}`);
+  }
+});
