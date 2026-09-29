@@ -129,7 +129,7 @@ export default function NewPortal({ onPortalLayoutChange }) {
   const completeOnboarding = useCallback(({ subjects: chosen, level, startStyle }) => {
     setMySubjects(chosen);
     setSelectedLevel(level);
-    setSection(startStyle === 'browse' ? 'library' : 'today');
+    setSection(new URLSearchParams(window.location.search).get('view') === 'builder' ? 'builder' : startStyle === 'browse' ? 'library' : 'today');
     setShowOnboarding(false);
     setShowSignInPrompt(false);
     try {
@@ -162,7 +162,7 @@ export default function NewPortal({ onPortalLayoutChange }) {
   const [error, setError] = useState(null);
 
   // Navigation
-  const [section, setSection] = useState('today');
+  const [section, setSection] = useState(() => new URLSearchParams(window.location.search).get('view') === 'builder' ? 'builder' : 'today');
   const [libraryQuery, setLibraryQuery] = useState('');
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [isAgentOpen, setIsAgentOpen] = useState(false);

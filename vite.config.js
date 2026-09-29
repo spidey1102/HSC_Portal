@@ -107,6 +107,25 @@ export default defineConfig(({ mode }) => {
           })
 
           server.middlewares.use('/api/paper-metadata', async (req, res) => {
+            // Vercel supplies parsed JSON and these response helpers in production.
+            // Supply the same contract when testing the builder through Vite.
+            res.status = (code) => { res.statusCode = code; return res }
+            res.json = (body) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(body)) }
+            if (req.method === 'POST' && new URL(req.url, 'http://localhost').searchParams.get('practiceBuilder') === '1') {
+              try {
+                const chunks = []
+                let size = 0
+                for await (const chunk of req) {
+                  size += chunk.length
+                  if (size > 1_000_000) throw new Error('Request too large')
+                  chunks.push(chunk)
+                }
+                req.body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')
+              } catch {
+                res.status(400).json({ error: 'Choose valid practice set options.' })
+                return
+              }
+            }
             await paperMetadataHandler(req, res)
           })
 

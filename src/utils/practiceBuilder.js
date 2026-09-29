@@ -8,8 +8,8 @@ async function readResponse(response) {
   return payload;
 }
 
-export async function fetchPracticeBuilderFacets(subject, level, { signal } = {}) {
-  const params = new URLSearchParams({ subject, level: String(level) });
+export async function fetchPracticeBuilderFacets(subject, level, { signal, pdfOnly = false } = {}) {
+  const params = new URLSearchParams({ subject, level: String(level), pdfOnly: pdfOnly ? '1' : '0' });
   return readResponse(await fetch(`/api/paper-metadata?practiceBuilder=1&${params}`, { signal }));
 }
 

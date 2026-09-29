@@ -13,7 +13,10 @@ function paperIdentity(paper) {
   return JSON.stringify([paper.v, paper.s, paper.l, paper.c, paper.y, paper.h, paper.w, paper.n]);
 }
 
-function sourcePdfUrl(paper) {
+function sourcePdfUrl(paper, crop) {
+  if (crop?.sourceUrl === `/reviewed-paper-sources/${crop.sourceSha256}.pdf`) {
+    return new URL(crop.sourceUrl, window.location.origin).href;
+  }
   return `${SOURCE_BASE_URL}${encodeURI(paper.cf)}`;
 }
 
@@ -28,7 +31,7 @@ function verifiedFragments(result, paper) {
     || crop.unitId !== expectedUnit(result.question)
     || !/^[a-f0-9]{64}$/.test(String(crop.sourceSha256 || ''))
     || Number(crop.marks) !== Number(result.question?.marks)
-    || !Array.isArray(fragments) || !fragments.length || fragments.length > 8) {
+    || !Array.isArray(fragments) || !fragments.length || fragments.length > 32) {
     throw new Error(`Question ${result.question?.id || ''} has no verified PDF crop. Build a PDF-ready set.`);
   }
   let previousPage = 0;
@@ -41,7 +44,7 @@ function verifiedFragments(result, paper) {
       || !Number.isFinite(width) || !Number.isFinite(height)
       || width < 100 || height < 100 || ![left, top, right, bottom].every(Number.isFinite)
       || left < 0 || top < 0 || right > width || bottom > height
-      || right - left < 30 || bottom - top < 25) {
+      || right - left < 1 || bottom - top < 1) {
       throw new Error(`Question ${result.question?.id || ''} has an invalid PDF crop.`);
     }
     previousPage = page;
@@ -77,7 +80,7 @@ function addCover(doc, build) {
   doc.setFont('times', 'normal');
   doc.setFontSize(12);
   doc.setTextColor(50, 50, 50);
-  doc.text('Questions are reproduced from the credited school trial paper pages below.', PAGE_MARGIN, 190);
+  doc.text('Questions are reproduced from the credited school papers below.', PAGE_MARGIN, 190);
   doc.text('Use the source link to view the original paper.', PAGE_MARGIN, 209);
 }
 
@@ -86,8 +89,8 @@ async function sha256Hex(bytes) {
   return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, '0')).join('');
 }
 
-async function loadVerifiedSource(paper, expectedHash) {
-  const url = sourcePdfUrl(paper);
+async function loadVerifiedSource(paper, expectedHash, crop) {
+  const url = sourcePdfUrl(paper, crop);
   const response = await fetch(url);
   if (!response.ok) throw new Error(`The source PDF for ${paper.n || 'a question'} could not be loaded.`);
   const bytes = await response.arrayBuffer();
@@ -112,10 +115,11 @@ export async function createMiniPaperPdf(build, papers = []) {
     if (existing && existing.hash !== item.result.question.pdfCrop.sourceSha256) {
       throw new Error('The same source paper has conflicting approved checksums.');
     }
-    if (!existing) sources.set(item.paper.cf, { paper: item.paper, hash: item.result.question.pdfCrop.sourceSha256 });
+    if (!existing) sources.set(item.paper.cf, { paper: item.paper, hash: item.result.question.pdfCrop.sourceSha256, crop: item.result.question.pdfCrop });
   }
+  try {
   for (const [path, source] of sources) {
-    sources.set(path, { ...source, ...await loadVerifiedSource(source.paper, source.hash) });
+    sources.set(path, { ...source, ...await loadVerifiedSource(source.paper, source.hash, source.crop) });
   }
   // Validate every page before creating any output. A bad map cannot yield a partial paper.
   for (const { paper, fragments } of items) {
@@ -131,11 +135,31 @@ export async function createMiniPaperPdf(build, papers = []) {
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true });
   addCover(doc, build);
-  const totalPages = items.reduce((sum, item) => sum + item.fragments.length, 0);
   let outputPage = 0;
+  const pageFooters = [];
   for (let questionIndex = 0; questionIndex < items.length; questionIndex += 1) {
     const { result, paper, fragments } = items[questionIndex];
     const source = sources.get(paper.cf);
+    const availableWidth = A4_WIDTH - PAGE_MARGIN * 2;
+    const availableHeight = A4_HEIGHT - 145;
+    // Keep short stems at the same scale as their part, on the same output page.
+    // Only break at reviewed fragment boundaries, never in the middle of a diagram.
+    const widest = Math.max(...fragments.map((f) => f.bbox[2] - f.bbox[0]));
+    let cursorY = 48;
+    let footer;
+    const startQuestionPage = (continued = false) => {
+      outputPage += 1;
+      doc.addPage();
+      doc.setFont('times', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(30, 30, 30);
+      const part = result.question.challenge?.subpartId ? `(${result.question.challenge.subpartId})` : '';
+      doc.text(`${questionIndex + 1}.  Question ${result.question.id}${part}  ·  ${result.question.marks} marks${continued ? ' (continued)' : ''}`, PAGE_MARGIN, 34);
+      cursorY = 48;
+      footer = { page: doc.getNumberOfPages(), number: outputPage, paper, url: source.url, sourcePages: [] };
+      pageFooters.push(footer);
+    };
+    startQuestionPage();
     for (const fragment of fragments) {
       const sourcePage = await source.document.getPage(fragment.page);
       const viewport = sourcePage.getViewport({ scale: 2 });
@@ -152,37 +176,37 @@ export async function createMiniPaperPdf(build, papers = []) {
         0, 0, cropCanvas.width, cropCanvas.height,
       );
 
-      outputPage += 1;
-      doc.addPage();
-      doc.setFont('times', 'bold');
-      doc.setFontSize(12);
-      doc.setTextColor(30, 30, 30);
-      const part = result.question.challenge?.subpartId ? `(${result.question.challenge.subpartId})` : '';
-      doc.text(`${questionIndex + 1}.  Question ${result.question.id}${part}  ·  ${result.question.marks} marks`, PAGE_MARGIN, 34);
-      const availableWidth = A4_WIDTH - PAGE_MARGIN * 2;
-      const availableHeight = A4_HEIGHT - 145;
-      const ratio = Math.min(availableWidth / cropCanvas.width, availableHeight / cropCanvas.height);
+      const ratio = Math.min(availableWidth / (widest * scaleX), availableHeight / cropCanvas.height);
       const imageWidth = cropCanvas.width * ratio;
       const imageHeight = cropCanvas.height * ratio;
-      doc.addImage(cropCanvas.toDataURL('image/jpeg', 0.94), 'JPEG', (A4_WIDTH - imageWidth) / 2, 48, imageWidth, imageHeight, undefined, 'FAST');
-
-      const footerY = A4_HEIGHT - 58;
-      doc.setDrawColor(195, 195, 195);
-      doc.line(PAGE_MARGIN, footerY - 13, A4_WIDTH - PAGE_MARGIN, footerY - 13);
-      doc.setFont('times', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(75, 75, 75);
-      doc.text(`${paper.n || 'School trial paper'} ${paper.y || ''} · original page ${fragment.page}`, PAGE_MARGIN, footerY);
-      doc.setTextColor(78, 121, 103);
-      doc.textWithLink('Open source paper', A4_WIDTH - PAGE_MARGIN - 92, footerY, { url: source.url });
-      doc.setFontSize(8);
-      doc.setTextColor(120, 120, 120);
-      doc.text(`${outputPage} / ${totalPages}`, A4_WIDTH - PAGE_MARGIN, A4_HEIGHT - 24, { align: 'right' });
+      if (cursorY > 48 && cursorY + imageHeight > 48 + availableHeight) startQuestionPage(true);
+      doc.addImage(cropCanvas.toDataURL('image/jpeg', 0.94), 'JPEG', PAGE_MARGIN, cursorY, imageWidth, imageHeight, undefined, 'FAST');
+      cursorY += imageHeight + 8;
+      if (!footer.sourcePages.includes(fragment.page)) footer.sourcePages.push(fragment.page);
       fullCanvas.width = 1;
       fullCanvas.height = 1;
       cropCanvas.width = 1;
       cropCanvas.height = 1;
     }
   }
+  for (const footer of pageFooters) {
+      doc.setPage(footer.page);
+      const footerY = A4_HEIGHT - 58;
+      doc.setDrawColor(195, 195, 195);
+      doc.line(PAGE_MARGIN, footerY - 13, A4_WIDTH - PAGE_MARGIN, footerY - 13);
+      doc.setFont('times', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(75, 75, 75);
+      const label = `${footer.paper.n || 'School paper'} · original page ${footer.sourcePages.join(', ')}`;
+      doc.text(doc.splitTextToSize(label, A4_WIDTH - PAGE_MARGIN * 2 - 110), PAGE_MARGIN, footerY);
+      doc.setTextColor(78, 121, 103);
+      doc.textWithLink('Open source paper', A4_WIDTH - PAGE_MARGIN - 92, footerY, { url: footer.url });
+      doc.setFontSize(8);
+      doc.setTextColor(120, 120, 120);
+      doc.text(`${footer.number} / ${outputPage}`, A4_WIDTH - PAGE_MARGIN, A4_HEIGHT - 24, { align: 'right' });
+  }
   doc.save(`${String(build.subject || 'practice-set').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-year-${build.level || ''}-practice-paper.pdf`);
+  } finally {
+    await Promise.all([...sources.values()].map((source) => source.document?.destroy()));
+  }
 }

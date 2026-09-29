@@ -15,7 +15,10 @@ const DIFFICULTIES = [
 export default function PracticeBuilder({
   subjects = [], mySubjects = [], papers = [], selectedLevel = 12, onLevelChange, onStart,
 }) {
-  const initialSubject = mySubjects.find((name) => subjects.includes(name)) || subjects[0] || '';
+  const requestedSubject = new URLSearchParams(window.location.search).get('builderSubject');
+  const initialSubject = (subjects.includes(requestedSubject) ? requestedSubject : null)
+    || mySubjects.find((name) => ['Maths Ext 1', 'Chemistry'].includes(name))
+    || (subjects.includes('Maths Ext 1') ? 'Maths Ext 1' : subjects[0]) || '';
   const [subject, setSubject] = useState(initialSubject);
   const [facets, setFacets] = useState(null);
   const [topics, setTopics] = useState([]);
@@ -24,7 +27,7 @@ export default function PracticeBuilder({
   const [targetMode, setTargetMode] = useState('time');
   const [targetValue, setTargetValue] = useState(30);
   const [preferSolutions, setPreferSolutions] = useState(true);
-  const [pdfOnly, setPdfOnly] = useState(false);
+  const [pdfOnly, setPdfOnly] = useState(true);
   const [generatedSet, setGeneratedSet] = useState(null);
   const [isLoadingTopics, setIsLoadingTopics] = useState(false);
   const [isBuilding, setIsBuilding] = useState(false);
@@ -45,14 +48,14 @@ export default function PracticeBuilder({
     setTopics([]);
     setGeneratedSet(null);
     setError('');
-    fetchPracticeBuilderFacets(subject, selectedLevel, { signal: controller.signal })
+    fetchPracticeBuilderFacets(subject, selectedLevel, { signal: controller.signal, pdfOnly })
       .then((payload) => setFacets(payload))
       .catch((requestError) => {
         if (requestError.name !== 'AbortError') setError(requestError.message || 'Available topics could not be loaded.');
       })
       .finally(() => { if (!controller.signal.aborted) setIsLoadingTopics(false); });
     return () => controller.abort();
-  }, [subject, selectedLevel]);
+  }, [subject, selectedLevel, pdfOnly]);
 
   const visibleTopics = useMemo(() => {
     const query = topicSearch.trim().toLowerCase();
@@ -113,7 +116,7 @@ export default function PracticeBuilder({
         <div>
           <div className="kick">A focused practice session</div>
           <h1>Build a mini-paper</h1>
-          <p className="dim">Choose what you want to practise. We’ll assemble real questions from cached Question Maps.</p>
+          <p className="dim">Choose your questions, build a practice test and download a printable paper.</p>
         </div>
         <Sparkles size={22} aria-hidden="true" />
       </div>
@@ -230,7 +233,7 @@ export default function PracticeBuilder({
             <input type="checkbox" checked={pdfOnly} onChange={(event) => { setPdfOnly(event.target.checked); setGeneratedSet(null); }} />
             Use only questions with verified PDF images
           </label>
-          <p className="dim">{facets?.pdfReadyQuestionCount || 0} questions have verified PDF images for this subject and year.</p>
+          <p className="dim">{facets?.pdfReadyQuestionCount || 0} reviewed questions and parts from {facets?.reviewedPaperCount || 0} papers are ready to print. Selecting a lettered part includes all its roman subsections.</p>
           <button type="button" className="btn btn-primary builder-build-button" onClick={() => build()} disabled={!canBuild}>
             {isBuilding ? <><RefreshCw size={15} className="spin" /> Building set…</> : generatedSet ? 'Regenerate set' : 'Build practice set'}
           </button>
@@ -289,8 +292,8 @@ export default function PracticeBuilder({
                     <span className="builder-question-index">{index + 1}</span>
                     <div className="builder-question-info">
                       <strong>{question.question?.id}{question.question?.challenge?.subpartId ? `(${question.question.challenge.subpartId})` : ''} · {question.question?.marks} marks</strong>
-                      <span>{String(question.paperName || '').replace(/\s+w\.?\s*sol(?:utions?)?/gi, '').trim()} {question.paperYear} · page {question.question?.page}</span>
-                      <span>{(question.question?.topics || []).join(' · ')}</span>
+                      <span>{String(question.paperName || '').replace(/\s+w\.?\s*sol(?:utions?)?/gi, '').trim()} · page {question.question?.page}</span>
+                      <span>{(question.question?.topics || []).join(' · ') || 'Topic not yet tagged — included when all topics are selected'}</span>
                       <span className="builder-crop-warning">{question.question?.pdfCrop ? 'PDF image verified' : 'PDF image unavailable'}</span>
                     </div>
                     <span className={`builder-difficulty is-${question.question?.challenge?.level}`}>{question.question?.challenge?.level}</span>

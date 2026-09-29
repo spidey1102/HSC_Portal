@@ -734,6 +734,7 @@ export default async function handler(req, res) {
         res.status(200).json(await getPracticeBuilderFacets({
           subject: requestUrl.searchParams.get('subject'),
           level: requestUrl.searchParams.get('level'),
+          pdfOnly: requestUrl.searchParams.get('pdfOnly') === '1',
         }));
         return;
       }

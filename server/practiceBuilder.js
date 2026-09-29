@@ -1,5 +1,23 @@
 import { collectCachedQuestionCandidates } from './cachedQuestionDiscovery.js';
 import { buildPracticeSet, normaliseBuilderOptions } from './practiceBuilderCore.js';
+import { reviewedPracticeCandidates, reviewedPracticePaperCount } from './reviewedPracticeCandidates.js';
+
+async function builderCandidates(options) {
+  const reviewed = reviewedPracticeCandidates(options);
+  if (options.pdfOnly) return reviewed;
+  // Reviewed papers remain usable even when the shared analysis service is down.
+  let cached;
+  try {
+    cached = await collectCachedQuestionCandidates(options);
+  } catch (error) {
+    if (!reviewed.length) throw error;
+    console.warn('[practice-builder] Shared question cache unavailable; using reviewed papers.');
+    return reviewed;
+  }
+  const byKey = new Map(cached.map((candidate) => [candidate.key, candidate]));
+  for (const candidate of reviewed) byKey.set(candidate.key, candidate);
+  return [...byKey.values()];
+}
 
 function validateSubject(subject) {
   const value = String(subject || '').trim();
@@ -37,16 +55,17 @@ function facetResponse(subject, level, candidates) {
     questionCount: candidates.length,
     markedQuestionCount,
     pdfReadyQuestionCount,
+    reviewedPaperCount: reviewedPracticePaperCount({ subject, level }),
     topics: [...topics.entries()].map(([name, count]) => ({ name, count }))
       .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name)),
     difficulty,
   };
 }
 
-export async function getPracticeBuilderFacets({ subject, level }) {
+export async function getPracticeBuilderFacets({ subject, level, pdfOnly = false }) {
   const safeSubject = validateSubject(subject);
   const safeLevel = validateLevel(level);
-  const candidates = await collectCachedQuestionCandidates({ subject: safeSubject, level: safeLevel, preferSubparts: true, requireIndexedPaper: true, groupRomanSubparts: true });
+  const candidates = await builderCandidates({ subject: safeSubject, level: safeLevel, pdfOnly, preferSubparts: true, requireIndexedPaper: true, groupRomanSubparts: true });
   return facetResponse(safeSubject, safeLevel, candidates);
 }
 
@@ -71,7 +90,8 @@ export async function createPracticeBuilderSet(body = {}) {
     throw new Error('Too many excluded questions.');
   }
   const options = normaliseBuilderOptions({ ...body, subject, level, target: { mode: target.mode, value: targetValue } });
-  const excludedCandidates = await collectCachedQuestionCandidates({
+  const excludedCandidates = await builderCandidates({
+    pdfOnly: options.pdfOnly,
     subject, level, topics: options.topics, difficulty: options.difficulty === 'mixed' ? 'any' : options.difficulty,
     excludeQuestionKeys: options.excludeQuestionKeys, requireMarks: true, requireIndexedPaper: true, groupRomanSubparts: true,
   });
@@ -79,7 +99,8 @@ export async function createPracticeBuilderSet(body = {}) {
   const tolerance = Math.max(2, Math.round(options.targetMarks * 0.1));
   if (options.excludeQuestionKeys.length
     && (!result.questions.length || result.summary.totalMarks < options.targetMarks - tolerance)) {
-    const fallbackCandidates = await collectCachedQuestionCandidates({
+    const fallbackCandidates = await builderCandidates({
+      pdfOnly: options.pdfOnly,
       subject, level, topics: options.topics, difficulty: options.difficulty === 'mixed' ? 'any' : options.difficulty,
       requireMarks: true, requireIndexedPaper: true, groupRomanSubparts: true,
     });
