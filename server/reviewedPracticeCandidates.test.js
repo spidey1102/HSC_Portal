@@ -83,7 +83,15 @@ test('Maths Ext 1 topic builds draw from the other reviewed school papers too', 
 
 test('builder selects lettered crops instead of whole large questions', () => {
   const selectable = practiceCandidatesWithSelectableParts(reviewed.candidates);
-  assert.ok(!selectable.some((item) => item.paperName === 'Blacktown Boys 2022' && item.question.id === '14'));
+  const screenshotQuestion = reviewed.candidates.filter((item) => item.paperName === 'Blacktown Boys 2022 w. sol' && item.question.id === '14');
+  assert.deepEqual(screenshotQuestion.filter((item) => item.question.pdfCrop.unitId !== 'whole').map((item) => item.question.pdfCrop.unitId), ['a', 'b', 'c']);
+  assert.ok(!selectable.some((item) => item.paperName === 'Blacktown Boys 2022 w. sol' && item.question.id === '14' && item.question.pdfCrop.unitId === 'whole'));
+
+  const selectedPart = buildPracticeSet(screenshotQuestion.filter((item) => item.question.pdfCrop.unitId !== 'whole'), {
+    subject: 'Maths Ext 1', level: 12, pdfOnly: true,
+    topics: ['Differential Equations'], target: { mode: 'marks', value: 5 },
+  });
+  assert.deepEqual(selectedPart.questions.map((item) => [item.question.pdfCrop.unitId, item.question.marks]), [['c', 5]]);
 
   const build = buildPracticeSet(reviewed.candidates, {
     subject: 'Maths Ext 1', level: 12, pdfOnly: true,
