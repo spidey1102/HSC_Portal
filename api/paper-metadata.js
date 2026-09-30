@@ -14,7 +14,7 @@ import {
   loadPaperRecord,
 } from '../server/paperSource.js';
 import { getCompletionRoute, isRetryableProviderStatus, userSafeProviderError } from '../openRouterRouting.js';
-import { createPracticeBuilderSet, getPracticeBuilderFacets } from '../server/practiceBuilder.js';
+import { createPracticeBuilderSet, getPracticeBuilderFacets, getPracticeBuilderSubjects } from '../server/practiceBuilder.js';
 
 // This route only claims a shared job and returns immediately. The separate worker
 // route owns the five-minute analysis allowance.
@@ -731,6 +731,13 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     try {
       if (req.method === 'GET') {
+        if (requestUrl.searchParams.get('subjectsOnly') === '1') {
+          res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+          res.status(200).json({ subjects: await getPracticeBuilderSubjects({
+            level: requestUrl.searchParams.get('level'),
+          }) });
+          return;
+        }
         res.status(200).json(await getPracticeBuilderFacets({
           subject: requestUrl.searchParams.get('subject'),
           level: requestUrl.searchParams.get('level'),

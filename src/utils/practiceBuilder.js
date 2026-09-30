@@ -14,8 +14,8 @@ export async function fetchPracticeBuilderFacets(subject, level, { signal, pdfOn
 }
 
 export async function fetchPracticeBuilderSubjects(level, { signal } = {}) {
-  const params = new URLSearchParams({ level: String(level) });
-  return readResponse(await fetch(`/api/practice-builder-subjects?${params}`, { signal }));
+  const params = new URLSearchParams({ practiceBuilder: '1', subjectsOnly: '1', level: String(level) });
+  return readResponse(await fetch(`/api/paper-metadata?${params}`, { signal }));
 }
 
 export async function generatePracticeSet(options, { signal } = {}) {
