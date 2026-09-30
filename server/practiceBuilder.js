@@ -2,6 +2,8 @@ import { cachedQuestionMapSubjects, collectCachedQuestionCandidates } from './ca
 import { buildPracticeSet, normaliseBuilderOptions, practiceCandidatesWithSelectableParts } from './practiceBuilderCore.js';
 import { reviewedPracticeCandidates, reviewedPracticePaperCount, reviewedPracticeSubjects } from './reviewedPracticeCandidates.js';
 
+const BUILDER_SUBJECTS = new Set(['Chemistry', 'Maths Ext 1']);
+
 async function builderCandidates(options) {
   const reviewed = reviewedPracticeCandidates(options);
   if (options.pdfOnly) return reviewed;
@@ -40,6 +42,7 @@ export async function getPracticeBuilderSubjects({ level } = {}) {
     console.warn('[practice-builder] Could not list shared question maps; using reviewed maps.', error?.message || error);
   }
   return [...new Set([...cachedSubjects, ...reviewedPracticeSubjects({ level: safeLevel })])]
+    .filter((subject) => BUILDER_SUBJECTS.has(subject))
     .sort((left, right) => left.localeCompare(right));
 }
 
