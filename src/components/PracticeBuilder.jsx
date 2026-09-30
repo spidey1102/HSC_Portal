@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Check, Download, RefreshCw, Sparkles } from 'lucide-react';
-import { fetchPracticeBuilderFacets, generatePracticeSet } from '../utils/practiceBuilder';
+import { fetchPracticeBuilderFacets, fetchPracticeBuilderSubjects, generatePracticeSet } from '../utils/practiceBuilder';
 import { extractQuestionKeys } from '../utils/topicQuestionQueue';
 
 const TIME_PRESETS = [10, 20, 30, 45, 60, 90];
@@ -20,6 +20,9 @@ export default function PracticeBuilder({
     || mySubjects.find((name) => ['Maths Ext 1', 'Chemistry'].includes(name))
     || (subjects.includes('Maths Ext 1') ? 'Maths Ext 1' : subjects[0]) || '';
   const [subject, setSubject] = useState(initialSubject);
+  const [mappedSubjects, setMappedSubjects] = useState([]);
+  const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
+  const [subjectListError, setSubjectListError] = useState('');
   const [facets, setFacets] = useState(null);
   const [topics, setTopics] = useState([]);
   const [topicSearch, setTopicSearch] = useState('');
@@ -35,13 +38,43 @@ export default function PracticeBuilder({
   const [error, setError] = useState('');
   const [exportError, setExportError] = useState('');
 
-  useEffect(() => {
-    if (!subjects.length) return;
-    if (!subjects.includes(subject)) setSubject(mySubjects.find((name) => subjects.includes(name)) || subjects[0]);
-  }, [subjects, mySubjects, subject]);
+  const builderSubjects = useMemo(
+    () => subjects.filter((name) => mappedSubjects.includes(name)),
+    [subjects, mappedSubjects],
+  );
 
   useEffect(() => {
-    if (!subject || ![11, 12].includes(Number(selectedLevel))) return undefined;
+    const controller = new AbortController();
+    setIsLoadingSubjects(true);
+    setSubjectListError('');
+    setFacets(null);
+    setTopics([]);
+    setGeneratedSet(null);
+    setIsLoadingTopics(false);
+    fetchPracticeBuilderSubjects(selectedLevel, { signal: controller.signal })
+      .then((payload) => setMappedSubjects(Array.isArray(payload.subjects) ? payload.subjects : []))
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError') {
+          setMappedSubjects([]);
+          setSubjectListError(requestError.message || 'Mapped subjects could not be loaded.');
+        }
+      })
+      .finally(() => { if (!controller.signal.aborted) setIsLoadingSubjects(false); });
+    return () => controller.abort();
+  }, [selectedLevel]);
+
+  useEffect(() => {
+    if (isLoadingSubjects || builderSubjects.includes(subject)) return;
+    const nextSubject = (builderSubjects.includes(requestedSubject) ? requestedSubject : null)
+      || mySubjects.find((name) => builderSubjects.includes(name))
+      || (builderSubjects.includes('Maths Ext 1') ? 'Maths Ext 1' : null)
+      || builderSubjects[0]
+      || '';
+    setSubject(nextSubject);
+  }, [isLoadingSubjects, builderSubjects, subject, mySubjects, requestedSubject]);
+
+  useEffect(() => {
+    if (isLoadingSubjects || !builderSubjects.includes(subject) || ![11, 12].includes(Number(selectedLevel))) return undefined;
     const controller = new AbortController();
     setIsLoadingTopics(true);
     setFacets(null);
@@ -55,7 +88,7 @@ export default function PracticeBuilder({
       })
       .finally(() => { if (!controller.signal.aborted) setIsLoadingTopics(false); });
     return () => controller.abort();
-  }, [subject, selectedLevel, pdfOnly]);
+  }, [subject, selectedLevel, pdfOnly, isLoadingSubjects, builderSubjects]);
 
   const visibleTopics = useMemo(() => {
     const query = topicSearch.trim().toLowerCase();
@@ -63,7 +96,7 @@ export default function PracticeBuilder({
   }, [facets, topicSearch]);
   const targetPresets = targetMode === 'time' ? TIME_PRESETS : MARK_PRESETS;
   const availableCount = facets?.markedQuestionCount;
-  const canBuild = Boolean(subject && facets && facets.markedQuestionCount > 0 && !isLoadingTopics && !isBuilding && Number(targetValue) > 0);
+  const canBuild = Boolean(builderSubjects.includes(subject) && facets && facets.markedQuestionCount > 0 && !isLoadingTopics && !isBuilding && Number(targetValue) > 0);
   const pdfReady = Boolean(generatedSet?.questions?.length && generatedSet.questions.every((entry) => entry.question?.pdfCrop));
   const unverifiedCount = generatedSet?.questions?.filter((entry) => !entry.question?.pdfCrop).length || 0;
 
@@ -125,9 +158,15 @@ export default function PracticeBuilder({
         <section className="card builder-filters" aria-label="Practice set filters">
           <div className="builder-field">
             <label htmlFor="builder-subject">Subject</label>
-            <select id="builder-subject" className="input" value={subject} onChange={(event) => setSubject(event.target.value)}>
-              {subjects.map((name) => <option key={name} value={name}>{name}</option>)}
+            <select id="builder-subject" className="input" value={builderSubjects.includes(subject) ? subject : ''}
+              onChange={(event) => setSubject(event.target.value)} disabled={isLoadingSubjects || !builderSubjects.length}>
+              <option value="" disabled>{isLoadingSubjects ? 'Loading mapped subjects…' : 'Choose a subject'}</option>
+              {builderSubjects.map((name) => <option key={name} value={name}>{name}</option>)}
             </select>
+            {!isLoadingSubjects && subjectListError && <p className="builder-error" role="alert">{subjectListError}</p>}
+            {!isLoadingSubjects && !subjectListError && !builderSubjects.length && (
+              <p className="dim">No subjects with a Question Map are available for Year {selectedLevel} yet.</p>
+            )}
           </div>
 
           <fieldset className="builder-field builder-level">

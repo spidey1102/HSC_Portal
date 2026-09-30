@@ -15,6 +15,7 @@ const STOP_WORDS = new Set([
 ]);
 
 let paperIndexCache = null;
+const questionMapSubjectsCache = new Map();
 
 function normaliseText(value) {
   return String(value || '')
@@ -120,6 +121,34 @@ function practiceSubparts(subparts) {
       topics: [...new Set(group.flatMap((part) => Array.isArray(part?.topics) ? part.topics : []))],
     };
   });
+}
+
+export async function cachedQuestionMapSubjects({ level } = {}) {
+  const requestedLevel = Number(level);
+  const wantedLevel = [11, 12].includes(requestedLevel) ? requestedLevel : null;
+  const cacheKey = wantedLevel || 'all';
+  const cached = questionMapSubjectsCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.subjects;
+
+  const sql = getSupabaseSql();
+  const index = loadPaperIndex();
+  const rows = await sql`
+    select paper_key
+    from public.paper_metadata
+    where status = 'ready'
+      and jsonb_array_length(questions) > 0
+  `;
+  const subjects = new Set();
+  for (const row of rows) {
+    const paper = parsePaperIdentity(row.paper_key);
+    if (!paper || !index.paperIdentities.has(paper.paperIdentity)) continue;
+    if (wantedLevel && paper.l !== wantedLevel) continue;
+    const subject = String(index.subjects[paper.s] || '').trim();
+    if (subject) subjects.add(subject);
+  }
+  const result = [...subjects].sort((left, right) => left.localeCompare(right));
+  questionMapSubjectsCache.set(cacheKey, { subjects: result, expiresAt: Date.now() + 60_000 });
+  return result;
 }
 
 function randomiseEqualScores(candidates) {

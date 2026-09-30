@@ -1,6 +1,6 @@
-import { collectCachedQuestionCandidates } from './cachedQuestionDiscovery.js';
+import { cachedQuestionMapSubjects, collectCachedQuestionCandidates } from './cachedQuestionDiscovery.js';
 import { buildPracticeSet, normaliseBuilderOptions, practiceCandidatesWithSelectableParts } from './practiceBuilderCore.js';
-import { reviewedPracticeCandidates, reviewedPracticePaperCount } from './reviewedPracticeCandidates.js';
+import { reviewedPracticeCandidates, reviewedPracticePaperCount, reviewedPracticeSubjects } from './reviewedPracticeCandidates.js';
 
 async function builderCandidates(options) {
   const reviewed = reviewedPracticeCandidates(options);
@@ -29,6 +29,18 @@ function validateLevel(level) {
   const value = Number(level);
   if (![11, 12].includes(value)) throw new Error('Year level must be 11 or 12.');
   return value;
+}
+
+export async function getPracticeBuilderSubjects({ level } = {}) {
+  const safeLevel = validateLevel(level);
+  let cachedSubjects = [];
+  try {
+    cachedSubjects = await cachedQuestionMapSubjects({ level: safeLevel });
+  } catch (error) {
+    console.warn('[practice-builder] Could not list shared question maps; using reviewed maps.', error?.message || error);
+  }
+  return [...new Set([...cachedSubjects, ...reviewedPracticeSubjects({ level: safeLevel })])]
+    .sort((left, right) => left.localeCompare(right));
 }
 
 function facetResponse(subject, level, candidates) {
