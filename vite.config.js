@@ -9,7 +9,7 @@ import paperContextHandler from './api/agent/paper-context.js'
 import { handleAgentChatRequest } from './agentChatHandler.js'
 import paperMetadataHandler from './api/paper-metadata.js'
 import paperMetadataWorkerHandler from './api/paper-metadata/worker.js'
-import accountsHandler from './api/accounts/[resource].js'
+import accountsHandler from './api/accounts.js'
 import dailyPostsHandler from './api/daily-posts.js'
 
 // https://vite.dev/config/

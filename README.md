@@ -80,7 +80,7 @@ Server setup (local `.env` or Vercel environment variables; never use `VITE_` pr
 
 The account panel does not require `VITE_DAILY_QUESTIONS_ENABLED`. Local Vite routes support the owner identity lookup and account API. Deploy the updated application after setting the server variables. Source-access failures appear as errors or warnings, not fabricated empty accounts.
 
-The account directory (`/api/accounts/users`) and per-user study sync (`/api/accounts/data`) share the single dynamic Vercel function `api/accounts/[resource].js`. Their implementation modules live under `server/`, not `api/`, so they are not deployed as additional functions. This keeps the current deployment at the Vercel Hobby limit of 12 serverless functions without removing either feature. New `api/` entry points require further consolidation or a plan that permits more functions.
+The account directory (`/api/accounts/users`) and per-user study sync (`/api/accounts/data`) share the single Vercel function `api/accounts.js`. Explicit rewrites in `vercel.json` send those public paths to the function with a `resource` parameter before the frontend fallback. Do not rely on bracket-style dynamic filenames for this Vite deployment. The implementation modules live under `server/`, not `api/`, so they are not deployed as additional functions. This keeps the current deployment at the Vercel Hobby limit of 12 serverless functions without removing either feature. New `api/` entry points require further consolidation or a plan that permits more functions.
 
 
 ---

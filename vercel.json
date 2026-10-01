@@ -29,6 +29,14 @@
   ],
   "rewrites": [
     {
+      "source": "/api/accounts/users",
+      "destination": "/api/accounts?resource=users"
+    },
+    {
+      "source": "/api/accounts/data",
+      "destination": "/api/accounts?resource=data"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
