@@ -123,7 +123,7 @@ async function contributorRoles(users) {
   const sql = getSupabaseSql();
   const rows = await sql`
     select firebase_uid, active from public.daily_contributors
-    where firebase_uid = any(${sql.array(lookup)})
+    where firebase_uid in ${sql(lookup)}
   `;
   for (const row of rows) if (row.active) roleByUid.set(row.firebase_uid, 'poster');
   return roleByUid;
