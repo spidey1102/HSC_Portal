@@ -186,6 +186,10 @@ export async function listAdminUsers({ pageToken = undefined } = {}) {
   try {
     roles = await contributorRoles(page.users);
   } catch (error) {
+    console.error('[admin-users] contributor role lookup failed', {
+      code: error?.code || null,
+      message: String(error?.message || 'Unknown database error').slice(0, 240),
+    });
     const missingDatabaseUrl = /DATABASE_URL must be configured/i.test(String(error?.message || ''));
     throw new AdminUsersError(missingDatabaseUrl ? 503 : 500, 'Account role information could not be loaded.');
   }
