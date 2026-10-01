@@ -1,7 +1,5 @@
-import { requireAuthenticatedUser } from '../server/firebaseAdmin.js';
-import { getUserData, saveUserData } from '../server/portalStorage.js';
-
-export const maxDuration = 30;
+import { requireAuthenticatedUser } from './firebaseAdmin.js';
+import { getUserData, saveUserData } from './portalStorage.js';
 
 function sendJson(res, status, payload) {
   res.statusCode = status;

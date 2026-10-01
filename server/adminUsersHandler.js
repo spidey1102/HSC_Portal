@@ -1,8 +1,6 @@
-import { requireAuthenticatedUser } from '../server/firebaseAdmin.js';
-import { isOwner } from '../server/dailyPosts.js';
-import { AdminUsersError, getAdminUserDetail, listAdminUsers } from '../server/adminUsers.js';
-
-export const maxDuration = 30;
+import { requireAuthenticatedUser } from './firebaseAdmin.js';
+import { isOwner } from './dailyPosts.js';
+import { AdminUsersError, getAdminUserDetail, listAdminUsers } from './adminUsers.js';
 
 function sendJson(res, status, payload) {
   res.statusCode = status;

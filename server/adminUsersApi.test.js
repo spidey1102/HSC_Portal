@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAdminUsersHandler } from '../api/admin-users.js';
+import { createAdminUsersHandler } from './adminUsersHandler.js';
 
 function responseRecorder() {
   return {

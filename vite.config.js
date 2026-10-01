@@ -9,8 +9,7 @@ import paperContextHandler from './api/agent/paper-context.js'
 import { handleAgentChatRequest } from './agentChatHandler.js'
 import paperMetadataHandler from './api/paper-metadata.js'
 import paperMetadataWorkerHandler from './api/paper-metadata/worker.js'
-import userDataHandler from './api/user-data.js'
-import adminUsersHandler from './api/admin-users.js'
+import accountsHandler from './api/accounts/[resource].js'
 import dailyPostsHandler from './api/daily-posts.js'
 
 // https://vite.dev/config/
@@ -116,12 +115,8 @@ export default defineConfig(({ mode }) => {
             await paperMetadataHandler(req, res)
           })
 
-          server.middlewares.use('/api/user-data', async (req, res) => {
-            await userDataHandler(req, res)
-          })
-
-          server.middlewares.use('/api/admin-users', async (req, res) => {
-            await adminUsersHandler(req, res)
+          server.middlewares.use('/api/accounts', async (req, res) => {
+            await accountsHandler(req, res)
           })
 
           server.middlewares.use('/api/daily-posts', async (req, res) => {

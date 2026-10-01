@@ -1,7 +1,7 @@
 import { getApp } from 'firebase/app';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 
-const USER_DATA_ENDPOINT = '/api/user-data';
+const USER_DATA_ENDPOINT = '/api/accounts/data';
 const LEGACY_CHECK_KEY = '_legacyFirestoreChecked';
 const STUDY_FIELDS = [
   'bookmarks', 'assessments', 'appearance', 'selectedSubject', 'selectedLevel',

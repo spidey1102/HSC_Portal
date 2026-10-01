@@ -9,7 +9,7 @@ async function request(user, query, signal) {
   const token = await user.getIdToken();
   if (signal?.aborted) throw abortError();
 
-  const response = await fetch(`/api/admin-users?${query}`, {
+  const response = await fetch(`/api/accounts/users?${query}`, {
     method: 'GET',
     cache: 'no-store',
     signal,
