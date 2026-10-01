@@ -65,6 +65,22 @@ npm start
 
 1. Just Run
 
+### Owner account directory
+
+The owner-only **Admin → Users** tab lists registered Firebase Authentication accounts, including email, UID, profile fields, account status, sign-in providers, creation/sign-in/refresh metadata, custom claims, and multi-factor enrollment metadata. Select an account to inspect its complete synced study data, legacy Firestore `users/{uid}` document, daily-contributor record, submitted answers, and authored daily posts. Directory pages and activity pages contain up to 50 records; use **Load more** to inspect the remaining records. Search applies to accounts already loaded.
+
+Access is read-only and enforced on every `/api/admin-users` request using the existing `DAILY_POST_OWNER_UIDS` server allowlist. Trusted posters and students cannot access this directory. Password hashes, salts, authentication tokens, and secret-bearing custom-claim fields are excluded. Browser-only data that has never been synced cannot be inspected remotely. Missing records and unavailable sources are reported separately.
+
+Server setup (local `.env` or Vercel environment variables; never use `VITE_` prefixes):
+
+- `FIREBASE_SERVICE_ACCOUNT_JSON`: a Firebase service-account JSON object for the project in `firebase-applet-config.json`, with permission to list/read Authentication users and read the legacy Firestore user documents. Alternatively, configure Google Application Default Credentials for that same project. Keep the private key server-only.
+- `FIREBASE_FIRESTORE_DATABASE_ID`: the Firestore database containing the legacy user documents; leave empty for `(default)`.
+- `DATABASE_URL`: the existing Supabase Postgres connection, with the portal storage and daily-question migrations applied.
+- `DAILY_POST_OWNER_UIDS`: the owner's Firebase UID, or comma-separated owner UIDs.
+
+The account panel does not require `VITE_DAILY_QUESTIONS_ENABLED`. Local Vite routes support the owner identity lookup and account API. Deploy the updated application after setting the server variables. Source-access failures appear as errors or warnings, not fabricated empty accounts.
+
+
 ---
 
 ## Folder Structure

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, Check, ChevronDown, CircleAlert, Database, FileSearch, LockKeyhole, Play, Search, ShieldCheck, Square, X } from 'lucide-react';
+import { Activity, Check, ChevronDown, CircleAlert, Database, FileSearch, LockKeyhole, Play, Search, ShieldCheck, Square, Users, X } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { getDaily } from '../utils/dailyApi';
 import { analysePaperMetadata, getPaperMetadata } from '../utils/paperMetadata';
 import { getPaperIdentity } from '../utils/paperIdentity';
 import { normalisePaperCategories } from '../utils/normalisePaperCategory';
+import AdminUsersPanel from './AdminUsersPanel';
 import './OwnerAdminPanel.css';
 
 const PAGE_SIZE = 50;
@@ -25,6 +26,7 @@ export default function OwnerAdminPanel() {
   const [role, setRole] = useState(null);
   const [roleChecked, setRoleChecked] = useState(false);
   const [open, setOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('papers');
   const [papers, setPapers] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [schools, setSchools] = useState([]);
@@ -221,19 +223,24 @@ export default function OwnerAdminPanel() {
             <div>
               <span className="owner-admin-eyebrow"><LockKeyhole size={13} /> Owner access</span>
               <h1 id="owner-admin-title">Admin workspace</h1>
-              <p>Manage the paper library and build its shared question maps.</p>
+              <p>Inspect registered accounts and manage the paper library and shared question maps.</p>
             </div>
             <button type="button" className="owner-admin-close" onClick={() => setOpen(false)} disabled={running} aria-label="Close admin panel"><X size={19} /></button>
           </header>
 
-          <div className="owner-admin-stats">
+          <nav className="owner-admin-tabs" role="tablist" aria-label="Admin sections">
+            <button type="button" role="tab" id="owner-admin-tab-papers" aria-selected={activeTab === 'papers'} aria-controls="owner-admin-panel-papers" className={activeTab === 'papers' ? 'is-active' : ''} onClick={() => setActiveTab('papers')}><FileSearch size={15} /> Papers</button>
+            <button type="button" role="tab" id="owner-admin-tab-users" aria-selected={activeTab === 'users'} aria-controls="owner-admin-panel-users" className={activeTab === 'users' ? 'is-active' : ''} onClick={() => setActiveTab('users')}><Users size={15} /> Users</button>
+          </nav>
+
+          <div className="owner-admin-stats" hidden={activeTab !== 'papers'}>
             <div><Database size={17} /><span><strong>{papers.length.toLocaleString()}</strong><small>Library papers</small></span></div>
             <div><FileSearch size={17} /><span><strong>{pdfPapers.length.toLocaleString()}</strong><small>With PDF sources</small></span></div>
             <div><Check size={17} /><span><strong>{selected.size}</strong><small>Selected · max {MAX_BATCH_SIZE}</small></span></div>
             <div><Activity size={17} /><span><strong>{completedCount}{failedCount ? ` / ${failedCount} failed` : ''}</strong><small>Batch progress</small></span></div>
           </div>
 
-          <div className="owner-admin-workspace">
+          <div className="owner-admin-workspace owner-admin-tab-panel" id="owner-admin-panel-papers" role="tabpanel" aria-labelledby="owner-admin-tab-papers" hidden={activeTab !== 'papers'}>
             <div className="owner-admin-library">
               <div className="owner-admin-tools">
                 <label className="owner-admin-search"><Search size={16} /><input value={search} onChange={(event) => { setSearch(event.target.value); setVisibleCount(PAGE_SIZE); }} placeholder="Search papers, schools or subjects" /></label>
@@ -277,6 +284,9 @@ export default function OwnerAdminPanel() {
               <div className="owner-admin-run-foot">Signed in as {user.displayName || user.email || 'owner'} · Owner</div>
             </aside>
           </div>
+          {activeTab === 'users' && <div className="owner-admin-tab-panel owner-admin-users-panel" id="owner-admin-panel-users" role="tabpanel" aria-labelledby="owner-admin-tab-users">
+            <AdminUsersPanel key={user.uid} user={user} />
+          </div>}
         </section>
       </div>}
     </>

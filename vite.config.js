@@ -10,10 +10,16 @@ import { handleAgentChatRequest } from './agentChatHandler.js'
 import paperMetadataHandler from './api/paper-metadata.js'
 import paperMetadataWorkerHandler from './api/paper-metadata/worker.js'
 import userDataHandler from './api/user-data.js'
+import adminUsersHandler from './api/admin-users.js'
+import dailyPostsHandler from './api/daily-posts.js'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  // Server-only routes read credentials from process.env, including during local development.
+  for (const [key, value] of Object.entries(env)) {
+    if (process.env[key] === undefined) process.env[key] = value
+  }
 
   return {
     server: {
@@ -112,6 +118,15 @@ export default defineConfig(({ mode }) => {
 
           server.middlewares.use('/api/user-data', async (req, res) => {
             await userDataHandler(req, res)
+          })
+
+          server.middlewares.use('/api/admin-users', async (req, res) => {
+            await adminUsersHandler(req, res)
+          })
+
+          server.middlewares.use('/api/daily-posts', async (req, res) => {
+            req.query = Object.fromEntries(new URL(req.url, 'http://localhost').searchParams)
+            await dailyPostsHandler(req, res)
           })
         },
       },
