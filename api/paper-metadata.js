@@ -245,13 +245,19 @@ const MIN_SUBSTANTIVE_QUESTION_RANGE = 4;
 function questionRangeFromPaperText(paperText) {
   const questionIds = new Set();
   const text = String(paperText || '');
-  const rangePattern = /\b(?:attempt|answer|complete)\s+(?:all\s+)?questions?\s+(\d{1,3})\s*(?:-|–|to)\s*(\d{1,3})\b/gi;
+  const rangePattern = /\b(?:attempt|answer|complete)\b[^.\r\n]{0,120}?\bquestions?\s+(\d{1,3})\s*(?:[-‐‑‒–—―−?\uFFFD]|to)\s*(\d{1,3})\b/gi;
 
   for (const match of text.matchAll(rangePattern)) {
     const first = Number(match[1]);
     const last = Number(match[2]);
     if (!Number.isInteger(first) || !Number.isInteger(last) || first < 1 || last < first || last - first > 100) continue;
     for (let question = first; question <= last; question += 1) questionIds.add(question);
+  }
+
+  const singlePattern = /\b(?:attempt|answer|complete)\b[^.\r\n]{0,80}?\bquestions?\s+(\d{1,3})\b/gi;
+  for (const match of text.matchAll(singlePattern)) {
+    const question = Number(match[1]);
+    if (Number.isInteger(question) && question >= 1 && question <= 250) questionIds.add(question);
   }
 
   return [...questionIds].sort((left, right) => left - right);
@@ -386,6 +392,7 @@ function buildAnalysisPrompt(paper, paperText) {
 
   return [
     'You extract the structure of NSW HSC past papers. Return JSON only, with no markdown or commentary.',
+    'Completeness: include every question in every section, including every alternate offered when the student must choose only some. Include separate Paper 2/elective booklets. If booklets reuse question numbers, distinguish their ids, for example "1 (Paper 1)" and "1 (Paper 2)".',
     'Identify each top-level numbered question exactly once. For each, extract its printed marks where reliably stated, its PDF page number, every explicit direct subpart (such as a, b, c or i, ii) in printed order, each subpart’s own marks and page where reliably stated, and a compact challenge classification. For every extracted direct subpart, provide its own zero to three concise syllabus-aligned topics, short assessed skill, and printed commandVerb where clear; these must describe that exact part rather than copying the parent question’s broad labels. Preserve a subpart even when its marks are not printed, provided its label is explicit.',
     coverageInstruction,
     'Classify the question itself, not the student. Use challenge.level "routine" for ordinary single-step practice, "challenging" when careful application or more than one step is required, and "stretch" only when the question is unusually difficult, non-routine, or deliberately unfamiliar for this course.',
@@ -909,6 +916,7 @@ export default async function handler(req, res) {
 }
 
 export {
+  buildAnalysisPrompt,
   isObviouslyIncompleteCachedAnalysis,
   metadataDocumentId,
   normaliseAnalysis,
