@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { adminActivityPage, publicAdminAccount } from './adminUsers.js';
+import { adminActivityPage, firebaseAccountReadError, publicAdminAccount } from './adminUsers.js';
 
 test('admin account serialization allowlists identity fields and excludes credentials', () => {
   const account = publicAdminAccount({
@@ -38,4 +38,30 @@ test('activity pagination returns at most 50 rows and signals another page only 
   const last = adminActivityPage(rows.slice(0, 50), 50);
   assert.equal(last.items.length, 50);
   assert.equal(last.nextOffset, null);
+});
+
+test('Firebase credential and permission failures are service failures, not owner-access denials', () => {
+  for (const code of ['app/invalid-credential', 'auth/invalid-credential', 'auth/insufficient-permission']) {
+    const error = firebaseAccountReadError({ code, message: 'private-key-must-not-leak' }, 'Read failed.');
+    assert.equal(error.status, 503);
+    assert.equal(error.firebaseCode, code);
+    assert.equal(error.message.includes('private-key-must-not-leak'), false);
+  }
+});
+
+test('invalid Firebase pagination is a client error and retains its safe error code', () => {
+  const error = firebaseAccountReadError({ code: 'auth/invalid-page-token' }, 'Read failed.');
+  assert.equal(error.status, 400);
+  assert.equal(error.firebaseCode, 'auth/invalid-page-token');
+});
+
+test('unrecognized Firebase failures never expose raw upstream messages or arbitrary codes', () => {
+  const error = firebaseAccountReadError({
+    code: 'auth/internal-error private-key-must-not-leak',
+    message: 'postgres://private-password@database.example',
+  }, 'Read failed.');
+  assert.equal(error.status, 500);
+  assert.equal(error.firebaseCode, 'unknown');
+  assert.equal(error.message.includes('private-key-must-not-leak'), false);
+  assert.equal(error.message.includes('private-password'), false);
 });

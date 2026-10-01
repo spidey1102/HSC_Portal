@@ -86,7 +86,8 @@ export function createAdminUsersHandler({
     } catch (error) {
       const status = error instanceof AdminUsersError ? error.status : 500;
       const message = error instanceof AdminUsersError ? error.message : 'Account inspection could not be completed.';
-      sendJson(res, status, { error: message });
+      const firebaseCode = error instanceof AdminUsersError ? error.firebaseCode : undefined;
+      sendJson(res, status, { error: message, ...(firebaseCode ? { firebaseCode } : {}) });
     }
   };
 }

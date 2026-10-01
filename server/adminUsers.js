@@ -46,7 +46,7 @@ function firebaseAdminApp() {
     return existing;
   }
   try {
-    return initializeApp({ credential, projectId: expectedProjectId }, ADMIN_APP_NAME);
+    return initializeApp({ projectId: expectedProjectId, ...(credential ? { credential } : {}) }, ADMIN_APP_NAME);
   } catch {
     throw new AdminUsersError(503, 'Account inspection is not configured.');
   }
@@ -153,9 +153,25 @@ async function readPage(sql, table, uid, offset) {
   return adminActivityPage(rows, offset);
 }
 
-function firebaseConfigurationError(error) {
-  return error?.code === 'app/invalid-credential'
-    || /default credentials|failed to determine project id/i.test(String(error?.message || ''));
+export function firebaseAccountReadError(error, fallbackMessage) {
+  const code = typeof error?.code === 'string' && /^(?:auth|app)\/[a-z-]{1,64}$/.test(error.code)
+    ? error.code : 'unknown';
+  let status = 500;
+  let message = fallbackMessage;
+  if (['app/invalid-credential', 'auth/invalid-credential'].includes(code)
+    || /default credentials|failed to determine project id/i.test(String(error?.message || ''))) {
+    status = 503;
+    message = 'Firebase Admin credentials are unavailable or invalid. Configure FIREBASE_SERVICE_ACCOUNT_JSON for the portal Firebase project in the server environment.';
+  } else if (code === 'auth/insufficient-permission') {
+    status = 503;
+    message = 'Firebase denied account access. Grant the server service account Firebase Authentication Viewer (roles/firebaseauth.viewer) in the portal Firebase project.';
+  } else if (code === 'auth/invalid-page-token') {
+    status = 400;
+    message = 'The account page token is invalid. Refresh the account directory.';
+  }
+  const result = new AdminUsersError(status, `${message} Firebase error: ${code}.`);
+  result.firebaseCode = code;
+  return result;
 }
 
 export async function listAdminUsers({ pageToken = undefined } = {}) {
@@ -164,8 +180,7 @@ export async function listAdminUsers({ pageToken = undefined } = {}) {
   try {
     page = await auth.listUsers(PAGE_SIZE, pageToken);
   } catch (error) {
-    if (firebaseConfigurationError(error)) throw new AdminUsersError(503, 'Account inspection is not configured.');
-    throw new AdminUsersError(500, 'Accounts could not be loaded.');
+    throw firebaseAccountReadError(error, 'Accounts could not be loaded.');
   }
   let roles = new Map();
   try {
@@ -187,8 +202,7 @@ export async function getAdminUserDetail(uid, section = null, offset = 0) {
     user = await auth.getUser(uid);
   } catch (error) {
     if (error?.code === 'auth/user-not-found') throw new AdminUsersError(404, 'Account not found.');
-    if (firebaseConfigurationError(error)) throw new AdminUsersError(503, 'Account inspection is not configured.');
-    throw new AdminUsersError(500, 'Account details could not be loaded.');
+    throw firebaseAccountReadError(error, 'Account details could not be loaded.');
   }
   const warnings = [];
 
