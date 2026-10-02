@@ -3,7 +3,6 @@ import UserButton from './UserButton';
 import WhatsNewDialog from './WhatsNewDialog';
 import { getPlatformShortcuts } from '../utils/platformShortcuts';
 import { TEXTBOOKS_ENABLED } from '../config/featureFlags';
-import { NSW_MATHS_BOOKING_URL } from './NswMathsEventsBanner';
 import { useState } from 'react';
 
 export const PORTAL_SECTIONS = [
@@ -26,7 +25,6 @@ export default function PortalMasthead({
   runhead,
   onOpenPalette,
   onOpenCustomise,
-  showEventsButton = false,
   showActions = true,
 }) {
   const shortcuts = getPlatformShortcuts();
@@ -98,16 +96,6 @@ export default function PortalMasthead({
             {entry.label}
           </button>
         ))}
-        {showEventsButton && (
-          <a
-            className="nsw-maths-events-nav-link"
-            href={NSW_MATHS_BOOKING_URL}
-            target="_blank"
-            rel="noreferrer"
-          >
-            NSW Maths events
-          </a>
-        )}
       </nav>
     </header>
   );
